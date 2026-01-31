@@ -171,7 +171,12 @@ async def chat_completions(request: Request):
                                             result_queue.put(None)
                                             return
                                         
-                                        # logger.info(f"[sse_stream] RAW 原始chunk: {data_str[:300]}")
+                                        logger.info(f"[sse_stream] RAW 原始chunk: {data_str[:300]}")
+                                        print(f"[DEBUG] RAW: {data_str[:300]}", flush=True)
+                                        
+                                        # 写入原始 chunk 到日志文件
+                                        with open("/tmp/ds2api_debug.log", "a") as f:
+                                            f.write(f"[MAIN] chunk_path={chunk.get('p', '')}, v_type={type(chunk.get('v')).__name__}, chunk={str(chunk)[:300]}\n")
                                         
                                         if "v" in chunk:
                                             v_value = chunk["v"]
@@ -180,6 +185,23 @@ async def chat_completions(request: Request):
                                             
                                             if chunk_path == "response/search_status":
                                                 continue
+                                            
+                                            # 跳过所有状态相关的 chunk（不是内容）
+                                            # 注意：response/status 是真正的结束信号，需要特殊处理（后面的代码会处理）
+                                            # 但 response/fragments/-1/status 等需要跳过
+                                            skip_patterns = [
+                                                "quasi_status", "elapsed_secs", "token_usage", 
+                                                "pending_fragment", "conversation_mode",
+                                                "fragments/-1/status", "fragments/-2/status"  # 搜索片段状态
+                                            ]
+                                            if any(kw in chunk_path for kw in skip_patterns):
+                                                continue
+                                            
+                                            # 检查是否是真正的响应结束信号
+                                            if chunk_path == "response/status" and isinstance(v_value, str) and v_value == "FINISHED":
+                                                result_queue.put({"choices": [{"index": 0, "finish_reason": "stop"}]})
+                                                result_queue.put(None)
+                                                return
                                             
                                             # 检测是否开始正式回复
                                             # 只有当 fragments 包含 RESPONSE 类型时才认为开始正式回复
@@ -207,10 +229,12 @@ async def chat_completions(request: Request):
                                                 else:
                                                     ptype = "text"
                                             
-                                            # logger.info(f"[sse_stream] ptype={ptype}, response_started={response_started}, chunk_path='{chunk_path}', v_type={type(v_value).__name__}, v={str(v_value)[:50]}")
+                                            logger.info(f"[sse_stream] ptype={ptype}, response_started={response_started}, chunk_path='{chunk_path}', v_type={type(v_value).__name__}, v={str(v_value)[:100]}")
                                             if isinstance(v_value, str):
                                                 # 检查是否是 FINISHED 状态
-                                                if v_value == "FINISHED":
+                                                # 只有当 chunk_path 为空或为 "status" 时才认为是真正的结束
+                                                # 搜索模型会发送 "response/fragments/-1/status": "FINISHED" 表示搜索片段完成，不是响应结束
+                                                if v_value == "FINISHED" and (not chunk_path or chunk_path == "status"):
                                                     result_queue.put({"choices": [{"index": 0, "finish_reason": "stop"}]})
                                                     result_queue.put(None)
                                                     return
@@ -227,21 +251,51 @@ async def chat_completions(request: Request):
                                                         if not isinstance(item, dict):
                                                             continue
                                                         
-                                                        # 检查是否是 FINISHED 状态
-                                                        if item.get("p") == "status" and item.get("v") == "FINISHED":
-                                                            return None  # 信号结束
-                                                        
                                                         item_p = item.get("p", "")
                                                         item_v = item.get("v")
+                                                        
+                                                        # 写入调试日志 - 显示完整的 item
+                                                        with open("/tmp/ds2api_debug.log", "a") as f:
+                                                            f.write(f"[extract] full_item={str(item)[:200]}\n")
+                                                        
+                                                        # 跳过搜索结果项（包含 url/title/snippet 的项目）
+                                                        if "url" in item and "title" in item:
+                                                            continue
+                                                        
+                                                        # 跳过 quasi_status（搜索完成信号，不是响应完成）
+                                                        if item_p == "quasi_status":
+                                                            continue
+                                                        
+                                                        # 跳过 accumulated_token_usage 和 has_pending_fragment
+                                                        if item_p in ("accumulated_token_usage", "has_pending_fragment"):
+                                                            continue
+                                                        
+                                                        # 只有当 p="status" (精确匹配) 且 v="FINISHED" 才认为是真正结束
+                                                        if item_p == "status" and item_v == "FINISHED":
+                                                            return None  # 信号结束
                                                         
                                                         # 跳过搜索状态
                                                         if item_p == "response/search_status":
                                                             continue
                                                         
-                                                        # 确定类型
+                                                        # 直接处理包含 content 和 type 的项 (例如 {'id': 2, 'type': 'RESPONSE', 'content': '...'})
+                                                        if "content" in item and "type" in item:
+                                                            inner_type = item.get("type", "").upper()
+                                                            if inner_type == "THINK" or inner_type == "THINKING":
+                                                                final_type = "thinking"
+                                                            elif inner_type == "RESPONSE":
+                                                                final_type = "text"
+                                                            else:
+                                                                final_type = default_type
+                                                            content = item.get("content", "")
+                                                            if content:
+                                                                extracted.append((content, final_type))
+                                                            continue
+                                                        
+                                                        # 确定类型（基于 p 字段）
                                                         if "thinking" in item_p:
                                                             content_type = "thinking"
-                                                        elif "content" in item_p or item_p == "response":
+                                                        elif "content" in item_p or item_p == "response" or item_p == "fragments":
                                                             content_type = "text"
                                                         else:
                                                             content_type = default_type
@@ -256,7 +310,6 @@ async def chat_completions(request: Request):
                                                                 if isinstance(inner, dict):
                                                                     # 检查内层的 type 字段
                                                                     inner_type = inner.get("type", "").upper()
-                                                                    # logger.info(f"[sse_stream] 内层 type={inner_type}, content={str(inner.get('content', ''))[:50]}")
                                                                     # DeepSeek 使用 THINK 而不是 THINKING
                                                                     if inner_type == "THINK" or inner_type == "THINKING":
                                                                         final_type = "thinking"
@@ -396,7 +449,8 @@ async def chat_completions(request: Request):
                                 if ctype == "thinking":
                                     if thinking_enabled:
                                         final_thinking += ctext
-                                elif ctype == "text":
+                                else:
+                                    # 非 thinking 内容都作为普通文本处理（包括 ctype=None 或 "text"）
                                     final_text += ctext
                                 delta_obj = {}
                                 if not first_chunk_sent:
@@ -405,8 +459,10 @@ async def chat_completions(request: Request):
                                 if ctype == "thinking":
                                     if thinking_enabled:
                                         delta_obj["reasoning_content"] = ctext
-                                elif ctype == "text":
-                                    delta_obj["content"] = ctext
+                                else:
+                                    # 非 thinking 内容都作为 content 输出
+                                    if ctext:
+                                        delta_obj["content"] = ctext
                                 if delta_obj:
                                     new_choices.append({"delta": delta_obj, "index": choice.get("index", 0)})
                                     

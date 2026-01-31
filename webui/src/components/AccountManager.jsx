@@ -57,7 +57,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                 body: JSON.stringify({ key: newKey.trim() }),
             })
             if (res.ok) {
-                onMessage('success', 'API Key added successfully')
+                onMessage('success', 'API 密钥添加成功')
                 setNewKey('')
                 setShowAddKey(false)
                 onRefresh()
@@ -66,14 +66,14 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                 onMessage('error', data.detail || 'Failed to add')
             }
         } catch (e) {
-            onMessage('error', 'Network error')
+            onMessage('error', '网络错误')
         } finally {
             setLoading(false)
         }
     }
 
     const deleteKey = async (key) => {
-        if (!confirm('Are you sure you want to delete this API Key?')) return
+        if (!confirm('确定要删除此 API 密钥吗？')) return
         try {
             const res = await apiFetch(`/admin/keys/${encodeURIComponent(key)}`, { method: 'DELETE' })
             if (res.ok) {
@@ -100,7 +100,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                 body: JSON.stringify(newAccount),
             })
             if (res.ok) {
-                onMessage('success', 'Account added successfully')
+                onMessage('success', '账号添加成功')
                 setNewAccount({ email: '', mobile: '', password: '' })
                 setShowAddAccount(false)
                 onRefresh()
@@ -109,14 +109,14 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                 onMessage('error', data.detail || 'Failed to add')
             }
         } catch (e) {
-            onMessage('error', 'Network error')
+            onMessage('error', '网络错误')
         } finally {
             setLoading(false)
         }
     }
 
     const deleteAccount = async (id) => {
-        if (!confirm('Are you sure you want to delete this account?')) return
+        if (!confirm('确定要删除此账号吗？')) return
         try {
             const res = await apiFetch(`/admin/accounts/${encodeURIComponent(id)}`, { method: 'DELETE' })
             if (res.ok) {
@@ -149,7 +149,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
     }
 
     const validateAllAccounts = async () => {
-        if (!confirm('Validate ALL accounts? This might take a while.')) return
+        if (!confirm('校验所有账号？这可能需要一些时间。')) return
         const accounts = config.accounts || []
         if (accounts.length === 0) return
 
@@ -203,7 +203,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
     }
 
     const testAllAccounts = async () => {
-        if (!confirm('Test API connectivity for ALL accounts?')) return
+        if (!confirm('测试所有账号的 API 连通性？')) return
         const accounts = config.accounts || []
         if (accounts.length === 0) return
 
@@ -248,30 +248,30 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                             <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                                 <CheckCircle2 className="w-16 h-16" />
                             </div>
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Available</p>
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">可用</p>
                             <div className="mt-2 flex items-baseline gap-2">
                                 <span className="text-3xl font-bold text-foreground">{queueStatus.available}</span>
-                                <span className="text-xs text-muted-foreground">accounts</span>
+                                <span className="text-xs text-muted-foreground">个账号</span>
                             </div>
                         </div>
                         <div className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden group">
                             <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                                 <Server className="w-16 h-16" />
                             </div>
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">In Use</p>
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">正在使用</p>
                             <div className="mt-2 flex items-baseline gap-2">
                                 <span className="text-3xl font-bold text-foreground">{queueStatus.in_use}</span>
-                                <span className="text-xs text-muted-foreground">threads</span>
+                                <span className="text-xs text-muted-foreground">线程</span>
                             </div>
                         </div>
                         <div className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden group">
                             <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                                 <ShieldCheck className="w-16 h-16" />
                             </div>
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Total Pool</p>
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">账号池总数</p>
                             <div className="mt-2 flex items-baseline gap-2">
                                 <span className="text-3xl font-bold text-foreground">{queueStatus.total}</span>
-                                <span className="text-xs text-muted-foreground">accounts</span>
+                                <span className="text-xs text-muted-foreground">个账号</span>
                             </div>
                         </div>
                     </div>
@@ -290,7 +290,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                         className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm shadow-sm"
                     >
                         <Plus className="w-4 h-4" />
-                        Add Key
+                        添加密钥
                     </button>
                 </div>
 
@@ -329,7 +329,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                             className="flex items-center px-3 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors text-xs font-medium border border-border disabled:opacity-50"
                         >
                             {testingAll ? <span className="animate-spin mr-2">⟳</span> : <Play className="w-3 h-3 mr-2" />}
-                            Test All
+                            测试全部
                         </button>
                         <button
                             onClick={validateAllAccounts}
@@ -337,14 +337,14 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                             className="flex items-center px-3 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors text-xs font-medium border border-border disabled:opacity-50"
                         >
                             {validatingAll ? <span className="animate-spin mr-2">⟳</span> : <CheckCircle2 className="w-3 h-3 mr-2" />}
-                            Validate All
+                            校验全部
                         </button>
                         <button
                             onClick={() => setShowAddAccount(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm shadow-sm"
                         >
                             <Plus className="w-4 h-4" />
-                            Add Account
+                            添加账号
                         </button>
                     </div>
                 </div>
@@ -455,9 +455,9 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                                     />
                                 </div>
                                 <div className="flex justify-end gap-2 pt-2">
-                                    <button onClick={() => setShowAddKey(false)} className="px-4 py-2 rounded-lg border border-border hover:bg-secondary transition-colors text-sm font-medium">Cancel</button>
+                                    <button onClick={() => setShowAddKey(false)} className="px-4 py-2 rounded-lg border border-border hover:bg-secondary transition-colors text-sm font-medium">取消</button>
                                     <button onClick={addKey} disabled={loading} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50">
-                                        {loading ? 'Adding...' : 'Add Key'}
+                                        {loading ? '添加中...' : '添加密钥'}
                                     </button>
                                 </div>
                             </div>
@@ -508,9 +508,9 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                                     />
                                 </div>
                                 <div className="flex justify-end gap-2 pt-2">
-                                    <button onClick={() => setShowAddAccount(false)} className="px-4 py-2 rounded-lg border border-border hover:bg-secondary transition-colors text-sm font-medium">Cancel</button>
+                                    <button onClick={() => setShowAddAccount(false)} className="px-4 py-2 rounded-lg border border-border hover:bg-secondary transition-colors text-sm font-medium">取消</button>
                                     <button onClick={addAccount} disabled={loading} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50">
-                                        {loading ? 'Adding...' : 'Add Account'}
+                                        {loading ? '添加中...' : '添加账号'}
                                     </button>
                                 </div>
                             </div>

@@ -19,8 +19,10 @@ import {
 import clsx from 'clsx'
 
 const MODELS = [
-    { id: "deepseek-chat", name: "deepseek-chat", icon: MessageSquare, desc: "通用高智商模型 (V3)", color: "text-amber-500" },
-    { id: "deepseek-reasoner", name: "deepseek-reasoner", icon: Cpu, desc: "深度推理/思维链 (R1)", color: "text-amber-600" },
+    { id: "deepseek-chat", name: "deepseek-chat", icon: MessageSquare, desc: "非思考模型", color: "text-amber-500" },
+    { id: "deepseek-reasoner", name: "deepseek-reasoner", icon: Cpu, desc: "思考模型", color: "text-amber-600" },
+    { id: "deepseek-chat-search", name: "deepseek-chat-search", icon: SearchIcon, desc: "非思考模型 (带搜索)", color: "text-cyan-500" },
+    { id: "deepseek-reasoner-search", name: "deepseek-reasoner-search", icon: SearchIcon, desc: "思考模型 (带搜索)", color: "text-cyan-600" },
 ];
 
 export default function ApiTester({ config, onMessage, authFetch }) {
@@ -116,13 +118,16 @@ export default function ApiTester({ config, onMessage, authFetch }) {
 
                     try {
                         const json = JSON.parse(dataStr)
+                        console.log('[ApiTester] Parsed JSON:', json)
                         const choice = json.choices?.[0]
                         if (choice?.delta) {
                             const delta = choice.delta
+                            console.log('[ApiTester] Delta:', delta)
                             if (delta.reasoning_content) {
                                 setStreamingThinking(prev => prev + delta.reasoning_content)
                             }
                             if (delta.content) {
+                                console.log('[ApiTester] Content:', delta.content)
                                 setStreamingContent(prev => prev + delta.content)
                             }
                         }
@@ -135,7 +140,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
             if (e.name === 'AbortError') {
                 onMessage('info', '已停止生成')
             } else {
-                onMessage('error', 'Network error: ' + e.message)
+                onMessage('error', '网络错误: ' + e.message)
                 setResponse({ error: e.message, success: false })
             }
         } finally {
@@ -167,12 +172,12 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                     account: selectedAccount,
                 })
                 if (data.success) {
-                    onMessage('success', `${selectedAccount}: Test Success (${data.response_time}ms)`)
+                    onMessage('success', `${selectedAccount}: 测试成功 (${data.response_time}ms)`)
                 } else {
                     onMessage('error', `${selectedAccount}: ${data.message}`)
                 }
             } catch (e) {
-                onMessage('error', 'Network error: ' + e.message)
+                onMessage('error', '网络错误: ' + e.message)
                 setResponse({ error: e.message })
             } finally {
                 setLoading(false)
@@ -229,7 +234,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                                         >
                                             <div className={clsx(
                                                 "p-1.5 rounded-md shrink-0 transition-colors",
-                                                model === m.id ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                                                model === m.id ? m.color : "text-muted-foreground group-hover:text-foreground"
                                             )}>
                                                 <Icon className="w-4 h-4" />
                                             </div>
@@ -240,7 +245,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                                                 <div className="text-[11px] text-muted-foreground mt-0.5">{m.desc}</div>
                                             </div>
                                             {model === m.id && (
-                                                <div className="absolute top-3 right-3 text-primary">
+                                                <div className={clsx("absolute top-3 right-3", m.color)}>
                                                     <div className="w-1.5 h-1.5 rounded-full bg-current" />
                                                 </div>
                                             )}
@@ -274,7 +279,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                             <input
                                 type="password"
                                 className="w-full h-10 px-3 bg-muted/30 border border-border rounded-lg text-sm font-mono placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring transition-all"
-                                placeholder={config.keys?.[0] ? `默认: ...${config.keys[0].slice(-6)}` : '输入自定义 Key'}
+                                placeholder={config.keys?.[0] ? `默认: ...${config.keys[0].slice(-6)}` : '输入自定义密钥'}
                                 value={apiKey}
                                 onChange={e => setApiKey(e.target.value)}
                             />
@@ -319,7 +324,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                                             "text-[10px] px-1.5 py-0.5 rounded-sm border uppercase font-medium tracking-wider",
                                             response.success ? "border-emerald-500/20 text-emerald-500 bg-emerald-500/10" : "border-destructive/20 text-destructive bg-destructive/10"
                                         )}>
-                                            {response.status_code || 'ERR'}
+                                            {response.status_code || '错误'}
                                         </span>
                                     )}
                                 </div>
@@ -328,7 +333,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                                     <div className="text-xs bg-secondary/50 border border-border rounded-lg p-3 space-y-1.5">
                                         <div className="flex items-center gap-1.5 text-muted-foreground">
                                             <Zap className="w-3.5 h-3.5" />
-                                            <span className="font-medium">Thinking Process</span>
+                                            <span className="font-medium">思维链过程</span>
                                         </div>
                                         <div className="whitespace-pre-wrap leading-relaxed text-muted-foreground font-mono text-[11px] max-h-60 overflow-y-auto custom-scrollbar pl-5 border-l-2 border-border/50">
                                             {streamingThinking || response?.response?.thinking}
@@ -340,7 +345,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                                     {!selectedAccount ? (
                                         streamingContent || (response?.error && <span className="text-destructive font-medium">{response.error}</span>)
                                     ) : (
-                                        response?.response?.message || <span className="text-muted-foreground italic">Generating response...</span>
+                                        response?.response?.message || <span className="text-muted-foreground italic">正在生成响应...</span>
                                     )}
                                     {isStreaming && <span className="inline-block w-1.5 h-4 bg-primary ml-1 align-middle animate-pulse" />}
                                 </div>
@@ -354,7 +359,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                     <div className="max-w-4xl mx-auto relative group">
                         <textarea
                             className="w-full bg-[#09090b] border border-border rounded-xl pl-4 pr-12 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none custom-scrollbar placeholder:text-muted-foreground/50 text-foreground shadow-inner"
-                            placeholder="Type a message..."
+                            placeholder="输入消息..."
                             rows={1}
                             style={{ minHeight: '52px' }}
                             value={message}
@@ -386,7 +391,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                         </div>
                     </div>
                     <div className="max-w-4xl mx-auto mt-3 flex justify-center">
-                        <span className="text-[10px] text-muted-foreground/40 font-medium">DeepSeek Admin Interface</span>
+                        <span className="text-[10px] text-muted-foreground/40 font-medium">DeepSeek 管理员界面</span>
                     </div>
                 </div>
             </div>

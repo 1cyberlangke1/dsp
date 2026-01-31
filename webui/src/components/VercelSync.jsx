@@ -61,7 +61,7 @@ export default function VercelSync({ onMessage, authFetch }) {
                 onMessage('error', data.detail || '同步失败')
             }
         } catch (e) {
-            onMessage('error', 'Network error')
+            onMessage('error', '网络错误')
         } finally {
             setLoading(false)
         }
@@ -93,7 +93,7 @@ export default function VercelSync({ onMessage, authFetch }) {
                             <input
                                 type="password"
                                 className="w-full h-10 px-3 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all pr-10"
-                                placeholder={preconfig?.has_token ? "Using pre-configured token" : "Enter Vercel Access Token"}
+                                placeholder={preconfig?.has_token ? "正在使用预配置的令牌" : "输入 Vercel 访问令牌"}
                                 value={vercelToken}
                                 onChange={e => setVercelToken(e.target.value)}
                             />
@@ -140,11 +140,11 @@ export default function VercelSync({ onMessage, authFetch }) {
                         {loading ? (
                             <span className="flex items-center gap-2">
                                 <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                Syncing...
+                                正在同步...
                             </span>
                         ) : (
                             <span className="flex items-center gap-2">
-                                Sync & Redeploy <ArrowRight className="w-4 h-4" />
+                                同步并重新部署 <ArrowRight className="w-4 h-4" />
                             </span>
                         )}
                     </button>

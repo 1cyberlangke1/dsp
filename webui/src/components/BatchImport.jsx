@@ -91,7 +91,7 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
                 onMessage('error', data.detail || '导入失败')
             }
         } catch (e) {
-            onMessage('error', 'Network error')
+            onMessage('error', '网络错误')
         } finally {
             setLoading(false)
         }
@@ -169,7 +169,7 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
                         className="w-full flex items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all font-medium text-sm shadow-sm"
                     >
                         {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        {copied ? 'Copied' : 'Copy Base64 Config'}
+                        {copied ? '已复制' : '复制 Base64 配置'}
                     </button>
                     <p className="text-[10px] text-muted-foreground mt-2 text-center">
                         变量名: <code className="bg-background px-1 py-0.5 rounded border border-border">DS2API_CONFIG_JSON</code>
@@ -186,10 +186,10 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
                     </h3>
                     <div className="flex gap-2">
                         <button onClick={handleExport} className="px-3 py-1.5 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors text-xs font-medium border border-border">
-                            Load Current
+                            加载当前配置
                         </button>
                         <button onClick={handleImport} disabled={loading} className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-xs font-medium disabled:opacity-50">
-                            {loading ? 'Importing...' : 'Apply Config'}
+                            {loading ? '正在导入...' : '应用配置'}
                         </button>
                     </div>
                 </div>

@@ -85,27 +85,21 @@ python dev.py
 
 ## 📡 API 接口
 
-### 模型列表
+完整的 API 文档请参阅 **[API.md](API.md)**。
 
+### 快速示例
+
+**模型列表**：
 ```
 GET /v1/models
 ```
 
-### 对话补全
-
-```
-POST /v1/chat/completions
-Authorization: Bearer your-api-key
-```
-
-请求示例：
-
-```json
-{
-  "model": "deepseek-chat",
-  "messages": [{"role": "user", "content": "你好"}],
-  "stream": true
-}
+**对话补全**：
+```bash
+curl https://your-domain.com/v1/chat/completions \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"deepseek-chat","messages":[{"role":"user","content":"你好"}]}'
 ```
 
 ### 管理接口

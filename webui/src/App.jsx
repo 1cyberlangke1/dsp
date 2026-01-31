@@ -133,7 +133,7 @@ export default function App() {
             <div className="min-h-screen flex items-center justify-center bg-background">
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-muted-foreground animate-pulse">检查登录状态...</p>
+                    <p className="text-muted-foreground animate-pulse">正在检查登录状态...</p>
                 </div>
             </div>
         )
@@ -184,7 +184,7 @@ export default function App() {
                         </div>
                         <span>DS2API</span>
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-2 font-semibold tracking-[0.1em] uppercase opacity-60 px-1">V1.0.0 Admin Panel</p>
+                    <p className="text-[10px] text-muted-foreground mt-2 font-semibold tracking-[0.1em] uppercase opacity-60 px-1">V1.0.0 管理面板</p>
                 </div>
 
                 <nav className="flex-1 px-3 space-y-1 overflow-y-auto pt-2">
@@ -216,20 +216,20 @@ export default function App() {
                 <div className="p-4 border-t border-border bg-card">
                     <div className="space-y-4">
                         <div className="flex items-center justify-between text-sm px-1">
-                            <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">System Status</span>
+                            <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">系统状态</span>
                             <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                ONLINE
+                                在线
                             </span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             <div className="bg-background rounded-lg p-3 border border-border shadow-sm">
-                                <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5 opacity-70">Accounts</div>
+                                <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5 opacity-70">账号</div>
                                 <div className="text-lg font-bold text-foreground leading-tight">{config.accounts?.length || 0}</div>
                             </div>
                             <div className="bg-background rounded-lg p-3 border border-border shadow-sm">
-                                <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5 opacity-70">API Keys</div>
-                                <div className="text-lg font-bold text-foreground leading-tight">{config.keys?.length || 0}</div>
+                                <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5 opacity-70">密钥</div>
+                                <div className="text-lg font-bold text-foreground">{config.keys?.length || 0}</div>
                             </div>
                         </div>
                         <button
