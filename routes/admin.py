@@ -1,0 +1,419 @@
+# -*- coding: utf-8 -*-
+"""Admin API 路由 - 管理界面后端"""
+import base64
+import json
+import os
+import httpx
+
+from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+from core.config import CONFIG, save_config, logger
+from core.auth import account_queue, init_account_queue
+
+router = APIRouter(prefix="/admin", tags=["admin"])
+security = HTTPBearer(auto_error=False)
+
+# Admin Key 验证
+ADMIN_KEY = os.getenv("DS2API_ADMIN_KEY", "")
+
+# Vercel 预配置（可通过环境变量设置）
+VERCEL_TOKEN = os.getenv("VERCEL_TOKEN", "")
+VERCEL_PROJECT_ID = os.getenv("VERCEL_PROJECT_ID", "")
+VERCEL_TEAM_ID = os.getenv("VERCEL_TEAM_ID", "")
+
+
+def verify_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """验证 Admin 权限"""
+    if not ADMIN_KEY:
+        # 未配置 Admin Key，允许访问（开发模式）
+        return True
+    if not credentials or credentials.credentials != ADMIN_KEY:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+    return True
+
+
+# ----------------------------------------------------------------------
+# Vercel 预配置信息
+# ----------------------------------------------------------------------
+@router.get("/vercel/config")
+async def get_vercel_config(_: bool = Depends(verify_admin)):
+    """获取预配置的 Vercel 信息（脱敏）"""
+    return JSONResponse(content={
+        "has_token": bool(VERCEL_TOKEN),
+        "project_id": VERCEL_PROJECT_ID,
+        "team_id": VERCEL_TEAM_ID,
+        "token_preview": VERCEL_TOKEN[:8] + "****" if VERCEL_TOKEN else "",
+    })
+
+
+# ----------------------------------------------------------------------
+# 配置管理
+# ----------------------------------------------------------------------
+@router.get("/config")
+async def get_config(_: bool = Depends(verify_admin)):
+    """获取当前配置（密码脱敏）"""
+    safe_config = {
+        "keys": CONFIG.get("keys", []),
+        "accounts": [],
+        "claude_model_mapping": CONFIG.get("claude_model_mapping", {}),
+    }
+    for acc in CONFIG.get("accounts", []):
+        safe_acc = {
+            "email": acc.get("email", ""),
+            "mobile": acc.get("mobile", ""),
+            "has_password": bool(acc.get("password")),
+            "has_token": bool(acc.get("token")),
+        }
+        safe_config["accounts"].append(safe_acc)
+    return JSONResponse(content=safe_config)
+
+
+@router.post("/config")
+async def update_config(request: Request, _: bool = Depends(verify_admin)):
+    """更新完整配置"""
+    try:
+        new_config = await request.json()
+        
+        # 更新 keys
+        if "keys" in new_config:
+            CONFIG["keys"] = new_config["keys"]
+        
+        # 更新 accounts
+        if "accounts" in new_config:
+            CONFIG["accounts"] = new_config["accounts"]
+            init_account_queue()  # 重新初始化账号队列
+        
+        # 更新 claude_model_mapping
+        if "claude_model_mapping" in new_config:
+            CONFIG["claude_model_mapping"] = new_config["claude_model_mapping"]
+        
+        save_config(CONFIG)
+        return JSONResponse(content={"success": True, "message": "配置已更新"})
+    except Exception as e:
+        logger.error(f"[update_config] 错误: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ----------------------------------------------------------------------
+# API Keys 管理
+# ----------------------------------------------------------------------
+@router.post("/keys")
+async def add_key(request: Request, _: bool = Depends(verify_admin)):
+    """添加 API Key"""
+    data = await request.json()
+    key = data.get("key", "").strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="Key 不能为空")
+    if key in CONFIG.get("keys", []):
+        raise HTTPException(status_code=400, detail="Key 已存在")
+    
+    if "keys" not in CONFIG:
+        CONFIG["keys"] = []
+    CONFIG["keys"].append(key)
+    save_config(CONFIG)
+    return JSONResponse(content={"success": True})
+
+
+@router.delete("/keys/{key}")
+async def delete_key(key: str, _: bool = Depends(verify_admin)):
+    """删除 API Key"""
+    if key not in CONFIG.get("keys", []):
+        raise HTTPException(status_code=404, detail="Key 不存在")
+    CONFIG["keys"].remove(key)
+    save_config(CONFIG)
+    return JSONResponse(content={"success": True})
+
+
+# ----------------------------------------------------------------------
+# 账号管理
+# ----------------------------------------------------------------------
+@router.post("/accounts")
+async def add_account(request: Request, _: bool = Depends(verify_admin)):
+    """添加账号"""
+    data = await request.json()
+    email = data.get("email", "").strip()
+    mobile = data.get("mobile", "").strip()
+    password = data.get("password", "").strip()
+    
+    if not password:
+        raise HTTPException(status_code=400, detail="密码不能为空")
+    if not email and not mobile:
+        raise HTTPException(status_code=400, detail="Email 或手机号至少填一个")
+    
+    # 检查重复
+    for acc in CONFIG.get("accounts", []):
+        if email and acc.get("email") == email:
+            raise HTTPException(status_code=400, detail="该 Email 已存在")
+        if mobile and acc.get("mobile") == mobile:
+            raise HTTPException(status_code=400, detail="该手机号已存在")
+    
+    new_account = {"password": password, "token": ""}
+    if email:
+        new_account["email"] = email
+    if mobile:
+        new_account["mobile"] = mobile
+    
+    if "accounts" not in CONFIG:
+        CONFIG["accounts"] = []
+    CONFIG["accounts"].append(new_account)
+    init_account_queue()
+    save_config(CONFIG)
+    return JSONResponse(content={"success": True})
+
+
+@router.delete("/accounts/{identifier}")
+async def delete_account(identifier: str, _: bool = Depends(verify_admin)):
+    """删除账号（通过 email 或 mobile）"""
+    accounts = CONFIG.get("accounts", [])
+    for i, acc in enumerate(accounts):
+        if acc.get("email") == identifier or acc.get("mobile") == identifier:
+            accounts.pop(i)
+            init_account_queue()
+            save_config(CONFIG)
+            return JSONResponse(content={"success": True})
+    raise HTTPException(status_code=404, detail="账号不存在")
+
+
+# ----------------------------------------------------------------------
+# 批量导入
+# ----------------------------------------------------------------------
+@router.post("/import")
+async def batch_import(request: Request, _: bool = Depends(verify_admin)):
+    """批量导入配置 (JSON 格式)"""
+    try:
+        data = await request.json()
+        imported_keys = 0
+        imported_accounts = 0
+        
+        # 导入 keys
+        if "keys" in data:
+            for key in data["keys"]:
+                if key not in CONFIG.get("keys", []):
+                    if "keys" not in CONFIG:
+                        CONFIG["keys"] = []
+                    CONFIG["keys"].append(key)
+                    imported_keys += 1
+        
+        # 导入 accounts
+        if "accounts" in data:
+            existing_ids = set()
+            for acc in CONFIG.get("accounts", []):
+                existing_ids.add(acc.get("email", ""))
+                existing_ids.add(acc.get("mobile", ""))
+            
+            for acc in data["accounts"]:
+                acc_id = acc.get("email", "") or acc.get("mobile", "")
+                if acc_id and acc_id not in existing_ids:
+                    if "accounts" not in CONFIG:
+                        CONFIG["accounts"] = []
+                    CONFIG["accounts"].append(acc)
+                    existing_ids.add(acc_id)
+                    imported_accounts += 1
+        
+        init_account_queue()
+        save_config(CONFIG)
+        
+        return JSONResponse(content={
+            "success": True,
+            "imported_keys": imported_keys,
+            "imported_accounts": imported_accounts,
+        })
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="无效的 JSON 格式")
+    except Exception as e:
+        logger.error(f"[batch_import] 错误: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ----------------------------------------------------------------------
+# API 测试
+# ----------------------------------------------------------------------
+@router.post("/test")
+async def test_api(request: Request, _: bool = Depends(verify_admin)):
+    """测试 API 调用"""
+    try:
+        data = await request.json()
+        model = data.get("model", "deepseek-chat")
+        message = data.get("message", "你好")
+        api_key = data.get("api_key", "")
+        
+        if not api_key:
+            # 使用配置中的第一个 key
+            keys = CONFIG.get("keys", [])
+            if not keys:
+                raise HTTPException(status_code=400, detail="没有可用的 API Key")
+            api_key = keys[0]
+        
+        # 构造请求
+        host = request.headers.get("host", "localhost:5001")
+        scheme = "https" if "vercel" in host.lower() else "http"
+        base_url = f"{scheme}://{host}"
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{base_url}/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": message}],
+                    "stream": False,
+                },
+            )
+            
+            return JSONResponse(content={
+                "success": response.status_code == 200,
+                "status_code": response.status_code,
+                "response": response.json() if response.status_code == 200 else response.text,
+            })
+    except Exception as e:
+        logger.error(f"[test_api] 错误: {e}")
+        return JSONResponse(content={
+            "success": False,
+            "error": str(e),
+        })
+
+
+# ----------------------------------------------------------------------
+# Vercel 同步
+# ----------------------------------------------------------------------
+@router.post("/vercel/sync")
+async def sync_to_vercel(request: Request, _: bool = Depends(verify_admin)):
+    """同步配置到 Vercel 并触发重新部署"""
+    try:
+        data = await request.json()
+        vercel_token = data.get("vercel_token", "")
+        project_id = data.get("project_id", "")
+        team_id = data.get("team_id", "")  # 可选
+        
+        # 支持使用预配置的 token
+        if vercel_token == "__USE_PRECONFIG__" or not vercel_token:
+            vercel_token = VERCEL_TOKEN
+        if not project_id:
+            project_id = VERCEL_PROJECT_ID
+        if not team_id:
+            team_id = VERCEL_TEAM_ID
+        
+        if not vercel_token or not project_id:
+            raise HTTPException(status_code=400, detail="需要 Vercel Token 和 Project ID（可通过环境变量 VERCEL_TOKEN 和 VERCEL_PROJECT_ID 预配置）")
+        
+        # 准备配置 JSON
+        config_json = json.dumps(CONFIG, ensure_ascii=False, separators=(",", ":"))
+        config_b64 = base64.b64encode(config_json.encode("utf-8")).decode("utf-8")
+        
+        headers = {"Authorization": f"Bearer {vercel_token}"}
+        base_url = "https://api.vercel.com"
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # 1. 获取现有环境变量
+            params = {"teamId": team_id} if team_id else {}
+            env_resp = await client.get(
+                f"{base_url}/v9/projects/{project_id}/env",
+                headers=headers,
+                params=params,
+            )
+            
+            if env_resp.status_code != 200:
+                raise HTTPException(status_code=env_resp.status_code, detail=f"获取环境变量失败: {env_resp.text}")
+            
+            env_vars = env_resp.json().get("envs", [])
+            existing_env = None
+            for env in env_vars:
+                if env.get("key") == "DS2API_CONFIG_JSON":
+                    existing_env = env
+                    break
+            
+            # 2. 更新或创建环境变量
+            if existing_env:
+                # 更新
+                env_id = existing_env["id"]
+                update_resp = await client.patch(
+                    f"{base_url}/v9/projects/{project_id}/env/{env_id}",
+                    headers=headers,
+                    params=params,
+                    json={"value": config_b64},
+                )
+                if update_resp.status_code not in [200, 201]:
+                    raise HTTPException(status_code=update_resp.status_code, detail=f"更新环境变量失败: {update_resp.text}")
+            else:
+                # 创建
+                create_resp = await client.post(
+                    f"{base_url}/v10/projects/{project_id}/env",
+                    headers=headers,
+                    params=params,
+                    json={
+                        "key": "DS2API_CONFIG_JSON",
+                        "value": config_b64,
+                        "type": "encrypted",
+                        "target": ["production", "preview"],
+                    },
+                )
+                if create_resp.status_code not in [200, 201]:
+                    raise HTTPException(status_code=create_resp.status_code, detail=f"创建环境变量失败: {create_resp.text}")
+            
+            # 3. 触发重新部署 (获取最新的 git 信息并创建新部署)
+            # 获取项目信息
+            project_resp = await client.get(
+                f"{base_url}/v9/projects/{project_id}",
+                headers=headers,
+                params=params,
+            )
+            
+            if project_resp.status_code == 200:
+                project_data = project_resp.json()
+                repo = project_data.get("link", {})
+                
+                if repo.get("type") == "github":
+                    # 使用 GitHub 信息创建部署
+                    deploy_resp = await client.post(
+                        f"{base_url}/v13/deployments",
+                        headers=headers,
+                        params=params,
+                        json={
+                            "name": project_id,
+                            "project": project_id,
+                            "target": "production",
+                            "gitSource": {
+                                "type": "github",
+                                "repoId": repo.get("repoId"),
+                                "ref": repo.get("productionBranch", "main"),
+                            },
+                        },
+                    )
+                    
+                    if deploy_resp.status_code in [200, 201]:
+                        deploy_data = deploy_resp.json()
+                        return JSONResponse(content={
+                            "success": True,
+                            "message": "配置已同步，正在重新部署...",
+                            "deployment_url": deploy_data.get("url"),
+                        })
+            
+            # 如果无法自动部署，返回成功但提示手动部署
+            return JSONResponse(content={
+                "success": True,
+                "message": "配置已同步到 Vercel，请手动触发重新部署",
+                "manual_deploy_required": True,
+            })
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[sync_to_vercel] 错误: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ----------------------------------------------------------------------
+# 导出配置
+# ----------------------------------------------------------------------
+@router.get("/export")
+async def export_config(_: bool = Depends(verify_admin)):
+    """导出完整配置（JSON 和 Base64）"""
+    config_json = json.dumps(CONFIG, ensure_ascii=False, separators=(",", ":"))
+    config_b64 = base64.b64encode(config_json.encode("utf-8")).decode("utf-8")
+    
+    return JSONResponse(content={
+        "json": config_json,
+        "base64": config_b64,
+    })

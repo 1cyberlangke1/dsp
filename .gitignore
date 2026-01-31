@@ -1,5 +1,6 @@
 *.bak
 config.json
+.env
 
 # Python
 __pycache__/
@@ -47,3 +48,35 @@ uvicorn.log
 
 # Vercel
 .vercel
+
+# Node.js / Frontend
+node_modules/
+webui/node_modules/
+webui/dist/
+static/admin/
+.npm
+.pnpm-store/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build artifacts
+*.tsbuildinfo
+.cache/
+.parcel-cache/
+
+# Environment
+.env.local
+.env.*.local
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Misc
+*.pyc
+*.pyo
+.git/
+Thumbs.db
