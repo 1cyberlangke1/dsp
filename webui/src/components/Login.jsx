@@ -49,10 +49,10 @@ export default function Login({ onLogin, onMessage }) {
                         <Lock className="w-8 h-8" />
                     </div>
                     <h1 className="text-2xl font-bold tracking-tight text-white">
-                        Welcome Back
+                        欢迎回来
                     </h1>
                     <p className="text-muted-foreground text-sm">
-                        Enter your admin key to access the dashboard
+                        请输入管理员密钥访问控制面板
                     </p>
                 </div>
 
@@ -60,7 +60,7 @@ export default function Login({ onLogin, onMessage }) {
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <label className="text-xs font-medium text-muted-foreground ml-1 uppercase tracking-wider">
-                                Admin Key
+                                管理员密钥
                             </label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors">
@@ -69,7 +69,7 @@ export default function Login({ onLogin, onMessage }) {
                                 <input
                                     type="password"
                                     className="block w-full pl-10 pr-3 py-2.5 bg-secondary/50 border border-border rounded-lg text-sm placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 focus:bg-secondary focus:outline-none transition-all duration-200"
-                                    placeholder="Enter your DS2API_ADMIN_KEY"
+                                    placeholder="输入您的 DS2API_ADMIN_KEY"
                                     value={adminKey}
                                     onChange={e => setAdminKey(e.target.value)}
                                     autoFocus
@@ -94,7 +94,7 @@ export default function Login({ onLogin, onMessage }) {
                                 onClick={() => setRemember(!remember)}
                                 className="text-sm text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
                             >
-                                Keep me signed in
+                                记住登录状态
                             </span>
                         </div>
                     </div>
@@ -108,7 +108,7 @@ export default function Login({ onLogin, onMessage }) {
                             <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                         ) : (
                             <>
-                                <span>Access Dashboard</span>
+                                <span>进入控制面板</span>
                                 <ArrowRight className="w-4 h-4 ml-2" />
                             </>
                         )}
@@ -118,7 +118,7 @@ export default function Login({ onLogin, onMessage }) {
                 <div className="pt-6 border-t border-border/50 text-center">
                     <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/70">
                         <ShieldCheck className="w-3 h-3" />
-                        <span>Secure Session • 24h Expiration</span>
+                        <span>安全会话 • 24小时有效</span>
                     </div>
                 </div>
             </div>

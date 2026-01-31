@@ -15,8 +15,8 @@ import {
 import clsx from 'clsx'
 
 const MODELS = [
-    { id: 'deepseek-chat', name: 'DeepSeek Chat', icon: MessageSquare, desc: 'General purpose chat model' },
-    { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', icon: Cpu, desc: 'Optimized for reasoning tasks' },
+    { id: 'deepseek-chat', name: 'DeepSeek Chat', icon: MessageSquare, desc: '通用聊天模型' },
+    { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', icon: Cpu, desc: '推理能力增强模型' },
     // Removed search models as they might be deprecated or identical to chat with search tool
 ]
 
@@ -58,7 +58,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
         try {
             const key = apiKey || (config.keys?.[0] || '')
             if (!key) {
-                onMessage('error', 'Please provide an API Key')
+                onMessage('error', '请提供 API 密钥')
                 setLoading(false)
                 setIsStreaming(false)
                 return
@@ -80,8 +80,8 @@ export default function ApiTester({ config, onMessage, authFetch }) {
 
             if (!res.ok) {
                 const data = await res.json()
-                setResponse({ success: false, error: data.error?.message || 'Request failed' })
-                onMessage('error', data.error?.message || 'Request failed')
+                setResponse({ success: false, error: data.error?.message || '请求失败' })
+                onMessage('error', data.error?.message || '请求失败')
                 setLoading(false)
                 setIsStreaming(false)
                 return
@@ -127,7 +127,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
             }
         } catch (e) {
             if (e.name === 'AbortError') {
-                onMessage('info', 'Generation stopped')
+                onMessage('info', '已停止生成')
             } else {
                 onMessage('error', 'Network error: ' + e.message)
                 setResponse({ error: e.message, success: false })
@@ -184,11 +184,11 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                 <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-5">
                     <h3 className="font-semibold flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-primary" />
-                        Configuration
+                        模型选项
                     </h3>
 
                     <div className="space-y-3">
-                        <label className="text-sm font-medium text-muted-foreground">Model</label>
+                        <label className="text-sm font-medium text-muted-foreground">模型</label>
                         <div className="grid grid-cols-1 gap-2">
                             {MODELS.map(m => {
                                 const Icon = m.icon
@@ -217,13 +217,13 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground">Account Strategy</label>
+                        <label className="text-sm font-medium text-muted-foreground">账号策略</label>
                         <select
                             className="input-field"
                             value={selectedAccount}
                             onChange={e => setSelectedAccount(e.target.value)}
                         >
-                            <option value="">🎲 Random (Streaming)</option>
+                            <option value="">🎲 随机切换 (支持流式预览)</option>
                             {accounts.map((acc, i) => (
                                 <option key={i} value={acc.email || acc.mobile}>
                                     👤 {acc.email || acc.mobile}
@@ -233,11 +233,11 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground">API Key (Optional)</label>
+                        <label className="text-sm font-medium text-muted-foreground">API 密钥 (可选)</label>
                         <input
                             type="password"
                             className="input-field font-mono text-xs"
-                            placeholder={config.keys?.[0] ? `Default: ${config.keys[0].slice(0, 8)}...` : 'Enter custom API Key'}
+                            placeholder={config.keys?.[0] ? `默认: ${config.keys[0].slice(0, 8)}...` : '输入自定义 API 密钥'}
                             value={apiKey}
                             onChange={e => setApiKey(e.target.value)}
                         />
@@ -256,7 +256,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                         </div>
                         <div className="space-y-1 flew-1">
                             <div className="flex items-center gap-2">
-                                <span className="font-medium text-sm">You</span>
+                                <span className="font-medium text-sm">用户</span>
                             </div>
                             <div className="bg-secondary/50 rounded-2xl rounded-tl-none px-4 py-3 text-sm border border-border">
                                 {message}
@@ -290,7 +290,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                                     <div className="text-xs text-muted-foreground bg-muted/30 border border-border rounded-lg p-3 space-y-1">
                                         <div className="flex items-center gap-1.5 opacity-70 mb-1">
                                             <Sparkles className="w-3 h-3" />
-                                            <span>Reasoning Process</span>
+                                            <span>思维链/推理过程</span>
                                         </div>
                                         <div className="whitespace-pre-wrap leading-relaxed opacity-90 font-mono">
                                             {streamingThinking || response?.response?.thinking}
@@ -316,7 +316,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                     <div className="max-w-3xl mx-auto relative">
                         <textarea
                             className="w-full bg-secondary/30 border border-border rounded-xl pl-4 pr-14 py-3 text-sm focus:bg-background focus:ring-1 focus:ring-primary focus:border-primary transition-all resize-none custom-scrollbar"
-                            placeholder="Type your message here..."
+                            placeholder="输入消息..."
                             rows={3}
                             value={message}
                             onChange={e => setMessage(e.target.value)}

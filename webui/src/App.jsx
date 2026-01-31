@@ -180,9 +180,9 @@ export default function App() {
                 <div className="p-6 border-b border-border">
                     <div className="flex items-center gap-2 font-bold text-xl text-primary">
                         <LayoutDashboard className="w-6 h-6" />
-                        <span>DS2API Admin</span>
+                        <span>DS2API 管理面板</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1 ml-8">V1.0.0 Control Panel</p>
+                    <p className="text-xs text-muted-foreground mt-1 ml-8">V1.0.0 控制面板</p>
                 </div>
 
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
@@ -213,19 +213,19 @@ export default function App() {
                 <div className="p-4 border-t border-border bg-card/50">
                     <div className="space-y-4">
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">API Status</span>
+                            <span className="text-muted-foreground">API 状态</span>
                             <span className="flex items-center gap-1.5 text-xs font-medium text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                                Online
+                                在线
                             </span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             <div className="bg-background rounded p-2 border border-border">
-                                <div className="text-xs text-muted-foreground">Accounts</div>
+                                <div className="text-xs text-muted-foreground">账号</div>
                                 <div className="text-lg font-bold">{config.accounts?.length || 0}</div>
                             </div>
                             <div className="bg-background rounded p-2 border border-border">
-                                <div className="text-xs text-muted-foreground">Api Keys</div>
+                                <div className="text-xs text-muted-foreground">API 密钥</div>
                                 <div className="text-lg font-bold">{config.keys?.length || 0}</div>
                             </div>
                         </div>
@@ -234,7 +234,7 @@ export default function App() {
                             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 transition-colors"
                         >
                             <LogOut className="w-4 h-4" />
-                            Sign Out
+                            退出登录
                         </button>
                     </div>
                 </div>
@@ -280,7 +280,7 @@ export default function App() {
                             {loading ? (
                                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                                     <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-                                    <p>Please wait while loading data...</p>
+                                    <p>正在加载数据，请稍候...</p>
                                 </div>
                             ) : (
                                 renderTab()

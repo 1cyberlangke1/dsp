@@ -32,11 +32,11 @@ export default function VercelSync({ onMessage, authFetch }) {
         const tokenToUse = preconfig?.has_token && !vercelToken ? '__USE_PRECONFIG__' : vercelToken
 
         if (!tokenToUse && !preconfig?.has_token) {
-            onMessage('error', 'Vercel Token is required')
+            onMessage('error', '需要 Vercel 访问令牌')
             return
         }
         if (!projectId) {
-            onMessage('error', 'Project ID is required')
+            onMessage('error', '需要项目 ID')
             return
         }
 
@@ -58,7 +58,7 @@ export default function VercelSync({ onMessage, authFetch }) {
                 onMessage('success', data.message)
             } else {
                 setResult({ ...data, success: false })
-                onMessage('error', data.detail || 'Sync failed')
+                onMessage('error', data.detail || '同步失败')
             }
         } catch (e) {
             onMessage('error', 'Network error')
@@ -74,26 +74,26 @@ export default function VercelSync({ onMessage, authFetch }) {
                 <div className="border-b border-border pb-6">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
                         <Cloud className="w-6 h-6 text-primary" />
-                        Vercel Deployment
+                        Vercel 部署
                     </h2>
                     <p className="text-muted-foreground text-sm mt-1">
-                        Sync your current key and account configuration directly to Vercel environment variables.
+                        将当前密钥和账号配置直接同步到 Vercel 环境变量中。
                     </p>
                 </div>
 
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <label className="text-sm font-medium flex items-center justify-between">
-                            Vercel Token
+                            Vercel 访问令牌
                             <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
-                                Get Token <ExternalLink className="w-3 h-3" />
+                                获取令牌 <ExternalLink className="w-3 h-3" />
                             </a>
                         </label>
                         <div className="relative">
                             <input
                                 type="password"
                                 className="input-field pr-10"
-                                placeholder={preconfig?.has_token ? "Using pre-configured token" : "Enter Vercel Access Token"}
+                                placeholder={preconfig?.has_token ? "正在使用预配置令牌" : "输入 Vercel 访问令牌"}
                                 value={vercelToken}
                                 onChange={e => setVercelToken(e.target.value)}
                             />
@@ -106,20 +106,20 @@ export default function VercelSync({ onMessage, authFetch }) {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">Project ID</label>
+                        <label className="text-sm font-medium">项目 ID</label>
                         <input
                             type="text"
                             className="input-field"
-                            placeholder="prj_xxxxxxxxxxxx or Project Name"
+                            placeholder="prj_xxxxxxxxxxxx 或项目名称"
                             value={projectId}
                             onChange={e => setProjectId(e.target.value)}
                         />
-                        <p className="text-xs text-muted-foreground">Found in Project Settings → General</p>
+                        <p className="text-xs text-muted-foreground">可在项目设置 (Project Settings) → 常规 (General) 中找到</p>
                     </div>
 
                     <div className="space-y-2">
                         <label className="text-sm font-medium flex items-center gap-2">
-                            Team ID <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                            团队 ID <span className="text-xs text-muted-foreground font-normal">(可选)</span>
                         </label>
                         <input
                             type="text"
@@ -140,16 +140,16 @@ export default function VercelSync({ onMessage, authFetch }) {
                         {loading ? (
                             <span className="flex items-center gap-2">
                                 <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                Syncing...
+                                同步中...
                             </span>
                         ) : (
                             <span className="flex items-center gap-2">
-                                Sync & Redeploy <ArrowRight className="w-5 h-5" />
+                                同步并重新部署 <ArrowRight className="w-5 h-5" />
                             </span>
                         )}
                     </button>
                     <p className="text-xs text-center text-muted-foreground mt-4">
-                        This will trigger a new deployment on Vercel which takes about 30-60 seconds.
+                        这将触发 Vercel 的重新部署，大约需要 30-60 秒。
                     </p>
                 </div>
             </div>
@@ -170,14 +170,14 @@ export default function VercelSync({ onMessage, authFetch }) {
                             )}
                             <div className="space-y-1">
                                 <h3 className={`font-semibold text-lg ${result.success ? 'text-emerald-500' : 'text-destructive'}`}>
-                                    {result.success ? 'Sync Successful' : 'Sync Failed'}
+                                    {result.success ? '同步成功' : '同步失败'}
                                 </h3>
                                 <p className="text-sm opacity-90">{result.message}</p>
 
                                 {result.deployment_url && (
                                     <div className="pt-3 mt-3 border-t border-emerald-500/20">
                                         <a href={`https://${result.deployment_url}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium hover:underline">
-                                            Visit Deployment <ExternalLink className="w-3 h-3" />
+                                            访问部署地址 <ExternalLink className="w-3 h-3" />
                                         </a>
                                     </div>
                                 )}
@@ -189,24 +189,24 @@ export default function VercelSync({ onMessage, authFetch }) {
                 <div className="bg-secondary/20 border border-border rounded-xl p-6">
                     <h3 className="font-semibold flex items-center gap-2 mb-4">
                         <Info className="w-5 h-5 text-primary" />
-                        How it works
+                        工作原理
                     </h3>
                     <ul className="space-y-4">
                         <li className="flex gap-3">
                             <span className="shrink-0 w-6 h-6 rounded-full bg-background border border-border flex items-center justify-center text-xs font-bold text-muted-foreground">1</span>
-                            <p className="text-sm text-muted-foreground">Current configuration (Keys & Accounts) is exported to a JSON string.</p>
+                            <p className="text-sm text-muted-foreground">当前配置 (密钥和账号) 被导出为 JSON 字符串。</p>
                         </li>
                         <li className="flex gap-3">
                             <span className="shrink-0 w-6 h-6 rounded-full bg-background border border-border flex items-center justify-center text-xs font-bold text-muted-foreground">2</span>
-                            <p className="text-sm text-muted-foreground">The JSON is encoded to Base64 to ensure format compatibility.</p>
+                            <p className="text-sm text-muted-foreground">JSON 被编码为 Base64 以确保格式兼容性。</p>
                         </li>
                         <li className="flex gap-3">
                             <span className="shrink-0 w-6 h-6 rounded-full bg-background border border-border flex items-center justify-center text-xs font-bold text-muted-foreground">3</span>
-                            <p className="text-sm text-muted-foreground">We update the <code className="bg-background px-1 py-0.5 rounded border border-border text-xs">DS2API_CONFIG_JSON</code> env variable in your Vercel project.</p>
+                            <p className="text-sm text-muted-foreground">更新 Vercel 项目中的 <code className="bg-background px-1 py-0.5 rounded border border-border text-xs">DS2API_CONFIG_JSON</code> 环境变量。</p>
                         </li>
                         <li className="flex gap-3">
                             <span className="shrink-0 w-6 h-6 rounded-full bg-background border border-border flex items-center justify-center text-xs font-bold text-muted-foreground">4</span>
-                            <p className="text-sm text-muted-foreground">A redeployment is triggered to apply the new environment variables.</p>
+                            <p className="text-sm text-muted-foreground">触发重新部署以应用新的环境变量。</p>
                         </li>
                     </ul>
                 </div>

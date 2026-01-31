@@ -249,7 +249,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                                 <CheckCircle2 className="w-5 h-5" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Available</p>
+                                <p className="text-sm font-medium text-muted-foreground">可用账号</p>
                                 <p className="text-2xl font-bold">{queueStatus.available}</p>
                             </div>
                         </div>
@@ -260,7 +260,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                                 <Server className="w-5 h-5" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">In Use</p>
+                                <p className="text-sm font-medium text-muted-foreground">使用中</p>
                                 <p className="text-2xl font-bold">{queueStatus.in_use}</p>
                             </div>
                         </div>
@@ -271,7 +271,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                                 <ShieldCheck className="w-5 h-5" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Total Accounts</p>
+                                <p className="text-sm font-medium text-muted-foreground">账号总数</p>
                                 <p className="text-2xl font-bold">{queueStatus.total}</p>
                             </div>
                         </div>
@@ -283,15 +283,15 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
             <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h2 className="text-lg font-semibold">API Keys</h2>
-                        <p className="text-sm text-muted-foreground">Manage access keys for the API</p>
+                        <h2 className="text-lg font-semibold">API 密钥</h2>
+                        <p className="text-sm text-muted-foreground">管理 API 访问密钥池</p>
                     </div>
                     <button
                         onClick={() => setShowAddKey(true)}
                         className="btn btn-primary flex items-center gap-2"
                     >
                         <Plus className="w-4 h-4" />
-                        New Key
+                        新增密钥
                     </button>
                 </div>
 
@@ -311,7 +311,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                             </div>
                         ))
                     ) : (
-                        <div className="p-8 text-center text-muted-foreground">No API keys found</div>
+                        <div className="p-8 text-center text-muted-foreground">未找到 API 密钥</div>
                     )}
                 </div>
             </div>
@@ -320,8 +320,8 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
             <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h2 className="text-lg font-semibold">DeepSeek Accounts</h2>
-                        <p className="text-sm text-muted-foreground">Manage your account pool</p>
+                        <h2 className="text-lg font-semibold">DeepSeek 账号</h2>
+                        <p className="text-sm text-muted-foreground">管理 DeepSeek 账号池</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <button
@@ -330,7 +330,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                             className="btn btn-secondary text-xs"
                         >
                             {testingAll ? <span className="animate-spin mr-2">⟳</span> : <Play className="w-3 h-3 mr-2" />}
-                            Test All
+                            测试全部
                         </button>
                         <button
                             onClick={validateAllAccounts}
@@ -338,14 +338,14 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                             className="btn btn-secondary text-xs"
                         >
                             {validatingAll ? <span className="animate-spin mr-2">⟳</span> : <CheckCircle2 className="w-3 h-3 mr-2" />}
-                            Validate All
+                            校验全部
                         </button>
                         <button
                             onClick={() => setShowAddAccount(true)}
                             className="btn btn-primary flex items-center gap-2"
                         >
                             <Plus className="w-4 h-4" />
-                            Add Account
+                            添加账号
                         </button>
                     </div>
                 </div>
@@ -354,7 +354,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                 {(testingAll || validatingAll) && batchProgress.total > 0 && (
                     <div className="p-4 border-b border-border bg-muted/30">
                         <div className="flex items-center justify-between text-sm mb-2">
-                            <span className="font-medium">{testingAll ? 'Testing all accounts...' : 'Validating all accounts...'}</span>
+                            <span className="font-medium">{testingAll ? '正在测试所有账号...' : '正在校验所有账号...'}</span>
                             <span className="text-muted-foreground">{batchProgress.current} / {batchProgress.total}</span>
                         </div>
                         <div className="w-full bg-muted rounded-full h-2 overflow-hidden mb-4">
@@ -392,7 +392,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                                         <div className="min-w-0">
                                             <div className="font-medium truncate">{id}</div>
                                             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                                                <span>{acc.has_token ? 'Active Session' : 'Login Required'}</span>
+                                                <span>{acc.has_token ? '已建立会话' : '需重新登录'}</span>
                                                 {acc.token_preview && (
                                                     <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">
                                                         {acc.token_preview}
@@ -407,14 +407,14 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                                             disabled={testing[id]}
                                             className="px-3 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-secondary transition-colors disabled:opacity-50"
                                         >
-                                            {testing[id] ? 'Testing...' : 'Test'}
+                                            {testing[id] ? '正在测试...' : '测试'}
                                         </button>
                                         <button
                                             onClick={() => validateAccount(id)}
                                             disabled={validating[id]}
                                             className="px-3 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-secondary transition-colors disabled:opacity-50"
                                         >
-                                            {validating[id] ? 'Validating...' : 'Validate'}
+                                            {validating[id] ? '正在校验...' : '校验'}
                                         </button>
                                         <button
                                             onClick={() => deleteAccount(id)}
@@ -427,7 +427,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                             )
                         })
                     ) : (
-                        <div className="p-8 text-center text-muted-foreground">No accounts found</div>
+                        <div className="p-8 text-center text-muted-foreground">未找到任何账号</div>
                     )}
                 </div>
             </div>
@@ -437,27 +437,27 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
                     <div className="bg-card w-full max-w-md rounded-xl border border-border shadow-2xl overflow-hidden animate-in zoom-in-95">
                         <div className="p-4 border-b border-border flex justify-between items-center">
-                            <h3 className="font-semibold">Add API Key</h3>
+                            <h3 className="font-semibold">添加 API 密钥</h3>
                             <button onClick={() => setShowAddKey(false)} className="text-muted-foreground hover:text-foreground">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium mb-1.5">New Key value</label>
+                                <label className="block text-sm font-medium mb-1.5">新密钥值</label>
                                 <input
                                     type="text"
                                     className="input-field"
-                                    placeholder="Enter custom API key"
+                                    placeholder="输入自定义 API 密钥"
                                     value={newKey}
                                     onChange={e => setNewKey(e.target.value)}
                                     autoFocus
                                 />
                             </div>
                             <div className="flex justify-end gap-2 pt-2">
-                                <button onClick={() => setShowAddKey(false)} className="btn btn-secondary">Cancel</button>
+                                <button onClick={() => setShowAddKey(false)} className="btn btn-secondary">取消</button>
                                 <button onClick={addKey} disabled={loading} className="btn btn-primary">
-                                    {loading ? 'Adding...' : 'Add Key'}
+                                    {loading ? '添加中...' : '添加'}
                                 </button>
                             </div>
                         </div>
@@ -469,14 +469,14 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
                     <div className="bg-card w-full max-w-md rounded-xl border border-border shadow-2xl overflow-hidden animate-in zoom-in-95">
                         <div className="p-4 border-b border-border flex justify-between items-center">
-                            <h3 className="font-semibold">Add DeepSeek Account</h3>
+                            <h3 className="font-semibold">添加 DeepSeek 账号</h3>
                             <button onClick={() => setShowAddAccount(false)} className="text-muted-foreground hover:text-foreground">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium mb-1.5">Email (Optional)</label>
+                                <label className="block text-sm font-medium mb-1.5">邮箱 (可选)</label>
                                 <input
                                     type="email"
                                     className="input-field"
@@ -486,7 +486,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1.5">Mobile (Optional)</label>
+                                <label className="block text-sm font-medium mb-1.5">手机号 (可选)</label>
                                 <input
                                     type="text"
                                     className="input-field"
@@ -496,19 +496,19 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1.5">Password <span className="text-destructive">*</span></label>
+                                <label className="block text-sm font-medium mb-1.5">密码 <span className="text-destructive">*</span></label>
                                 <input
                                     type="password"
                                     className="input-field"
-                                    placeholder="Account password"
+                                    placeholder="账号密码"
                                     value={newAccount.password}
                                     onChange={e => setNewAccount({ ...newAccount, password: e.target.value })}
                                 />
                             </div>
                             <div className="flex justify-end gap-2 pt-2">
-                                <button onClick={() => setShowAddAccount(false)} className="btn btn-secondary">Cancel</button>
+                                <button onClick={() => setShowAddAccount(false)} className="btn btn-secondary">取消</button>
                                 <button onClick={addAccount} disabled={loading} className="btn btn-primary">
-                                    {loading ? 'Adding...' : 'Add Account'}
+                                    {loading ? '添加中...' : '添加账号'}
                                 </button>
                             </div>
                         </div>

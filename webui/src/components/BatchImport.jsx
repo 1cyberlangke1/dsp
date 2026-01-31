@@ -4,8 +4,8 @@ import clsx from 'clsx'
 
 const TEMPLATES = {
     full: {
-        name: 'Full Configuration',
-        desc: 'Includes keys, accounts, and model mappings',
+        name: '全量配置模板',
+        desc: '包含密钥、账号及模型映射',
         config: {
             keys: ["your-api-key-1", "your-api-key-2"],
             accounts: [
@@ -20,8 +20,8 @@ const TEMPLATES = {
         }
     },
     email_only: {
-        name: 'Email Only',
-        desc: 'Batch import email accounts',
+        name: '仅邮箱账号',
+        desc: '批量导入邮箱格式账号',
         config: {
             keys: ["your-api-key"],
             accounts: [
@@ -32,8 +32,8 @@ const TEMPLATES = {
         }
     },
     mobile_only: {
-        name: 'Mobile Only',
-        desc: 'Batch import mobile number accounts',
+        name: '仅手机号账号',
+        desc: '批量导入手机号格式账号',
         config: {
             keys: ["your-api-key"],
             accounts: [
@@ -44,8 +44,8 @@ const TEMPLATES = {
         }
     },
     keys_only: {
-        name: 'API Keys Only',
-        desc: 'Just adding API access keys',
+        name: '仅 API 密钥',
+        desc: '仅添加 API 访问密钥',
         config: {
             keys: ["key-1", "key-2", "key-3"]
         }
@@ -62,7 +62,7 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
 
     const handleImport = async () => {
         if (!jsonInput.trim()) {
-            onMessage('error', 'Please enter JSON configuration')
+            onMessage('error', '请输入 JSON 配置内容')
             return
         }
 
@@ -70,7 +70,7 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
         try {
             config = JSON.parse(jsonInput)
         } catch (e) {
-            onMessage('error', 'Invalid JSON format')
+            onMessage('error', '无效的 JSON 格式')
             return
         }
 
@@ -85,10 +85,10 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
             const data = await res.json()
             if (res.ok) {
                 setResult(data)
-                onMessage('success', `Imported: ${data.imported_keys} Keys, ${data.imported_accounts} Accounts`)
+                onMessage('success', `导入成功: ${data.imported_keys} 个密钥, ${data.imported_accounts} 个账号`)
                 onRefresh()
             } else {
-                onMessage('error', data.detail || 'Import failed')
+                onMessage('error', data.detail || '导入失败')
             }
         } catch (e) {
             onMessage('error', 'Network error')
@@ -101,7 +101,7 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
         const tpl = TEMPLATES[key]
         if (tpl) {
             setJsonInput(JSON.stringify(tpl.config, null, 2))
-            onMessage('info', `Loaded template: ${tpl.name}`)
+            onMessage('info', `已加载模板: ${tpl.name}`)
         }
     }
 
@@ -111,10 +111,10 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
             if (res.ok) {
                 const data = await res.json()
                 setJsonInput(JSON.stringify(JSON.parse(data.json), null, 2))
-                onMessage('success', 'Configuration loaded')
+                onMessage('success', '当前配置已加载')
             }
         } catch (e) {
-            onMessage('error', 'Failed to fetch config')
+            onMessage('error', '获取配置失败')
         }
     }
 
@@ -126,10 +126,10 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
                 await navigator.clipboard.writeText(data.base64)
                 setCopied(true)
                 setTimeout(() => setCopied(false), 2000)
-                onMessage('success', 'Base64 copied to clipboard')
+                onMessage('success', 'Base64 配置已复制到剪贴板')
             }
         } catch (e) {
-            onMessage('error', 'Copy failed')
+            onMessage('error', '复制失败')
         }
     }
 
@@ -140,7 +140,7 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
                 <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
                     <h3 className="font-semibold flex items-center gap-2 mb-4">
                         <FileCode className="w-4 h-4 text-primary" />
-                        Quick Templates
+                        快速模板
                     </h3>
                     <div className="space-y-3">
                         {Object.entries(TEMPLATES).map(([key, tpl]) => (
@@ -159,20 +159,20 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
                 <div className="bg-linear-to-br from-primary/10 to-transparent border border-primary/20 rounded-xl p-5 shadow-sm">
                     <h3 className="font-semibold flex items-center gap-2 mb-2 text-primary">
                         <Download className="w-4 h-4" />
-                        Export Data
+                        数据导出
                     </h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                        Get your configuration as a Base64 string for Vercel environment variables.
+                        获取配置的 Base64 字符串，用于 Vercel 环境变量。
                     </p>
                     <button
                         onClick={copyBase64}
                         className="w-full btn btn-primary bg-primary/90 hover:bg-primary shadow-lg shadow-primary/20"
                     >
                         {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
-                        {copied ? 'Copied!' : 'Copy Base64 Config'}
+                        {copied ? '已复制！' : '复制 Base64 配置'}
                     </button>
                     <p className="text-[10px] text-muted-foreground mt-2 text-center">
-                        Variable Name: <code className="bg-background px-1 py-0.5 rounded border border-border">DS2API_CONFIG_JSON</code>
+                        变量名: <code className="bg-background px-1 py-0.5 rounded border border-border">DS2API_CONFIG_JSON</code>
                     </p>
                 </div>
             </div>
@@ -182,14 +182,14 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
                 <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20">
                     <h3 className="font-semibold flex items-center gap-2">
                         <Upload className="w-4 h-4 text-primary" />
-                        JSON Editor
+                        JSON 编辑器
                     </h3>
                     <div className="flex gap-2">
                         <button onClick={handleExport} className="btn btn-secondary text-xs h-8">
-                            Load Current
+                            加载当前配置
                         </button>
                         <button onClick={handleImport} disabled={loading} className="btn btn-primary text-xs h-8">
-                            {loading ? 'Importing...' : 'Simulate Import'}
+                            {loading ? '导入中...' : '模拟导入/应用'}
                         </button>
                     </div>
                 </div>
@@ -217,10 +217,10 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
                             )}
                             <div>
                                 <h4 className={clsx("font-medium", result.imported_keys || result.imported_accounts ? "text-emerald-500" : "text-destructive")}>
-                                    Import Operation Completed
+                                    导入操作已完成
                                 </h4>
                                 <p className="text-sm opacity-80 mt-1">
-                                    Successfully imported {result.imported_keys} API keys and updated {result.imported_accounts} accounts.
+                                    成功导入了 {result.imported_keys} 个 API 密钥，并更新了 {result.imported_accounts} 个账号。
                                 </p>
                             </div>
                         </div>
