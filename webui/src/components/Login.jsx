@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Key, ArrowRight, ShieldCheck, Lock } from 'lucide-react'
+import clsx from 'clsx'
 
 export default function Login({ onLogin, onMessage }) {
     const [adminKey, setAdminKey] = useState('')
@@ -7,6 +9,8 @@ export default function Login({ onLogin, onMessage }) {
 
     const handleLogin = async (e) => {
         e.preventDefault()
+        if (!adminKey.trim()) return
+
         setLoading(true)
 
         try {
@@ -19,7 +23,6 @@ export default function Login({ onLogin, onMessage }) {
             const data = await res.json()
 
             if (res.ok && data.success) {
-                // 存储 token
                 const storage = remember ? localStorage : sessionStorage
                 storage.setItem('ds2api_token', data.token)
                 storage.setItem('ds2api_token_expires', Date.now() + data.expires_in * 1000)
@@ -39,50 +42,84 @@ export default function Login({ onLogin, onMessage }) {
     }
 
     return (
-        <div className="login-container">
-            <div className="login-card">
-                <div className="login-header">
-                    <h1>🔐 DS2API Admin</h1>
-                    <p>请输入管理密钥登录</p>
+        <div className="flex flex-col items-center justify-center p-4 w-full max-w-md relative z-10">
+            <div className="w-full bg-card/50 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-8 space-y-8 animate-in fade-in zoom-in-95 duration-300">
+                <div className="text-center space-y-2">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/20 text-primary mb-4 ring-1 ring-white/10 shadow-inner">
+                        <Lock className="w-8 h-8" />
+                    </div>
+                    <h1 className="text-2xl font-bold tracking-tight text-white">
+                        Welcome Back
+                    </h1>
+                    <p className="text-muted-foreground text-sm">
+                        Enter your admin key to access the dashboard
+                    </p>
                 </div>
 
-                <form onSubmit={handleLogin}>
-                    <div className="form-group">
-                        <label className="form-label">管理密钥</label>
-                        <input
-                            type="password"
-                            className="form-input"
-                            placeholder="输入 DS2API_ADMIN_KEY..."
-                            value={adminKey}
-                            onChange={e => setAdminKey(e.target.value)}
-                            autoFocus
-                        />
-                    </div>
+                <form onSubmit={handleLogin} className="space-y-6">
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-medium text-muted-foreground ml-1 uppercase tracking-wider">
+                                Admin Key
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors">
+                                    <Key className="w-4 h-4" />
+                                </div>
+                                <input
+                                    type="password"
+                                    className="block w-full pl-10 pr-3 py-2.5 bg-secondary/50 border border-border rounded-lg text-sm placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 focus:bg-secondary focus:outline-none transition-all duration-200"
+                                    placeholder="Enter your DS2API_ADMIN_KEY"
+                                    value={adminKey}
+                                    onChange={e => setAdminKey(e.target.value)}
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
 
-                    <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
-                        <input
-                            type="checkbox"
-                            id="remember"
-                            checked={remember}
-                            onChange={e => setRemember(e.target.checked)}
-                        />
-                        <label htmlFor="remember" style={{ cursor: 'pointer' }}>
-                            记住登录状态
-                        </label>
+                        <div className="flex items-center space-x-2">
+                            <button
+                                type="button"
+                                role="checkbox"
+                                aria-checked={remember}
+                                onClick={() => setRemember(!remember)}
+                                className={clsx(
+                                    "w-4 h-4 rounded border flex items-center justify-center transition-all duration-200",
+                                    remember ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/50 bg-transparent"
+                                )}
+                            >
+                                {remember && <div className="w-2 h-2 rounded-[1px] bg-current" />}
+                            </button>
+                            <span
+                                onClick={() => setRemember(!remember)}
+                                className="text-sm text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+                            >
+                                Keep me signed in
+                            </span>
+                        </div>
                     </div>
 
                     <button
                         type="submit"
-                        className="btn btn-primary"
                         disabled={loading}
-                        style={{ width: '100%', justifyContent: 'center' }}
+                        className="w-full flex items-center justify-center py-2.5 px-4 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 active:translate-y-0"
                     >
-                        {loading ? <span className="loading"></span> : '🚀 登录'}
+                        {loading ? (
+                            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                            <>
+                                <span>Access Dashboard</span>
+                                <ArrowRight className="w-4 h-4 ml-2" />
+                            </>
+                        )}
                     </button>
                 </form>
 
-                <div className="login-footer">
-                    <p>Session 有效期 24 小时</p>
+                <div className="pt-6 border-t border-border/50 text-center">
+                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/70">
+                        <ShieldCheck className="w-3 h-3" />
+                        <span>Secure Session • 24h Expiration</span>
+                    </div>
                 </div>
             </div>
         </div>

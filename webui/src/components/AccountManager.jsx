@@ -1,4 +1,18 @@
 import { useState, useEffect } from 'react'
+import {
+    Plus,
+    Trash2,
+    RefreshCw,
+    CheckCircle2,
+    AlertCircle,
+    Search,
+    Play,
+    MoreHorizontal,
+    X,
+    Server,
+    ShieldCheck
+} from 'lucide-react'
+import clsx from 'clsx'
 
 export default function AccountManager({ config, onRefresh, onMessage, authFetch }) {
     const [showAddKey, setShowAddKey] = useState(false)
@@ -6,17 +20,15 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
     const [newKey, setNewKey] = useState('')
     const [newAccount, setNewAccount] = useState({ email: '', mobile: '', password: '' })
     const [loading, setLoading] = useState(false)
-    const [validating, setValidating] = useState({})  // 单个账号验证状态
+    const [validating, setValidating] = useState({})
     const [validatingAll, setValidatingAll] = useState(false)
-    const [testing, setTesting] = useState({})  // 单个账号测试状态
+    const [testing, setTesting] = useState({})
     const [testingAll, setTestingAll] = useState(false)
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, results: [] })
     const [queueStatus, setQueueStatus] = useState(null)
 
-    // 使用 authFetch 或回退到普通 fetch
     const apiFetch = authFetch || fetch
 
-    // 获取队列状态
     const fetchQueueStatus = async () => {
         try {
             const res = await apiFetch('/admin/queue/status')
@@ -25,13 +37,13 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                 setQueueStatus(data)
             }
         } catch (e) {
-            console.error('获取队列状态失败:', e)
+            console.error('Failed to fetch queue status:', e)
         }
     }
 
     useEffect(() => {
         fetchQueueStatus()
-        const interval = setInterval(fetchQueueStatus, 5000)  // 每5秒刷新
+        const interval = setInterval(fetchQueueStatus, 5000)
         return () => clearInterval(interval)
     }, [])
 
@@ -45,39 +57,39 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                 body: JSON.stringify({ key: newKey.trim() }),
             })
             if (res.ok) {
-                onMessage('success', 'API Key 添加成功')
+                onMessage('success', 'API Key added successfully')
                 setNewKey('')
                 setShowAddKey(false)
                 onRefresh()
             } else {
                 const data = await res.json()
-                onMessage('error', data.detail || '添加失败')
+                onMessage('error', data.detail || 'Failed to add')
             }
         } catch (e) {
-            onMessage('error', '网络错误')
+            onMessage('error', 'Network error')
         } finally {
             setLoading(false)
         }
     }
 
     const deleteKey = async (key) => {
-        if (!confirm('确定删除此 API Key？')) return
+        if (!confirm('Are you sure you want to delete this API Key?')) return
         try {
             const res = await apiFetch(`/admin/keys/${encodeURIComponent(key)}`, { method: 'DELETE' })
             if (res.ok) {
-                onMessage('success', '删除成功')
+                onMessage('success', 'Deleted successfully')
                 onRefresh()
             } else {
-                onMessage('error', '删除失败')
+                onMessage('error', 'Delete failed')
             }
         } catch (e) {
-            onMessage('error', '网络错误')
+            onMessage('error', 'Network error')
         }
     }
 
     const addAccount = async () => {
         if (!newAccount.password || (!newAccount.email && !newAccount.mobile)) {
-            onMessage('error', '请填写密码和邮箱/手机号')
+            onMessage('error', 'Password and Email/Mobile are required')
             return
         }
         setLoading(true)
@@ -88,37 +100,36 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                 body: JSON.stringify(newAccount),
             })
             if (res.ok) {
-                onMessage('success', '账号添加成功')
+                onMessage('success', 'Account added successfully')
                 setNewAccount({ email: '', mobile: '', password: '' })
                 setShowAddAccount(false)
                 onRefresh()
             } else {
                 const data = await res.json()
-                onMessage('error', data.detail || '添加失败')
+                onMessage('error', data.detail || 'Failed to add')
             }
         } catch (e) {
-            onMessage('error', '网络错误')
+            onMessage('error', 'Network error')
         } finally {
             setLoading(false)
         }
     }
 
     const deleteAccount = async (id) => {
-        if (!confirm('确定删除此账号？')) return
+        if (!confirm('Are you sure you want to delete this account?')) return
         try {
             const res = await apiFetch(`/admin/accounts/${encodeURIComponent(id)}`, { method: 'DELETE' })
             if (res.ok) {
-                onMessage('success', '删除成功')
+                onMessage('success', 'Deleted successfully')
                 onRefresh()
             } else {
-                onMessage('error', '删除失败')
+                onMessage('error', 'Delete failed')
             }
         } catch (e) {
-            onMessage('error', '网络错误')
+            onMessage('error', 'Network error')
         }
     }
 
-    // 验证单个账号
     const validateAccount = async (identifier) => {
         setValidating(prev => ({ ...prev, [identifier]: true }))
         try {
@@ -128,22 +139,17 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                 body: JSON.stringify({ identifier }),
             })
             const data = await res.json()
-            if (data.valid) {
-                onMessage('success', `${identifier}: ${data.message}`)
-            } else {
-                onMessage('error', `${identifier}: ${data.message}`)
-            }
+            onMessage(data.valid ? 'success' : 'error', `${identifier}: ${data.message}`)
             onRefresh()
         } catch (e) {
-            onMessage('error', '验证失败: ' + e.message)
+            onMessage('error', 'Validation failed: ' + e.message)
         } finally {
             setValidating(prev => ({ ...prev, [identifier]: false }))
         }
     }
 
-    // 批量验证所有账号（带进度）
     const validateAllAccounts = async () => {
-        if (!confirm('确定要验证所有账号？')) return
+        if (!confirm('Validate ALL accounts? This might take a while.')) return
         const accounts = config.accounts || []
         if (accounts.length === 0) return
 
@@ -173,12 +179,11 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
             setBatchProgress({ current: i + 1, total: accounts.length, results: [...results] })
         }
 
-        onMessage('success', `验证完成: ${validCount}/${accounts.length} 个账号有效`)
+        onMessage('success', `Completed: ${validCount}/${accounts.length} valid`)
         onRefresh()
         setValidatingAll(false)
     }
 
-    // 测试单个账号 API
     const testAccount = async (identifier) => {
         setTesting(prev => ({ ...prev, [identifier]: true }))
         try {
@@ -188,22 +193,17 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                 body: JSON.stringify({ identifier }),
             })
             const data = await res.json()
-            if (data.success) {
-                onMessage('success', `${identifier}: API 测试成功 (${data.response_time}ms)`)
-            } else {
-                onMessage('error', `${identifier}: ${data.message}`)
-            }
+            onMessage(data.success ? 'success' : 'error', `${identifier}: ${data.success ? `Success (${data.response_time}ms)` : data.message}`)
             onRefresh()
         } catch (e) {
-            onMessage('error', 'API 测试失败: ' + e.message)
+            onMessage('error', 'Test failed: ' + e.message)
         } finally {
             setTesting(prev => ({ ...prev, [identifier]: false }))
         }
     }
 
-    // 批量测试所有账号 API（带进度）
     const testAllAccounts = async () => {
-        if (!confirm('确定要测试所有账号的 API？')) return
+        if (!confirm('Test API connectivity for ALL accounts?')) return
         const accounts = config.accounts || []
         if (accounts.length === 0) return
 
@@ -233,100 +233,144 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
             setBatchProgress({ current: i + 1, total: accounts.length, results: [...results] })
         }
 
-        onMessage('success', `API 测试完成: ${successCount}/${accounts.length} 个账号可用`)
+        onMessage('success', `Completed: ${successCount}/${accounts.length} available`)
         onRefresh()
         setTestingAll(false)
     }
 
     return (
-        <div className="section">
-            {/* 队列状态监控 */}
+        <div className="space-y-6">
+            {/* Queue Status */}
             {queueStatus && (
-                <div className="card">
-                    <div className="card-header">
-                        <span className="card-title">📊 轮询队列状态</span>
-                        <button className="btn btn-secondary" onClick={fetchQueueStatus}>刷新</button>
-                    </div>
-                    <div className="queue-status">
-                        <div className="stat-row">
-                            <span className="stat-label">可用账号:</span>
-                            <span className="stat-value stat-success">{queueStatus.available}</span>
-                            <span className="stat-label" style={{ marginLeft: '20px' }}>使用中:</span>
-                            <span className="stat-value stat-warning">{queueStatus.in_use}</span>
-                            <span className="stat-label" style={{ marginLeft: '20px' }}>总计:</span>
-                            <span className="stat-value">{queueStatus.total}</span>
-                        </div>
-                        {queueStatus.in_use > 0 && (
-                            <div className="stat-detail">
-                                正在使用: {queueStatus.in_use_accounts.join(', ')}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
+                                <CheckCircle2 className="w-5 h-5" />
                             </div>
-                        )}
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Available</p>
+                                <p className="text-2xl font-bold">{queueStatus.available}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-500/10 text-amber-500 rounded-lg">
+                                <Server className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">In Use</p>
+                                <p className="text-2xl font-bold">{queueStatus.in_use}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                                <ShieldCheck className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Total Accounts</p>
+                                <p className="text-2xl font-bold">{queueStatus.total}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* API Keys */}
-            <div className="card">
-                <div className="card-header">
-                    <span className="card-title">🔑 API Keys</span>
-                    <button className="btn btn-primary" onClick={() => setShowAddKey(true)}>+ 添加</button>
+            {/* API Keys Section */}
+            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+                <div className="p-6 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-lg font-semibold">API Keys</h2>
+                        <p className="text-sm text-muted-foreground">Manage access keys for the API</p>
+                    </div>
+                    <button
+                        onClick={() => setShowAddKey(true)}
+                        className="btn btn-primary flex items-center gap-2"
+                    >
+                        <Plus className="w-4 h-4" />
+                        New Key
+                    </button>
                 </div>
 
-                {config.keys?.length > 0 ? (
-                    <div className="list">
-                        {config.keys.map((key, i) => (
-                            <div key={i} className="list-item">
-                                <span className="list-item-text">{key.slice(0, 16)}****</span>
-                                <button className="btn btn-danger" onClick={() => deleteKey(key)}>删除</button>
+                <div className="divide-y divide-border">
+                    {config.keys?.length > 0 ? (
+                        config.keys.map((key, i) => (
+                            <div key={i} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors group">
+                                <div className="font-mono text-sm bg-muted/50 px-3 py-1 rounded inline-block">
+                                    {key.slice(0, 16)}****
+                                </div>
+                                <button
+                                    onClick={() => deleteKey(key)}
+                                    className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
                             </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="empty-state">暂无 API Key</div>
-                )}
+                        ))
+                    ) : (
+                        <div className="p-8 text-center text-muted-foreground">No API keys found</div>
+                    )}
+                </div>
             </div>
 
-            {/* Accounts */}
-            <div className="card">
-                <div className="card-header">
-                    <span className="card-title">👤 DeepSeek 账号</span>
-                    <div className="btn-group-inline">
+            {/* Accounts Section */}
+            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+                <div className="p-6 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-lg font-semibold">DeepSeek Accounts</h2>
+                        <p className="text-sm text-muted-foreground">Manage your account pool</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
                         <button
-                            className="btn btn-primary btn-sm"
                             onClick={testAllAccounts}
                             disabled={testingAll || validatingAll || !config.accounts?.length}
+                            className="btn btn-secondary text-xs"
                         >
-                            {testingAll ? <span className="loading"></span> : '🧪 批量测试'}
+                            {testingAll ? <span className="animate-spin mr-2">⟳</span> : <Play className="w-3 h-3 mr-2" />}
+                            Test All
                         </button>
                         <button
-                            className="btn btn-secondary btn-sm"
                             onClick={validateAllAccounts}
                             disabled={validatingAll || testingAll || !config.accounts?.length}
+                            className="btn btn-secondary text-xs"
                         >
-                            {validatingAll ? <span className="loading"></span> : '✅ 批量验证'}
+                            {validatingAll ? <span className="animate-spin mr-2">⟳</span> : <CheckCircle2 className="w-3 h-3 mr-2" />}
+                            Validate All
                         </button>
-                        <button className="btn btn-primary" onClick={() => setShowAddAccount(true)}>+ 添加</button>
+                        <button
+                            onClick={() => setShowAddAccount(true)}
+                            className="btn btn-primary flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Add Account
+                        </button>
                     </div>
                 </div>
 
-                {/* 批量操作进度条 */}
+                {/* Batch Progress */}
                 {(testingAll || validatingAll) && batchProgress.total > 0 && (
-                    <div className="batch-progress">
-                        <div className="progress-header">
-                            <span>{testingAll ? '🧪 批量测试中...' : '✅ 批量验证中...'}</span>
-                            <span>{batchProgress.current}/{batchProgress.total}</span>
+                    <div className="p-4 border-b border-border bg-muted/30">
+                        <div className="flex items-center justify-between text-sm mb-2">
+                            <span className="font-medium">{testingAll ? 'Testing all accounts...' : 'Validating all accounts...'}</span>
+                            <span className="text-muted-foreground">{batchProgress.current} / {batchProgress.total}</span>
                         </div>
-                        <div className="progress-bar">
+                        <div className="w-full bg-muted rounded-full h-2 overflow-hidden mb-4">
                             <div
-                                className="progress-fill"
+                                className="bg-primary h-full transition-all duration-300"
                                 style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
                             />
                         </div>
                         {batchProgress.results.length > 0 && (
-                            <div className="progress-results">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
                                 {batchProgress.results.map((r, i) => (
-                                    <div key={i} className={`progress-result ${r.success ? 'success' : 'failed'}`}>
-                                        {r.success ? '✓' : '✗'} {r.id} {r.time ? `(${r.time}ms)` : ''}
+                                    <div key={i} className={clsx(
+                                        "text-xs px-2 py-1 rounded border truncate",
+                                        r.success ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-destructive/10 border-destructive/20 text-destructive"
+                                    )}>
+                                        {r.success ? '✓' : '✗'} {r.id}
                                     </div>
                                 ))}
                             </div>
@@ -334,120 +378,139 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                     </div>
                 )}
 
-                {config.accounts?.length > 0 ? (
-                    <div className="list">
-                        {config.accounts.map((acc, i) => {
+                <div className="divide-y divide-border">
+                    {config.accounts?.length > 0 ? (
+                        config.accounts.map((acc, i) => {
                             const id = acc.email || acc.mobile
                             return (
-                                <div key={i} className="list-item">
-                                    <div className="list-item-info">
-                                        <span className="list-item-text">{id}</span>
-                                        <span className={`badge ${acc.has_token ? 'badge-success' : 'badge-warning'}`}>
-                                            {acc.has_token ? '已登录' : '未登录'}
-                                        </span>
-                                        {acc.token_preview && (
-                                            <span className="token-preview" title="Token 预览">
-                                                🔑 {acc.token_preview}
-                                            </span>
-                                        )}
+                                <div key={i} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-muted/50 transition-colors">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className={clsx(
+                                            "w-2 h-2 rounded-full shrink-0",
+                                            acc.has_token ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-amber-500"
+                                        )} />
+                                        <div className="min-w-0">
+                                            <div className="font-medium truncate">{id}</div>
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                                <span>{acc.has_token ? 'Active Session' : 'Login Required'}</span>
+                                                {acc.token_preview && (
+                                                    <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">
+                                                        {acc.token_preview}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="btn-group-inline">
+                                    <div className="flex items-center gap-2 self-end md:self-auto">
                                         <button
-                                            className="btn btn-primary btn-sm"
                                             onClick={() => testAccount(id)}
                                             disabled={testing[id]}
+                                            className="px-3 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-secondary transition-colors disabled:opacity-50"
                                         >
-                                            {testing[id] ? <span className="loading"></span> : '测试'}
+                                            {testing[id] ? 'Testing...' : 'Test'}
                                         </button>
                                         <button
-                                            className="btn btn-secondary btn-sm"
                                             onClick={() => validateAccount(id)}
                                             disabled={validating[id]}
+                                            className="px-3 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-secondary transition-colors disabled:opacity-50"
                                         >
-                                            {validating[id] ? <span className="loading"></span> : '验证'}
+                                            {validating[id] ? 'Validating...' : 'Validate'}
                                         </button>
-                                        <button className="btn btn-danger btn-sm" onClick={() => deleteAccount(id)}>删除</button>
+                                        <button
+                                            onClick={() => deleteAccount(id)}
+                                            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
                                     </div>
                                 </div>
                             )
-                        })}
-                    </div>
-                ) : (
-                    <div className="empty-state">暂无账号</div>
-                )}
+                        })
+                    ) : (
+                        <div className="p-8 text-center text-muted-foreground">No accounts found</div>
+                    )}
+                </div>
             </div>
 
-            {/* Add Key Modal */}
+            {/* Modals */}
             {showAddKey && (
-                <div className="modal-overlay" onClick={() => setShowAddKey(false)}>
-                    <div className="modal" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <span className="modal-title">添加 API Key</span>
-                            <button className="modal-close" onClick={() => setShowAddKey(false)}>&times;</button>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">API Key</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="输入你自定义的 API Key"
-                                value={newKey}
-                                onChange={e => setNewKey(e.target.value)}
-                            />
-                        </div>
-                        <div className="btn-group">
-                            <button className="btn btn-secondary" onClick={() => setShowAddKey(false)}>取消</button>
-                            <button className="btn btn-primary" onClick={addKey} disabled={loading}>
-                                {loading ? <span className="loading"></span> : '添加'}
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
+                    <div className="bg-card w-full max-w-md rounded-xl border border-border shadow-2xl overflow-hidden animate-in zoom-in-95">
+                        <div className="p-4 border-b border-border flex justify-between items-center">
+                            <h3 className="font-semibold">Add API Key</h3>
+                            <button onClick={() => setShowAddKey(false)} className="text-muted-foreground hover:text-foreground">
+                                <X className="w-5 h-5" />
                             </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">New Key value</label>
+                                <input
+                                    type="text"
+                                    className="input-field"
+                                    placeholder="Enter custom API key"
+                                    value={newKey}
+                                    onChange={e => setNewKey(e.target.value)}
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button onClick={() => setShowAddKey(false)} className="btn btn-secondary">Cancel</button>
+                                <button onClick={addKey} disabled={loading} className="btn btn-primary">
+                                    {loading ? 'Adding...' : 'Add Key'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Add Account Modal */}
             {showAddAccount && (
-                <div className="modal-overlay" onClick={() => setShowAddAccount(false)}>
-                    <div className="modal" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <span className="modal-title">添加 DeepSeek 账号</span>
-                            <button className="modal-close" onClick={() => setShowAddAccount(false)}>&times;</button>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">Email（可选）</label>
-                            <input
-                                type="email"
-                                className="form-input"
-                                placeholder="user@example.com"
-                                value={newAccount.email}
-                                onChange={e => setNewAccount({ ...newAccount, email: e.target.value })}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">手机号（可选）</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="+86..."
-                                value={newAccount.mobile}
-                                onChange={e => setNewAccount({ ...newAccount, mobile: e.target.value })}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">密码（必填）</label>
-                            <input
-                                type="password"
-                                className="form-input"
-                                placeholder="DeepSeek 账号密码"
-                                value={newAccount.password}
-                                onChange={e => setNewAccount({ ...newAccount, password: e.target.value })}
-                            />
-                        </div>
-                        <div className="btn-group">
-                            <button className="btn btn-secondary" onClick={() => setShowAddAccount(false)}>取消</button>
-                            <button className="btn btn-primary" onClick={addAccount} disabled={loading}>
-                                {loading ? <span className="loading"></span> : '添加'}
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
+                    <div className="bg-card w-full max-w-md rounded-xl border border-border shadow-2xl overflow-hidden animate-in zoom-in-95">
+                        <div className="p-4 border-b border-border flex justify-between items-center">
+                            <h3 className="font-semibold">Add DeepSeek Account</h3>
+                            <button onClick={() => setShowAddAccount(false)} className="text-muted-foreground hover:text-foreground">
+                                <X className="w-5 h-5" />
                             </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Email (Optional)</label>
+                                <input
+                                    type="email"
+                                    className="input-field"
+                                    placeholder="user@example.com"
+                                    value={newAccount.email}
+                                    onChange={e => setNewAccount({ ...newAccount, email: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Mobile (Optional)</label>
+                                <input
+                                    type="text"
+                                    className="input-field"
+                                    placeholder="+86..."
+                                    value={newAccount.mobile}
+                                    onChange={e => setNewAccount({ ...newAccount, mobile: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Password <span className="text-destructive">*</span></label>
+                                <input
+                                    type="password"
+                                    className="input-field"
+                                    placeholder="Account password"
+                                    value={newAccount.password}
+                                    onChange={e => setNewAccount({ ...newAccount, password: e.target.value })}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button onClick={() => setShowAddAccount(false)} className="btn btn-secondary">Cancel</button>
+                                <button onClick={addAccount} disabled={loading} className="btn btn-primary">
+                                    {loading ? 'Adding...' : 'Add Account'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

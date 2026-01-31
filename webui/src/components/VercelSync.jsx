@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Cloud, ArrowRight, ExternalLink, Info, CheckCircle2, XCircle } from 'lucide-react'
 
 export default function VercelSync({ onMessage, authFetch }) {
     const [vercelToken, setVercelToken] = useState('')
@@ -8,10 +9,8 @@ export default function VercelSync({ onMessage, authFetch }) {
     const [result, setResult] = useState(null)
     const [preconfig, setPreconfig] = useState(null)
 
-    // 使用 authFetch 或回退到普通 fetch
     const apiFetch = authFetch || fetch
 
-    // 自动加载预配置的 Vercel 信息
     useEffect(() => {
         const loadPreconfig = async () => {
             try {
@@ -23,22 +22,21 @@ export default function VercelSync({ onMessage, authFetch }) {
                     if (data.team_id) setTeamId(data.team_id)
                 }
             } catch (e) {
-                console.error('加载 Vercel 预配置失败:', e)
+                console.error('Failed to load preconfig:', e)
             }
         }
         loadPreconfig()
     }, [])
 
     const handleSync = async () => {
-        // 如果预配置了 token，使用特殊标记让后端使用预配置的 token
         const tokenToUse = preconfig?.has_token && !vercelToken ? '__USE_PRECONFIG__' : vercelToken
 
         if (!tokenToUse && !preconfig?.has_token) {
-            onMessage('error', '请填写 Vercel Token')
+            onMessage('error', 'Vercel Token is required')
             return
         }
         if (!projectId) {
-            onMessage('error', '请填写 Project ID')
+            onMessage('error', 'Project ID is required')
             return
         }
 
@@ -56,140 +54,162 @@ export default function VercelSync({ onMessage, authFetch }) {
             })
             const data = await res.json()
             if (res.ok) {
-                setResult(data)
+                setResult({ ...data, success: true })
                 onMessage('success', data.message)
             } else {
-                onMessage('error', data.detail || '同步失败')
+                setResult({ ...data, success: false })
+                onMessage('error', data.detail || 'Sync failed')
             }
         } catch (e) {
-            onMessage('error', '网络错误')
+            onMessage('error', 'Network error')
         } finally {
             setLoading(false)
         }
     }
 
     return (
-        <div className="section">
-            <div className="card">
-                <div className="card-title" style={{ marginBottom: '1rem' }}>☁️ Vercel 同步</div>
-
-                <div className="alert alert-info" style={{ marginBottom: '1rem' }}>
-                    <strong>说明：</strong>同步配置到 Vercel 后会自动触发重新部署，约需 30-60 秒生效。
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto h-[calc(100vh-140px)]">
+            {/* Configuration Form */}
+            <div className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6">
+                <div className="border-b border-border pb-6">
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                        <Cloud className="w-6 h-6 text-primary" />
+                        Vercel Deployment
+                    </h2>
+                    <p className="text-muted-foreground text-sm mt-1">
+                        Sync your current key and account configuration directly to Vercel environment variables.
+                    </p>
                 </div>
 
-                <div className="form-group">
-                    <label className="form-label">
-                        Vercel Token
-                        <a
-                            href="https://vercel.com/account/tokens"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ marginLeft: '0.5rem', fontSize: '0.8rem' }}
-                        >
-                            获取 Token →
-                        </a>
-                    </label>
-                    <input
-                        type="password"
-                        className="form-input"
-                        placeholder="输入 Vercel API Token"
-                        value={vercelToken}
-                        onChange={e => setVercelToken(e.target.value)}
-                    />
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center justify-between">
+                            Vercel Token
+                            <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
+                                Get Token <ExternalLink className="w-3 h-3" />
+                            </a>
+                        </label>
+                        <div className="relative">
+                            <input
+                                type="password"
+                                className="input-field pr-10"
+                                placeholder={preconfig?.has_token ? "Using pre-configured token" : "Enter Vercel Access Token"}
+                                value={vercelToken}
+                                onChange={e => setVercelToken(e.target.value)}
+                            />
+                            {preconfig?.has_token && !vercelToken && (
+                                <div className="absolute right-3 top-2.5 text-emerald-500">
+                                    <CheckCircle2 className="w-5 h-5" />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Project ID</label>
+                        <input
+                            type="text"
+                            className="input-field"
+                            placeholder="prj_xxxxxxxxxxxx or Project Name"
+                            value={projectId}
+                            onChange={e => setProjectId(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">Found in Project Settings → General</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                            Team ID <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                        </label>
+                        <input
+                            type="text"
+                            className="input-field"
+                            placeholder="team_xxxxxxxxxxxx"
+                            value={teamId}
+                            onChange={e => setTeamId(e.target.value)}
+                        />
+                    </div>
                 </div>
 
-                <div className="form-group">
-                    <label className="form-label">
-                        Project ID
-                        <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            (可在 Vercel 项目设置中找到)
-                        </span>
-                    </label>
-                    <input
-                        type="text"
-                        className="form-input"
-                        placeholder="prj_xxxxxxxxxxxx 或项目名称"
-                        value={projectId}
-                        onChange={e => setProjectId(e.target.value)}
-                    />
+                <div className="pt-4">
+                    <button
+                        onClick={handleSync}
+                        disabled={loading}
+                        className="w-full btn btn-primary flex justify-center items-center py-3 text-base shadow-lg shadow-primary/20 hover:shadow-primary/30"
+                    >
+                        {loading ? (
+                            <span className="flex items-center gap-2">
+                                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                Syncing...
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-2">
+                                Sync & Redeploy <ArrowRight className="w-5 h-5" />
+                            </span>
+                        )}
+                    </button>
+                    <p className="text-xs text-center text-muted-foreground mt-4">
+                        This will trigger a new deployment on Vercel which takes about 30-60 seconds.
+                    </p>
                 </div>
-
-                <div className="form-group">
-                    <label className="form-label">
-                        Team ID（可选）
-                        <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            (个人项目无需填写)
-                        </span>
-                    </label>
-                    <input
-                        type="text"
-                        className="form-input"
-                        placeholder="team_xxxxxxxxxxxx"
-                        value={teamId}
-                        onChange={e => setTeamId(e.target.value)}
-                    />
-                </div>
-
-                <button
-                    className="btn btn-primary"
-                    onClick={handleSync}
-                    disabled={loading}
-                    style={{ width: '100%' }}
-                >
-                    {loading ? (
-                        <>
-                            <span className="loading"></span>
-                            同步中...
-                        </>
-                    ) : (
-                        '🚀 同步到 Vercel 并重新部署'
-                    )}
-                </button>
             </div>
 
-            {result && (
-                <div className="card">
-                    <div className="card-title" style={{ marginBottom: '1rem' }}>同步结果</div>
-                    <div className={`alert ${result.success ? 'alert-success' : 'alert-error'}`}>
-                        {result.message}
-                    </div>
-                    {result.deployment_url && (
-                        <p>
-                            部署地址：
-                            <a
-                                href={`https://${result.deployment_url}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ color: 'var(--accent)' }}
-                            >
-                                {result.deployment_url}
-                            </a>
-                        </p>
-                    )}
-                    {result.manual_deploy_required && (
-                        <p style={{ color: 'var(--warning)' }}>
-                            ⚠️ 需要手动在 Vercel 控制台触发重新部署
-                        </p>
-                    )}
-                </div>
-            )}
+            {/* Status & Guide */}
+            <div className="space-y-6">
+                {result && (
+                    <div className={`p-6 rounded-xl border ${result.success ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-destructive/10 border-destructive/20'} animate-in fade-in slide-in-from-right-4`}>
+                        <div className="flex items-start gap-4">
+                            {result.success ? (
+                                <div className="p-2 bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/30">
+                                    <CheckCircle2 className="w-6 h-6" />
+                                </div>
+                            ) : (
+                                <div className="p-2 bg-destructive text-white rounded-full shadow-lg shadow-destructive/30">
+                                    <XCircle className="w-6 h-6" />
+                                </div>
+                            )}
+                            <div className="space-y-1">
+                                <h3 className={`font-semibold text-lg ${result.success ? 'text-emerald-500' : 'text-destructive'}`}>
+                                    {result.success ? 'Sync Successful' : 'Sync Failed'}
+                                </h3>
+                                <p className="text-sm opacity-90">{result.message}</p>
 
-            <div className="card">
-                <div className="card-title" style={{ marginBottom: '1rem' }}>📖 使用说明</div>
-                <ol style={{ paddingLeft: '1.5rem', color: 'var(--text-secondary)' }}>
-                    <li style={{ marginBottom: '0.5rem' }}>
-                        前往 <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>Vercel Token 页面</a> 创建一个新 Token
-                    </li>
-                    <li style={{ marginBottom: '0.5rem' }}>
-                        在 Vercel 项目设置中找到 Project ID（Settings → General → Project ID）
-                    </li>
-                    <li style={{ marginBottom: '0.5rem' }}>
-                        如果是团队项目，还需要填写 Team ID
-                    </li>
-                    <li style={{ marginBottom: '0.5rem' }}>
-                        点击同步按钮，配置将自动更新到 Vercel 环境变量并触发重新部署
-                    </li>
-                </ol>
+                                {result.deployment_url && (
+                                    <div className="pt-3 mt-3 border-t border-emerald-500/20">
+                                        <a href={`https://${result.deployment_url}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium hover:underline">
+                                            Visit Deployment <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="bg-secondary/20 border border-border rounded-xl p-6">
+                    <h3 className="font-semibold flex items-center gap-2 mb-4">
+                        <Info className="w-5 h-5 text-primary" />
+                        How it works
+                    </h3>
+                    <ul className="space-y-4">
+                        <li className="flex gap-3">
+                            <span className="shrink-0 w-6 h-6 rounded-full bg-background border border-border flex items-center justify-center text-xs font-bold text-muted-foreground">1</span>
+                            <p className="text-sm text-muted-foreground">Current configuration (Keys & Accounts) is exported to a JSON string.</p>
+                        </li>
+                        <li className="flex gap-3">
+                            <span className="shrink-0 w-6 h-6 rounded-full bg-background border border-border flex items-center justify-center text-xs font-bold text-muted-foreground">2</span>
+                            <p className="text-sm text-muted-foreground">The JSON is encoded to Base64 to ensure format compatibility.</p>
+                        </li>
+                        <li className="flex gap-3">
+                            <span className="shrink-0 w-6 h-6 rounded-full bg-background border border-border flex items-center justify-center text-xs font-bold text-muted-foreground">3</span>
+                            <p className="text-sm text-muted-foreground">We update the <code className="bg-background px-1 py-0.5 rounded border border-border text-xs">DS2API_CONFIG_JSON</code> env variable in your Vercel project.</p>
+                        </li>
+                        <li className="flex gap-3">
+                            <span className="shrink-0 w-6 h-6 rounded-full bg-background border border-border flex items-center justify-center text-xs font-bold text-muted-foreground">4</span>
+                            <p className="text-sm text-muted-foreground">A redeployment is triggered to apply the new environment variables.</p>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
     )

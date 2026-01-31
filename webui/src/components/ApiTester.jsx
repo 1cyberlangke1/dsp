@@ -1,17 +1,30 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
+import {
+    Send,
+    Square,
+    MessageSquare,
+    Cpu,
+    Search as SearchIcon,
+    Sparkles,
+    Bot,
+    User,
+    Loader2,
+    CheckCircle2,
+    AlertCircle
+} from 'lucide-react'
+import clsx from 'clsx'
 
 const MODELS = [
-    { id: 'deepseek-chat', name: 'deepseek-chat' },
-    { id: 'deepseek-reasoner', name: 'deepseek-reasoner' },
-    { id: 'deepseek-chat-search', name: 'deepseek-chat-search' },
-    { id: 'deepseek-reasoner-search', name: 'deepseek-reasoner-search' },
+    { id: 'deepseek-chat', name: 'DeepSeek Chat', icon: MessageSquare, desc: 'General purpose chat model' },
+    { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', icon: Cpu, desc: 'Optimized for reasoning tasks' },
+    // Removed search models as they might be deprecated or identical to chat with search tool
 ]
 
 export default function ApiTester({ config, onMessage, authFetch }) {
     const [model, setModel] = useState('deepseek-chat')
-    const [message, setMessage] = useState('你好，请用一句话介绍你自己。')
+    const [message, setMessage] = useState('Hello, please introduce yourself in one sentence.')
     const [apiKey, setApiKey] = useState('')
-    const [selectedAccount, setSelectedAccount] = useState('')  // 空为随机
+    const [selectedAccount, setSelectedAccount] = useState('')
     const [response, setResponse] = useState(null)
     const [loading, setLoading] = useState(false)
     const [streamingContent, setStreamingContent] = useState('')
@@ -19,15 +32,8 @@ export default function ApiTester({ config, onMessage, authFetch }) {
     const [isStreaming, setIsStreaming] = useState(false)
     const abortControllerRef = useRef(null)
 
-    // 使用 authFetch 或回退到普通 fetch（admin API 用 authFetch，OpenAI 兼容 API 用普通 fetch）
     const apiFetch = authFetch || fetch
-
-    // 获取账号列表
     const accounts = config.accounts || []
-
-    const testApi = async () => {
-        // ... (保留旧的 server-side test作为备用，或者完全移除？保留吧但不使用)
-    }
 
     const stopGeneration = () => {
         if (abortControllerRef.current) {
@@ -52,7 +58,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
         try {
             const key = apiKey || (config.keys?.[0] || '')
             if (!key) {
-                onMessage('error', '请提供 API Key')
+                onMessage('error', 'Please provide an API Key')
                 setLoading(false)
                 setIsStreaming(false)
                 return
@@ -74,8 +80,8 @@ export default function ApiTester({ config, onMessage, authFetch }) {
 
             if (!res.ok) {
                 const data = await res.json()
-                setResponse({ success: false, error: data.error?.message || '请求失败' })
-                onMessage('error', data.error?.message || '请求失败')
+                setResponse({ success: false, error: data.error?.message || 'Request failed' })
+                onMessage('error', data.error?.message || 'Request failed')
                 setLoading(false)
                 setIsStreaming(false)
                 return
@@ -83,7 +89,6 @@ export default function ApiTester({ config, onMessage, authFetch }) {
 
             setResponse({ success: true, status_code: res.status })
 
-            // 处理流式响应
             const reader = res.body.getReader()
             const decoder = new TextDecoder()
             let buffer = ''
@@ -108,12 +113,9 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                         const choice = json.choices?.[0]
                         if (choice?.delta) {
                             const delta = choice.delta
-
-                            // DeepSeek 官方格式使用 reasoning_content 表示思考内容
                             if (delta.reasoning_content) {
                                 setStreamingThinking(prev => prev + delta.reasoning_content)
                             }
-                            // 正常内容
                             if (delta.content) {
                                 setStreamingContent(prev => prev + delta.content)
                             }
@@ -125,9 +127,9 @@ export default function ApiTester({ config, onMessage, authFetch }) {
             }
         } catch (e) {
             if (e.name === 'AbortError') {
-                onMessage('info', '已停止生成')
+                onMessage('info', 'Generation stopped')
             } else {
-                onMessage('error', '网络错误: ' + e.message)
+                onMessage('error', 'Network error: ' + e.message)
                 setResponse({ error: e.message, success: false })
             }
         } finally {
@@ -137,9 +139,7 @@ export default function ApiTester({ config, onMessage, authFetch }) {
         }
     }
 
-    // 智能测试：根据是否选择账号决定测试方式
     const sendTest = async () => {
-        // 如果选择了指定账号，使用账号测试接口（暂时保持非流式，或者后续改为支持流式）
         if (selectedAccount) {
             setLoading(true)
             setResponse(null)
@@ -161,12 +161,12 @@ export default function ApiTester({ config, onMessage, authFetch }) {
                     account: selectedAccount,
                 })
                 if (data.success) {
-                    onMessage('success', `${selectedAccount}: 测试成功 (${data.response_time}ms)`)
+                    onMessage('success', `${selectedAccount}: Test Success (${data.response_time}ms)`)
                 } else {
                     onMessage('error', `${selectedAccount}: ${data.message}`)
                 }
             } catch (e) {
-                onMessage('error', '网络错误: ' + e.message)
+                onMessage('error', 'Network error: ' + e.message)
                 setResponse({ error: e.message })
             } finally {
                 setLoading(false)
@@ -174,174 +174,180 @@ export default function ApiTester({ config, onMessage, authFetch }) {
             return
         }
 
-        // 随机账号：使用标准 API (流式)
         directTest()
     }
 
     return (
-        <div className="section">
-            <div className="card">
-                <div className="card-title" style={{ marginBottom: '1rem' }}>🧪 API 测试</div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
+            {/* Configuration Panel */}
+            <div className="lg:col-span-1 space-y-4 overflow-y-auto pr-2">
+                <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-5">
+                    <h3 className="font-semibold flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        Configuration
+                    </h3>
 
-                <div className="form-group">
-                    <label className="form-label">模型</label>
-                    <select
-                        className="form-input"
-                        value={model}
-                        onChange={e => setModel(e.target.value)}
-                    >
-                        {MODELS.map(m => (
-                            <option key={m.id} value={m.id}>{m.name}</option>
-                        ))}
-                    </select>
-                </div>
+                    <div className="space-y-3">
+                        <label className="text-sm font-medium text-muted-foreground">Model</label>
+                        <div className="grid grid-cols-1 gap-2">
+                            {MODELS.map(m => {
+                                const Icon = m.icon
+                                return (
+                                    <button
+                                        key={m.id}
+                                        onClick={() => setModel(m.id)}
+                                        className={clsx(
+                                            "flex items-center gap-3 p-3 rounded-lg border text-left transition-all",
+                                            model === m.id
+                                                ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                                                : "border-border hover:bg-secondary/50"
+                                        )}
+                                    >
+                                        <div className={clsx("p-2 rounded-md", model === m.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                                            <Icon className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <div className="font-medium text-sm">{m.name}</div>
+                                            <div className="text-xs text-muted-foreground">{m.desc}</div>
+                                        </div>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </div>
 
-                <div className="form-group">
-                    <label className="form-label">账号（指定测试哪个账号）</label>
-                    <select
-                        className="form-input"
-                        value={selectedAccount}
-                        onChange={e => setSelectedAccount(e.target.value)}
-                    >
-                        <option value="">🎲 随机选择 (流式)</option>
-                        {accounts.map((acc, i) => {
-                            const id = acc.email || acc.mobile
-                            return <option key={i} value={id}>{id} {acc.has_token ? '✅' : '⚠️'}</option>
-                        })}
-                    </select>
-                </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground">Account Strategy</label>
+                        <select
+                            className="input-field"
+                            value={selectedAccount}
+                            onChange={e => setSelectedAccount(e.target.value)}
+                        >
+                            <option value="">🎲 Random (Streaming)</option>
+                            {accounts.map((acc, i) => (
+                                <option key={i} value={acc.email || acc.mobile}>
+                                    👤 {acc.email || acc.mobile}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-                <div className="form-group">
-                    <label className="form-label">API Key（留空使用第一个配置的 Key）</label>
-                    <input
-                        type="text"
-                        className="form-input"
-                        placeholder={config.keys?.[0] ? `默认: ${config.keys[0].slice(0, 8)}...` : '请先添加 API Key'}
-                        value={apiKey}
-                        onChange={e => setApiKey(e.target.value)}
-                    />
-                </div>
-
-                <div className="form-group">
-                    <label className="form-label">消息内容</label>
-                    <textarea
-                        className="form-input"
-                        value={message}
-                        onChange={e => setMessage(e.target.value)}
-                        placeholder="输入测试消息..."
-                        rows={3}
-                    />
-                </div>
-
-                <div className="btn-group">
-                    {loading && isStreaming ? (
-                        <button className="btn btn-warning" onClick={stopGeneration}>
-                            ⏹ 停止生成
-                        </button>
-                    ) : (
-                        <button className="btn btn-primary" onClick={sendTest} disabled={loading}>
-                            {loading ? <span className="loading"></span> :
-                                selectedAccount ? `🚀 使用 ${selectedAccount} 发送` : '🚀 发送请求 (流式)'}
-                        </button>
-                    )}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground">API Key (Optional)</label>
+                        <input
+                            type="password"
+                            className="input-field font-mono text-xs"
+                            placeholder={config.keys?.[0] ? `Default: ${config.keys[0].slice(0, 8)}...` : 'Enter custom API Key'}
+                            value={apiKey}
+                            onChange={e => setApiKey(e.target.value)}
+                        />
+                    </div>
                 </div>
             </div>
 
-            {(response || isStreaming) && (
-                <div className="card">
-                    <div className="card-header">
-                        <span className="card-title">响应结果</span>
-                        {response && (
-                            <span className={`badge ${response.success ? 'badge-success' : 'badge-error'}`}>
-                                {response.success ? '成功' : '失败'} {response.status_code && `(${response.status_code})`}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* 流式响应显示区域 */}
-                    {(streamingContent || streamingThinking || isStreaming) && !selectedAccount ? (
-                        <div style={{ marginTop: '1rem' }}>
-                            {streamingThinking && (
-                                <div style={{ marginBottom: '1rem' }}>
-                                    <div className="form-label" style={{ color: '#888' }}>🤔 思考过程:</div>
-                                    <div style={{
-                                        padding: '1rem',
-                                        background: 'rgba(0,0,0,0.05)',
-                                        borderLeft: '4px solid #666',
-                                        color: '#666',
-                                        fontSize: '0.9em',
-                                        whiteSpace: 'pre-wrap',
-                                        maxHeight: '200px',
-                                        overflowY: 'auto'
-                                    }}>
-                                        {streamingThinking}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="form-label">🤖 AI 回复:</div>
-                            <div style={{
-                                padding: '1rem',
-                                background: 'var(--bg-tertiary)',
-                                borderRadius: 'var(--radius)',
-                                whiteSpace: 'pre-wrap',
-                                minHeight: '60px'
-                            }}>
-                                {streamingContent}
-                                {isStreaming && <span className="cursor-blink">|</span>}
+            {/* Chat Interface */}
+            <div className="lg:col-span-2 flex flex-col bg-card border border-border rounded-xl shadow-sm overflow-hidden h-full">
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+                    {/* User Message */}
+                    <div className="flex gap-4 max-w-3xl mx-auto">
+                        <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <div className="space-y-1 flew-1">
+                            <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm">You</span>
+                            </div>
+                            <div className="bg-secondary/50 rounded-2xl rounded-tl-none px-4 py-3 text-sm border border-border">
+                                {message}
                             </div>
                         </div>
-                    ) : (
-                        // 非流式响应显示（如JSON或指定账号测试结果）
-                        <div className="code-block">
-                            {JSON.stringify(response?.response || response?.error || {}, null, 2)}
+                    </div>
+
+                    {/* AI Response */}
+                    {(response || isStreaming) && (
+                        <div className="flex gap-4 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-2">
+                            <div className={clsx(
+                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                                response?.success !== false ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"
+                            )}>
+                                <Bot className="w-4 h-4" />
+                            </div>
+                            <div className="space-y-2 flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-medium text-sm">DeepSeek</span>
+                                    {response && (
+                                        <span className={clsx(
+                                            "text-[10px] px-1.5 py-0.5 rounded border uppercase font-bold tracking-wider",
+                                            response.success ? "border-emerald-500/20 text-emerald-500 bg-emerald-500/5" : "border-destructive/20 text-destructive bg-destructive/5"
+                                        )}>
+                                            {response.status_code || 'ERROR'}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {(streamingThinking || response?.response?.thinking) && (
+                                    <div className="text-xs text-muted-foreground bg-muted/30 border border-border rounded-lg p-3 space-y-1">
+                                        <div className="flex items-center gap-1.5 opacity-70 mb-1">
+                                            <Sparkles className="w-3 h-3" />
+                                            <span>Reasoning Process</span>
+                                        </div>
+                                        <div className="whitespace-pre-wrap leading-relaxed opacity-90 font-mono">
+                                            {streamingThinking || response?.response?.thinking}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                                    {!selectedAccount ? (
+                                        streamingContent || (response?.error && <span className="text-destructive">{response.error}</span>)
+                                    ) : (
+                                        response?.response?.message || <span className="text-muted-foreground italic">...</span>
+                                    )}
+                                    {isStreaming && <span className="inline-block w-1.5 h-4 bg-primary ml-1 align-middle animate-pulse" />}
+                                </div>
+                            </div>
                         </div>
                     )}
-
-                    {/* 指定账号测试的特定显示 */}
-                    {selectedAccount && response?.success && (
-                        <>
-                            {response.response?.thinking && (
-                                <div style={{ marginTop: '1rem' }}>
-                                    <div className="form-label" style={{ color: '#888' }}>🤔 思考过程:</div>
-                                    <div style={{
-                                        padding: '1rem',
-                                        background: 'rgba(0,0,0,0.05)',
-                                        borderLeft: '4px solid #666',
-                                        color: '#666',
-                                        fontSize: '0.9em',
-                                        whiteSpace: 'pre-wrap'
-                                    }}>
-                                        {response.response.thinking}
-                                    </div>
-                                </div>
-                            )}
-                            {response.response?.message && (
-                                <div style={{ marginTop: '1rem' }}>
-                                    <div className="form-label">AI 回复 ({response.account})：</div>
-                                    <div style={{
-                                        padding: '1rem',
-                                        background: 'var(--bg-tertiary)',
-                                        borderRadius: 'var(--radius)',
-                                        whiteSpace: 'pre-wrap'
-                                    }}>
-                                        {response.response.message}
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    )}
                 </div>
-            )}
 
-            <style>{`
-                .cursor-blink {
-                    animation: blink 1s step-end infinite;
-                }
-                @keyframes blink {
-                    50% { opacity: 0; }
-                }
-            `}</style>
+                {/* Input Area */}
+                <div className="p-4 border-t border-border bg-card">
+                    <div className="max-w-3xl mx-auto relative">
+                        <textarea
+                            className="w-full bg-secondary/30 border border-border rounded-xl pl-4 pr-14 py-3 text-sm focus:bg-background focus:ring-1 focus:ring-primary focus:border-primary transition-all resize-none custom-scrollbar"
+                            placeholder="Type your message here..."
+                            rows={3}
+                            value={message}
+                            onChange={e => setMessage(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault()
+                                    sendTest()
+                                }
+                            }}
+                        />
+                        <div className="absolute right-2 bottom-2">
+                            {loading && isStreaming ? (
+                                <button
+                                    onClick={stopGeneration}
+                                    className="p-2 bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity"
+                                >
+                                    <Square className="w-4 h-4 fill-current" />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={sendTest}
+                                    disabled={loading || !message.trim()}
+                                    className="p-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }
