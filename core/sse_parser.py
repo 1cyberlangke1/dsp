@@ -6,12 +6,9 @@
 
 from typing import List, Tuple, Optional, Dict, Any
 
-# 跳过的路径模式（状态相关，不是内容）
-SKIP_PATTERNS = [
-    "quasi_status", "elapsed_secs", "token_usage", 
-    "pending_fragment", "conversation_mode",
-    "fragments/-1/status", "fragments/-2/status", "fragments/-3/status"
-]
+from .constants import SKIP_PATTERNS
+
+
 
 
 def should_skip_chunk(chunk_path: str) -> bool:

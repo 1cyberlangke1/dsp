@@ -6,30 +6,19 @@ from fastapi import HTTPException
 
 from .config import CONFIG, save_config, logger
 from .utils import get_account_identifier
-
-# ----------------------------------------------------------------------
-# DeepSeek 相关常量
-# ----------------------------------------------------------------------
-DEEPSEEK_HOST = "chat.deepseek.com"
-DEEPSEEK_LOGIN_URL = f"https://{DEEPSEEK_HOST}/api/v0/users/login"
-DEEPSEEK_CREATE_SESSION_URL = f"https://{DEEPSEEK_HOST}/api/v0/chat_session/create"
-DEEPSEEK_CREATE_POW_URL = f"https://{DEEPSEEK_HOST}/api/v0/chat/create_pow_challenge"
-DEEPSEEK_COMPLETION_URL = f"https://{DEEPSEEK_HOST}/api/v0/chat/completion"
-
-BASE_HEADERS = {
-    "Host": "chat.deepseek.com",
-    "User-Agent": "DeepSeek/1.6.11 Android/35",
-    "Accept": "application/json",
-    "Accept-Encoding": "gzip",
-    "Content-Type": "application/json",
-    "x-client-platform": "android",
-    "x-client-version": "1.6.11",
-    "x-client-locale": "zh_CN",
-    "accept-charset": "UTF-8",
-}
+from .constants import (
+    DEEPSEEK_HOST,
+    DEEPSEEK_LOGIN_URL,
+    DEEPSEEK_CREATE_SESSION_URL,
+    DEEPSEEK_CREATE_POW_URL,
+    DEEPSEEK_COMPLETION_URL,
+    BASE_HEADERS,
+)
 
 
 # get_account_identifier 已移至 core.utils
+
+
 
 
 # ----------------------------------------------------------------------
