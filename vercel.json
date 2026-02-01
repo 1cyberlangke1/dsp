@@ -1,14 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "cd webui && npm install && npm run build",
+  "installCommand": "pip install -r requirements.txt && cd webui && npm install && npm run build",
   "builds": [
     {
       "src": "app.py",
       "use": "@vercel/python"
-    },
-    {
-      "src": "static/admin/**",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
