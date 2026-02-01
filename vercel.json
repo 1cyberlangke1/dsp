@@ -1,12 +1,21 @@
 {
   "version": 2,
+  "buildCommand": "cd webui && npm install && npm run build",
   "builds": [
     {
       "src": "app.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "static/admin/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
+    {
+      "src": "/webui/assets/(.*)",
+      "dest": "/static/admin/assets/$1"
+    },
     {
       "src": "/(.*)",
       "dest": "app.py"

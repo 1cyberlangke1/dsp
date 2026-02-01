@@ -101,3 +101,6 @@ WASM_PATH = resolve_path("DS2API_WASM_PATH", "sha3_wasm_bg.7b9ca65ddd.wasm")
 
 # 模板目录
 TEMPLATES_DIR = resolve_path("DS2API_TEMPLATES_DIR", "templates")
+
+# WebUI 静态文件目录
+STATIC_ADMIN_DIR = resolve_path("DS2API_STATIC_ADMIN_DIR", "static/admin")

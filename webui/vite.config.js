@@ -22,4 +22,5 @@ export default defineConfig({
         outDir: '../static/admin',
         emptyOutDir: true,
     },
+    base: '/webui/',
 })

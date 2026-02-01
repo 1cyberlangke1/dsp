@@ -49,6 +49,8 @@ Content-Type: application/json
 | `stream` | boolean | ❌ | 是否流式输出，默认 `false` |
 | `temperature` | number | ❌ | 温度参数，0-2 |
 | `max_tokens` | number | ❌ | 最大输出 token 数 |
+| `tools` | array | ❌ | 工具定义列表（OpenAI 格式） |
+| `tool_choice` | string | ❌ | 工具选择策略 |
 
 **支持的模型**:
 
@@ -108,6 +110,54 @@ data: [DONE]
     "completion_tokens": 50,
     "total_tokens": 60
   }
+}
+```
+
+**工具调用请求示例**:
+
+```json
+{
+  "model": "deepseek-chat",
+  "messages": [{"role": "user", "content": "北京今天天气怎么样？"}],
+  "tools": [{
+    "type": "function",
+    "function": {
+      "name": "get_weather",
+      "description": "获取指定城市的天气",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "location": {"type": "string", "description": "城市名称"}
+        },
+        "required": ["location"]
+      }
+    }
+  }]
+}
+```
+
+**工具调用响应格式**:
+
+```json
+{
+  "id": "chatcmpl-xxx",
+  "object": "chat.completion",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [{
+        "id": "call_xxx",
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "arguments": "{\"location\": \"北京\"}"
+        }
+      }]
+    },
+    "finish_reason": "tool_calls"
+  }]
 }
 ```
 
