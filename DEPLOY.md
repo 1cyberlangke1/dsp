@@ -35,6 +35,9 @@ go run ./cmd/ds2api
 
 ```bash
 ./scripts/build-webui.sh
+
+# 或依赖自动构建（默认本地开启）
+# DS2API_AUTO_BUILD_WEBUI=true go run ./cmd/ds2api
 ```
 
 ## 2. Docker 部署
@@ -62,7 +65,7 @@ docker-compose up -d --build
 
 - serverless 入口：`api/index.go`
 - 路由与缓存头：`vercel.json`
-- 已移除 legacy `builds` 字段，避免 `unused-build-settings` 警告
+- 构建阶段会自动执行 `npm ci --prefix webui && npm run build --prefix webui`
 
 至少配置环境变量：
 
@@ -78,6 +81,10 @@ docker-compose up -d --build
 - `DS2API_ACCOUNT_CONCURRENCY`（同上别名）
 
 并发建议值会动态按 `账号数量 × 每账号并发上限` 计算（默认即 `账号数量 × 2`）。
+
+说明：
+- 仓库不提交 `static/admin` 构建产物
+- Vercel / Docker 构建阶段自动生成 WebUI 静态文件
 
 部署后建议先访问：
 

@@ -64,7 +64,8 @@ pnpm-lock.yaml
 *.tsbuildinfo
 .cache/
 .parcel-cache/
-# static/admin build output is versioned for serverless deployments
+static/admin/
+internal/webui/assets/admin/
 
 # Environment
 .env.local

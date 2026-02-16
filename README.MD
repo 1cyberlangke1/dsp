@@ -8,7 +8,7 @@
 
 语言 / Language: [中文](README.MD) | [English](README.en.md)
 
-将 DeepSeek Web 对话能力转换为 OpenAI 与 Claude 兼容 API。当前仓库后端为 **Go 全量实现**，前端保留 React WebUI（构建产物托管于 `static/admin`）。
+将 DeepSeek Web 对话能力转换为 OpenAI 与 Claude 兼容 API。当前仓库后端为 **Go 全量实现**，前端保留 React WebUI（源码在 `webui/`，部署时自动构建到 `static/admin`）。
 
 ## 当前实现边界
 
@@ -65,7 +65,8 @@ go run ./cmd/ds2api
 
 默认地址：`http://localhost:5001`
 
-如果访问 `/admin` 提示未构建 WebUI，请执行：
+本地默认会在启动时自动尝试构建 WebUI（需要本机有 Node.js/npm）。
+若你想手动构建，也可执行：
 
 ```bash
 ./scripts/build-webui.sh
@@ -85,12 +86,12 @@ docker-compose logs -f
 
 - 入口：`api/index.go`
 - 路由重写：`vercel.json`
+- `vercel.json` 会在构建阶段自动执行 `npm ci --prefix webui && npm run build --prefix webui`
 - 至少配置：
 - `DS2API_ADMIN_KEY`
 - `DS2API_CONFIG_JSON`（JSON 字符串或 Base64）
 
-说明：`vercel.json` 已移除 legacy `builds` 配置，避免部署时出现
-`unused-build-settings` 警告，并使用当前推荐的函数路由模式。
+说明：仓库不提交 `static/admin` 构建产物，Vercel 构建时自动生成并打包。
 
 ## Release 自动构建产物（GitHub Actions）
 
@@ -162,6 +163,7 @@ cp config.example.json config.json
 | `DS2API_CONFIG_JSON` | 直接注入配置（JSON 或 Base64） |
 | `DS2API_WASM_PATH` | PoW wasm 文件路径 |
 | `DS2API_STATIC_ADMIN_DIR` | 管理台静态文件目录 |
+| `DS2API_AUTO_BUILD_WEBUI` | 启动时缺失 WebUI 时是否自动执行 npm build（默认：本地开启，Vercel 关闭） |
 | `VERCEL_TOKEN` | Vercel 同步 token（可选） |
 | `VERCEL_PROJECT_ID` | Vercel 项目 ID（可选） |
 | `VERCEL_TEAM_ID` | Vercel 团队 ID（可选） |

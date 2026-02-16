@@ -1,5 +1,11 @@
 {
   "version": 2,
+  "buildCommand": "npm ci --prefix webui && npm run build --prefix webui",
+  "functions": {
+    "api/index.go": {
+      "includeFiles": "static/admin/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/(.*)",

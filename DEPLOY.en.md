@@ -35,6 +35,9 @@ Build WebUI if `/admin` reports missing assets:
 
 ```bash
 ./scripts/build-webui.sh
+
+# Or rely on startup auto-build (enabled locally by default)
+# DS2API_AUTO_BUILD_WEBUI=true go run ./cmd/ds2api
 ```
 
 ## 2. Docker Deployment
@@ -62,7 +65,7 @@ Notes:
 
 - Serverless entry: `api/index.go`
 - Rewrites and cache headers: `vercel.json`
-- Legacy `builds` has been removed to avoid the `unused-build-settings` warning
+- Build stage runs `npm ci --prefix webui && npm run build --prefix webui` automatically
 
 Minimum environment variables:
 
@@ -78,6 +81,10 @@ Optional:
 - `DS2API_ACCOUNT_CONCURRENCY` (alias of the same setting)
 
 Recommended concurrency is computed dynamically as `account_count * per_account_inflight_limit` (default is `account_count * 2`).
+
+Notes:
+- `static/admin` build output is not committed
+- Vercel/Docker generate WebUI assets during build
 
 After deploy, verify:
 
