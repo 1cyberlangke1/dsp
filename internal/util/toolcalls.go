@@ -52,6 +52,20 @@ func ParseToolCalls(text string, availableToolNames []string) []ParsedToolCall {
 		}
 		out = append(out, tc)
 	}
+	// If the model clearly emitted tool_calls JSON but all names are outside the
+	// declared set, keep the parsed calls as a fallback so upper layers can still
+	// intercept structured tool output instead of leaking raw JSON to users.
+	if len(out) == 0 && len(parsed) > 0 {
+		for _, tc := range parsed {
+			if tc.Name == "" {
+				continue
+			}
+			if tc.Input == nil {
+				tc.Input = map[string]any{}
+			}
+			out = append(out, tc)
+		}
+	}
 	return out
 }
 

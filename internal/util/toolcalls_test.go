@@ -41,11 +41,14 @@ func TestParseToolCallsWithFunctionArgumentsString(t *testing.T) {
 	}
 }
 
-func TestParseToolCallsRejectUnknown(t *testing.T) {
+func TestParseToolCallsKeepsUnknownAsFallback(t *testing.T) {
 	text := `{"tool_calls":[{"name":"unknown","input":{}}]}`
 	calls := ParseToolCalls(text, []string{"search"})
-	if len(calls) != 0 {
-		t.Fatalf("expected 0 calls, got %d", len(calls))
+	if len(calls) != 1 {
+		t.Fatalf("expected fallback 1 call, got %d", len(calls))
+	}
+	if calls[0].Name != "unknown" {
+		t.Fatalf("unexpected name: %s", calls[0].Name)
 	}
 }
 

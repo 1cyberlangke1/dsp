@@ -309,6 +309,9 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 			flusher.Flush()
 		case line, ok := <-lines:
 			if !ok {
+				// Ensure scanner completion is observed only after all queued
+				// SSE lines are drained, avoiding early finalize races.
+				_ = <-done
 				finalize("stop")
 				return
 			}
@@ -369,9 +372,6 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 					"choices": newChoices,
 				})
 			}
-		case <-done:
-			finalize("stop")
-			return
 		}
 	}
 }
