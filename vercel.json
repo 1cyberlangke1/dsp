@@ -1,6 +1,7 @@
 {
   "version": 2,
   "buildCommand": "npm ci --prefix webui && npm run build --prefix webui",
+  "outputDirectory": "static/admin",
   "functions": {
     "api/index.go": {
       "includeFiles": "static/admin/**"

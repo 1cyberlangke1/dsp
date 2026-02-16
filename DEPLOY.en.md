@@ -132,6 +132,21 @@ Another common root cause (Go monorepo + `internal/`):
 This usually happens when the Vercel Go entrypoint imports `internal/...` directly.
 This repo now avoids that by using a public bridge package: `api/index.go` -> `ds2api/app` -> `internal/server`.
 
+If you see:
+
+```text
+No Output Directory named "public" found after the Build completed.
+```
+
+Vercel is validating frontend output against `public`, while this repo emits WebUI assets to `static/admin`.
+`vercel.json` now explicitly sets:
+
+```json
+"outputDirectory": "static/admin"
+```
+
+If you manually changed Output Directory in Project Settings, set it to `static/admin` (or clear it and let repo config apply).
+
 ## 4. Reverse Proxy (Nginx)
 
 Disable buffering for SSE:

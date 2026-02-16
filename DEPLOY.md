@@ -131,6 +131,20 @@ Error: Command failed: go build -ldflags -s -w -o .../bootstrap .../main__vc__go
 这通常发生在 Vercel Go 入口文件直接 `import internal/...`。
 当前仓库已通过公开桥接包 `app` 解决：`api/index.go` -> `ds2api/app` -> `internal/server`。
 
+若看到类似报错：
+
+```text
+No Output Directory named "public" found after the Build completed.
+```
+
+说明 Vercel 正在按 `public` 校验前端产物目录。当前仓库前端产物目录是 `static/admin`，已在 `vercel.json` 显式配置：
+
+```json
+"outputDirectory": "static/admin"
+```
+
+若你在项目设置里手动改过 Output Directory，请同步改为 `static/admin` 或清空让仓库配置生效。
+
 ## 4. 反向代理（Nginx）
 
 如果在 Nginx 后挂载，建议关闭缓冲以保证 SSE：
