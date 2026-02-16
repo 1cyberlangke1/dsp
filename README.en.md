@@ -12,21 +12,38 @@ DS2API converts DeepSeek Web chat capability into OpenAI-compatible and Claude-c
 
 ## Architecture Overview
 
-```text
-┌──────────────┐    ┌──────────────────────────────────────┐
-│   Clients    │    │             DS2API                    │
-│  (OpenAI /   │───▶│  ┌────────┐  ┌──────────┐  ┌──────┐ │
-│   Claude     │    │  │Auth MW  │─▶│Adapter   │─▶│DeepSeek│
-│   compat)    │    │  └────────┘  │OpenAI/   │  │Client │ │
-│              │◀───│              │Claude    │  └──────┘ │
-│              │    │  ┌────────┐  └──────────┘            │
-│              │    │  │Admin API│  ┌──────────┐           │
-│              │    │  └────────┘  │Account   │           │
-│              │    │  ┌────────┐  │Pool/Queue│           │
-│              │    │  │WebUI   │  └──────────┘           │
-│              │    │  │(/admin)│  ┌──────────┐           │
-│              │    │  └────────┘  │PoW WASM  │           │
-└──────────────┘    └──────────────────────────────────────┘
+```mermaid
+flowchart LR
+    Client["🖥️ Clients\n(OpenAI / Claude compat)"]
+
+    subgraph DS2API["DS2API Service"]
+        direction TB
+        CORS["CORS Middleware"]
+        Auth["🔐 Auth Middleware"]
+
+        subgraph Adapters["Adapter Layer"]
+            OA["OpenAI Adapter\n/v1/*"]
+            CA["Claude Adapter\n/anthropic/*"]
+        end
+
+        subgraph Support["Support Modules"]
+            Pool["📦 Account Pool / Queue"]
+            PoW["⚙️ PoW WASM\n(wazero)"]
+        end
+
+        Admin["🛠️ Admin API\n/admin/*"]
+        WebUI["🌐 WebUI\n(/admin)"]
+    end
+
+    DS["☁️ DeepSeek API"]
+
+    Client -- "Request" --> CORS --> Auth
+    Auth --> OA & CA
+    OA & CA -- "Call" --> DS
+    Auth --> Admin
+    OA & CA -. "Rotate accounts" .-> Pool
+    OA & CA -. "Compute PoW" .-> PoW
+    DS -- "Response" --> Client
 ```
 
 - **Backend**: Go (`cmd/ds2api/`, `api/`, `internal/`), no Python runtime
@@ -185,6 +202,7 @@ cp config.example.json config.json
 | `VERCEL_TOKEN` | Vercel sync token | — |
 | `VERCEL_PROJECT_ID` | Vercel project ID | — |
 | `VERCEL_TEAM_ID` | Vercel team ID | — |
+| `DS2API_VERCEL_PROTECTION_BYPASS` | Vercel deployment protection bypass for internal Node→Go calls | — |
 
 ## Authentication Modes
 

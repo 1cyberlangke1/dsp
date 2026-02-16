@@ -12,21 +12,38 @@
 
 ## 架构概览
 
-```text
-┌──────────────┐    ┌──────────────────────────────────────┐
-│   客户端      │    │             DS2API                    │
-│  (OpenAI /   │───▶│  ┌────────┐  ┌──────────┐  ┌──────┐ │
-│   Claude     │    │  │鉴权中间件│─▶│适配器层   │─▶│DeepSeek│
-│   兼容)      │    │  └────────┘  │OpenAI/    │  │Client │ │
-│              │◀───│              │Claude     │  └──────┘ │
-│              │    │  ┌────────┐  └──────────┘            │
-│              │    │  │Admin API│  ┌──────────┐           │
-│              │    │  └────────┘  │账号池/队列│           │
-│              │    │  ┌────────┐  └──────────┘           │
-│              │    │  │WebUI   │  ┌──────────┐           │
-│              │    │  │(/admin)│  │PoW WASM  │           │
-│              │    │  └────────┘  └──────────┘           │
-└──────────────┘    └──────────────────────────────────────┘
+```mermaid
+flowchart LR
+    Client["🖥️ 客户端\n(OpenAI / Claude 兼容)"]
+
+    subgraph DS2API["DS2API 服务"]
+        direction TB
+        CORS["CORS 中间件"]
+        Auth["🔐 鉴权中间件"]
+
+        subgraph Adapters["适配器层"]
+            OA["OpenAI 适配器\n/v1/*"]
+            CA["Claude 适配器\n/anthropic/*"]
+        end
+
+        subgraph Support["支撑模块"]
+            Pool["📦 账号池 / 并发队列"]
+            PoW["⚙️ PoW WASM\n(wazero)"]
+        end
+
+        Admin["🛠️ Admin API\n/admin/*"]
+        WebUI["🌐 WebUI\n(/admin)"]
+    end
+
+    DS["☁️ DeepSeek API"]
+
+    Client -- "请求" --> CORS --> Auth
+    Auth --> OA & CA
+    OA & CA -- "调用" --> DS
+    Auth --> Admin
+    OA & CA -. "轮询选账号" .-> Pool
+    OA & CA -. "计算 PoW" .-> PoW
+    DS -- "响应" --> Client
 ```
 
 - **后端**：Go（`cmd/ds2api/`、`api/`、`internal/`），不依赖 Python 运行时
@@ -185,6 +202,7 @@ cp config.example.json config.json
 | `VERCEL_TOKEN` | Vercel 同步 token | — |
 | `VERCEL_PROJECT_ID` | Vercel 项目 ID | — |
 | `VERCEL_TEAM_ID` | Vercel 团队 ID | — |
+| `DS2API_VERCEL_PROTECTION_BYPASS` | Vercel 部署保护绕过密钥（内部 Node→Go 调用） | — |
 
 ## 鉴权模式
 

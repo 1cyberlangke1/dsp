@@ -107,7 +107,7 @@ ds2api/
 │   │   └── claude/          # Claude adapter
 │   ├── admin/               # Admin API handlers
 │   ├── auth/                # Auth and JWT
-│   ├── config/              # Config loading
+│   ├── config/              # Config loading and hot-reload
 │   ├── deepseek/            # DeepSeek client, PoW WASM
 │   ├── server/              # HTTP routing (chi router)
 │   ├── sse/                 # SSE parsing utilities

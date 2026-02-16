@@ -107,7 +107,7 @@ ds2api/
 │   │   └── claude/          # Claude 兼容适配器
 │   ├── admin/               # Admin API handlers
 │   ├── auth/                # 鉴权与 JWT
-│   ├── config/              # 配置加载
+│   ├── config/              # 配置加载与热更新
 │   ├── deepseek/            # DeepSeek 客户端、PoW WASM
 │   ├── server/              # HTTP 路由（chi router）
 │   ├── sse/                 # SSE 解析工具
