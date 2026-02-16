@@ -246,7 +246,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 		if len(detected) > 0 {
 			finishReason = "tool_calls"
 			delta := map[string]any{
-				"tool_calls": util.FormatOpenAIToolCalls(detected),
+				"tool_calls": util.FormatOpenAIStreamToolCalls(detected),
 			}
 			if !firstChunkSent {
 				delta["role"] = "assistant"

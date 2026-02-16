@@ -209,6 +209,24 @@ func TestHandleStreamToolCallInterceptsWithoutRawContentLeak(t *testing.T) {
 	if !streamHasToolCallsDelta(frames) {
 		t.Fatalf("expected tool_calls delta, body=%s", rec.Body.String())
 	}
+	foundToolIndex := false
+	for _, frame := range frames {
+		choices, _ := frame["choices"].([]any)
+		for _, item := range choices {
+			choice, _ := item.(map[string]any)
+			delta, _ := choice["delta"].(map[string]any)
+			toolCalls, _ := delta["tool_calls"].([]any)
+			for _, tc := range toolCalls {
+				tcm, _ := tc.(map[string]any)
+				if _, ok := tcm["index"].(float64); ok {
+					foundToolIndex = true
+				}
+			}
+		}
+	}
+	if !foundToolIndex {
+		t.Fatalf("expected stream tool_calls item with index, body=%s", rec.Body.String())
+	}
 	if streamHasRawToolJSONContent(frames) {
 		t.Fatalf("raw tool_calls JSON leaked in content delta: %s", rec.Body.String())
 	}
@@ -235,6 +253,24 @@ func TestHandleStreamReasonerToolCallInterceptsWithoutRawContentLeak(t *testing.
 	}
 	if !streamHasToolCallsDelta(frames) {
 		t.Fatalf("expected tool_calls delta, body=%s", rec.Body.String())
+	}
+	foundToolIndex := false
+	for _, frame := range frames {
+		choices, _ := frame["choices"].([]any)
+		for _, item := range choices {
+			choice, _ := item.(map[string]any)
+			delta, _ := choice["delta"].(map[string]any)
+			toolCalls, _ := delta["tool_calls"].([]any)
+			for _, tc := range toolCalls {
+				tcm, _ := tc.(map[string]any)
+				if _, ok := tcm["index"].(float64); ok {
+					foundToolIndex = true
+				}
+			}
+		}
+	}
+	if !foundToolIndex {
+		t.Fatalf("expected stream tool_calls item with index, body=%s", rec.Body.String())
 	}
 	if streamHasRawToolJSONContent(frames) {
 		t.Fatalf("raw tool_calls JSON leaked in content delta: %s", rec.Body.String())
@@ -276,6 +312,24 @@ func TestHandleStreamUnknownToolStillIntercepted(t *testing.T) {
 	}
 	if !streamHasToolCallsDelta(frames) {
 		t.Fatalf("expected tool_calls delta, body=%s", rec.Body.String())
+	}
+	foundToolIndex := false
+	for _, frame := range frames {
+		choices, _ := frame["choices"].([]any)
+		for _, item := range choices {
+			choice, _ := item.(map[string]any)
+			delta, _ := choice["delta"].(map[string]any)
+			toolCalls, _ := delta["tool_calls"].([]any)
+			for _, tc := range toolCalls {
+				tcm, _ := tc.(map[string]any)
+				if _, ok := tcm["index"].(float64); ok {
+					foundToolIndex = true
+				}
+			}
+		}
+	}
+	if !foundToolIndex {
+		t.Fatalf("expected stream tool_calls item with index, body=%s", rec.Body.String())
 	}
 	if streamHasRawToolJSONContent(frames) {
 		t.Fatalf("raw tool_calls JSON leaked in content delta: %s", rec.Body.String())

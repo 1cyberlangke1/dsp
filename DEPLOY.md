@@ -94,6 +94,24 @@ docker-compose up -d --build
 - 自动构建 Linux/macOS/Windows 二进制包并上传到 Release Assets
 - 生成 `sha256sums.txt` 供校验
 
+## 3.2 Vercel 常见报错排查
+
+若看到类似报错：
+
+```text
+Error: Command failed: go build -ldflags -s -w -o .../bootstrap .../main__vc__go__.go
+```
+
+通常是 Vercel 项目里的 Go 构建参数配置不正确（`-ldflags` 没有作为一个整体字符串传递）。
+
+处理方式：
+
+1. 进入 Vercel Project Settings -> Build and Development Settings
+2. 清空自定义 Go Build Flags / Build Command（推荐）
+3. 若必须设置 ldflags，使用 `-ldflags=\"-s -w\"`（保证它是一个参数）
+4. 确认仓库 `go.mod` 为受支持版本（当前为 `go 1.24`）
+5. 重新部署（建议 `Redeploy` 并清缓存）
+
 ## 4. 反向代理（Nginx）
 
 如果在 Nginx 后挂载，建议关闭缓冲以保证 SSE：

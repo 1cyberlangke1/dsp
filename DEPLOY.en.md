@@ -94,6 +94,25 @@ This repo includes `.github/workflows/release-artifacts.yml`:
 - Builds Linux/macOS/Windows archives and uploads them to Release Assets
 - Generates `sha256sums.txt` for integrity checks
 
+## 3.2 Vercel Build Troubleshooting
+
+If you see an error like:
+
+```text
+Error: Command failed: go build -ldflags -s -w -o .../bootstrap .../main__vc__go__.go
+```
+
+it is usually caused by invalid Go build flag settings in Vercel
+(`-ldflags` not passed as a single argument).
+
+How to fix:
+
+1. Open Vercel Project Settings -> Build and Development Settings
+2. Clear custom Go Build Flags / Build Command (recommended)
+3. If ldflags must be used, set `-ldflags=\"-s -w\"` so it is passed as one argument
+4. Ensure `go.mod` uses a supported version (this repo uses `go 1.24`)
+5. Redeploy (preferably with cache cleared)
+
 ## 4. Reverse Proxy (Nginx)
 
 Disable buffering for SSE:
