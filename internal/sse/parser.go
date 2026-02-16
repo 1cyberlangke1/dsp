@@ -59,6 +59,42 @@ func ParseSSEChunkForContent(chunk map[string]any, thinkingEnabled bool, current
 		}
 	}
 	newType := currentFragmentType
+	parts := make([]ContentPart, 0, 8)
+
+	// Newer DeepSeek responses may emit fragment APPEND directly on
+	// path "response/fragments" instead of wrapping it in path "response".
+	if path == "response/fragments" {
+		if op, _ := chunk["o"].(string); strings.EqualFold(op, "APPEND") {
+			if frags, ok := v.([]any); ok {
+				for _, frag := range frags {
+					fm, ok := frag.(map[string]any)
+					if !ok {
+						continue
+					}
+					t, _ := fm["type"].(string)
+					content, _ := fm["content"].(string)
+					t = strings.ToUpper(t)
+					switch t {
+					case "THINK", "THINKING":
+						newType = "thinking"
+						if content != "" {
+							parts = append(parts, ContentPart{Text: content, Type: "thinking"})
+						}
+					case "RESPONSE":
+						newType = "text"
+						if content != "" {
+							parts = append(parts, ContentPart{Text: content, Type: "text"})
+						}
+					default:
+						if content != "" {
+							parts = append(parts, ContentPart{Text: content, Type: "text"})
+						}
+					}
+				}
+			}
+		}
+	}
+
 	if path == "response" {
 		if arr, ok := v.([]any); ok {
 			for _, it := range arr {
@@ -99,7 +135,6 @@ func ParseSSEChunkForContent(chunk map[string]any, thinkingEnabled bool, current
 			partType = newType
 		}
 	}
-	parts := make([]ContentPart, 0, 8)
 	switch val := v.(type) {
 	case string:
 		if val == "FINISHED" && (path == "" || path == "status") {

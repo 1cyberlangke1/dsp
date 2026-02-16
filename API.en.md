@@ -593,7 +593,7 @@ Or manual deploy required:
 
 Error payload formats are not fully unified in current code:
 
-- OpenAI routes often return: `{"error":"..."}`
+- OpenAI routes return: `{"error":{"message":"...","type":"..."}}`
 - Claude routes often return: `{"error":{"type":"...","message":"..."}}`
 - Admin routes often return: `{"detail":"..."}`
 

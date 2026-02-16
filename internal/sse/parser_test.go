@@ -47,3 +47,43 @@ func TestIsCitation(t *testing.T) {
 		t.Fatal("expected citation false")
 	}
 }
+
+func TestParseSSEChunkForContentFragmentsAppendSwitchToResponse(t *testing.T) {
+	chunk := map[string]any{
+		"p": "response/fragments",
+		"o": "APPEND",
+		"v": []any{
+			map[string]any{
+				"type":    "RESPONSE",
+				"content": "你好",
+			},
+		},
+	}
+	parts, finished, nextType := ParseSSEChunkForContent(chunk, true, "thinking")
+	if finished {
+		t.Fatal("expected unfinished")
+	}
+	if nextType != "text" {
+		t.Fatalf("expected next type text, got %q", nextType)
+	}
+	if len(parts) != 1 || parts[0].Type != "text" || parts[0].Text != "你好" {
+		t.Fatalf("unexpected parts: %#v", parts)
+	}
+}
+
+func TestParseSSEChunkForContentAfterAppendUsesUpdatedType(t *testing.T) {
+	chunk := map[string]any{
+		"p": "response/fragments/-1/content",
+		"v": "！",
+	}
+	parts, finished, nextType := ParseSSEChunkForContent(chunk, true, "text")
+	if finished {
+		t.Fatal("expected unfinished")
+	}
+	if nextType != "text" {
+		t.Fatalf("expected next type text, got %q", nextType)
+	}
+	if len(parts) != 1 || parts[0].Type != "text" || parts[0].Text != "！" {
+		t.Fatalf("unexpected parts: %#v", parts)
+	}
+}

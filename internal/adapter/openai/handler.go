@@ -42,7 +42,7 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 		if err == auth.ErrNoAccount {
 			status = http.StatusTooManyRequests
 		}
-		writeJSON(w, status, map[string]any{"error": detail})
+		writeOpenAIError(w, status, detail)
 		return
 	}
 	defer h.Auth.Release(a)
@@ -50,18 +50,18 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 
 	var req map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		writeOpenAIError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
 	model, _ := req["model"].(string)
 	messagesRaw, _ := req["messages"].([]any)
 	if model == "" || len(messagesRaw) == 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Request must include 'model' and 'messages'."})
+		writeOpenAIError(w, http.StatusBadRequest, "Request must include 'model' and 'messages'.")
 		return
 	}
 	thinkingEnabled, searchEnabled, ok := config.GetModelConfig(model)
 	if !ok {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": fmt.Sprintf("Model '%s' is not available.", model)})
+		writeOpenAIError(w, http.StatusServiceUnavailable, fmt.Sprintf("Model '%s' is not available.", model))
 		return
 	}
 
@@ -74,12 +74,16 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 
 	sessionID, err := h.DS.CreateSession(r.Context(), a, 3)
 	if err != nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "invalid token."})
+		if a.UseConfigToken {
+			writeOpenAIError(w, http.StatusUnauthorized, "Account token is invalid. Please re-login the account in admin.")
+		} else {
+			writeOpenAIError(w, http.StatusUnauthorized, "Invalid token. If this should be a DS2API key, add it to config.keys first.")
+		}
 		return
 	}
 	pow, err := h.DS.GetPow(r.Context(), a, 3)
 	if err != nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "Failed to get PoW (invalid token or unknown error)."})
+		writeOpenAIError(w, http.StatusUnauthorized, "Failed to get PoW (invalid token or unknown error).")
 		return
 	}
 	payload := map[string]any{
@@ -92,7 +96,7 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := h.DS.CallCompletion(r.Context(), a, payload, pow, 3)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to get completion."})
+		writeOpenAIError(w, http.StatusInternalServerError, "Failed to get completion.")
 		return
 	}
 	if toBool(req["stream"]) {
@@ -106,7 +110,7 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, ctx context.Context, re
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		writeJSON(w, resp.StatusCode, map[string]any{"error": string(body)})
+		writeOpenAIError(w, resp.StatusCode, string(body))
 		return
 	}
 	thinking := strings.Builder{}
@@ -183,7 +187,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		writeJSON(w, resp.StatusCode, map[string]any{"error": string(body)})
+		writeOpenAIError(w, resp.StatusCode, string(body))
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -191,7 +195,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 	w.Header().Set("Connection", "keep-alive")
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "streaming unsupported"})
+		writeOpenAIError(w, http.StatusInternalServerError, "streaming unsupported")
 		return
 	}
 
@@ -435,4 +439,33 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func writeOpenAIError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, map[string]any{
+		"error": map[string]any{
+			"message": message,
+			"type":    openAIErrorType(status),
+		},
+	})
+}
+
+func openAIErrorType(status int) string {
+	switch status {
+	case http.StatusBadRequest:
+		return "invalid_request_error"
+	case http.StatusUnauthorized:
+		return "authentication_error"
+	case http.StatusForbidden:
+		return "permission_error"
+	case http.StatusTooManyRequests:
+		return "rate_limit_error"
+	case http.StatusServiceUnavailable:
+		return "service_unavailable_error"
+	default:
+		if status >= 500 {
+			return "api_error"
+		}
+		return "invalid_request_error"
+	}
 }

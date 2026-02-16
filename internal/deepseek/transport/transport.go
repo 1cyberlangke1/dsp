@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"time"
@@ -44,16 +45,36 @@ func safariTLSDialer() func(ctx context.Context, network, addr string) (net.Conn
 			return nil, err
 		}
 		host, _, _ := net.SplitHostPort(addr)
-		uCfg := &utls.Config{
-			ServerName: host,
-			NextProtos: []string{"http/1.1"},
-		}
+		uCfg := &utls.Config{ServerName: host}
 		uConn := utls.UClient(plainConn, uCfg, utls.HelloSafari_Auto)
+		if err := forceHTTP11ALPN(uConn); err != nil {
+			_ = plainConn.Close()
+			return nil, err
+		}
 		err = uConn.HandshakeContext(ctx)
 		if err != nil {
 			_ = plainConn.Close()
 			return nil, err
 		}
+		if negotiated := uConn.ConnectionState().NegotiatedProtocol; negotiated != "" && negotiated != "http/1.1" {
+			_ = uConn.Close()
+			return nil, fmt.Errorf("unexpected ALPN protocol negotiated: %s", negotiated)
+		}
 		return uConn, nil
 	}
+}
+
+func forceHTTP11ALPN(uConn *utls.UConn) error {
+	if err := uConn.BuildHandshakeState(); err != nil {
+		return err
+	}
+	for _, ext := range uConn.Extensions {
+		alpnExt, ok := ext.(*utls.ALPNExtension)
+		if !ok {
+			continue
+		}
+		alpnExt.AlpnProtocols = []string{"http/1.1"}
+		return nil
+	}
+	return nil
 }

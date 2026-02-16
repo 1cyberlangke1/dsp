@@ -621,7 +621,7 @@ data: {"type":"message_stop"}
 
 不同模块错误格式不完全一致（按当前实现）：
 
-- OpenAI 接口常见：`{"error":"..."}`
+- OpenAI 接口：`{"error":{"message":"...","type":"..."}}`
 - Claude 接口常见：`{"error":{"type":"...","message":"..."}}`
 - Admin 接口常见：`{"detail":"..."}`
 
