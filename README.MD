@@ -51,7 +51,7 @@
 
 ### 1) 本地运行
 
-要求：Go 1.25+
+要求：Go 1.24+
 
 ```bash
 git clone https://github.com/CJackHwang/ds2api.git

@@ -13,7 +13,7 @@ This guide is aligned with the current Go codebase.
 
 ## 0. Prerequisites
 
-- Go 1.25+
+- Go 1.24+
 - Node.js 20+ (only if you need to build WebUI locally)
 - `config.json` or `DS2API_CONFIG_JSON`
 

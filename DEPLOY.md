@@ -13,7 +13,7 @@
 
 ## 0. 前置要求
 
-- Go 1.25+
+- Go 1.24+
 - Node.js 20+（仅在需要本地构建 WebUI 时）
 - `config.json` 或 `DS2API_CONFIG_JSON`
 

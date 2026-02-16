@@ -51,7 +51,7 @@ You can override mapping via `claude_mapping` or `claude_model_mapping` in confi
 
 ### 1) Local run
 
-Requirement: Go 1.25+
+Requirement: Go 1.24+
 
 ```bash
 git clone https://github.com/CJackHwang/ds2api.git
