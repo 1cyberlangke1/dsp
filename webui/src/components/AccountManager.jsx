@@ -419,7 +419,7 @@ export default function AccountManager({ config, onRefresh, onMessage, authFetch
                                             onClick={() => deleteAccount(id)}
                                             className="p-1 lg:p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
                                         >
-                                            <Trash2 className="w-3.5 h-3.5 lg:w-4 h-4" />
+                                            <Trash2 className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
                                         </button>
                                     </div>
                                 </div>
