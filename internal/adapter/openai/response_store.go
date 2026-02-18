@@ -3,9 +3,12 @@ package openai
 import (
 	"sync"
 	"time"
+
+	"ds2api/internal/auth"
 )
 
 type storedResponse struct {
+	Owner     string
 	Value     map[string]any
 	ExpiresAt time.Time
 }
@@ -26,30 +29,45 @@ func newResponseStore(ttl time.Duration) *responseStore {
 	}
 }
 
-func (s *responseStore) put(id string, value map[string]any) {
-	if s == nil || id == "" || value == nil {
+func responseStoreKey(owner, id string) string {
+	return owner + "\x00" + id
+}
+
+func responseStoreOwner(a *auth.RequestAuth) string {
+	if a == nil {
+		return ""
+	}
+	return a.CallerID
+}
+
+func (s *responseStore) put(owner, id string, value map[string]any) {
+	if s == nil || owner == "" || id == "" || value == nil {
 		return
 	}
 	now := time.Now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sweepLocked(now)
-	s.items[id] = storedResponse{
+	s.items[responseStoreKey(owner, id)] = storedResponse{
+		Owner:     owner,
 		Value:     cloneAnyMap(value),
 		ExpiresAt: now.Add(s.ttl),
 	}
 }
 
-func (s *responseStore) get(id string) (map[string]any, bool) {
-	if s == nil || id == "" {
+func (s *responseStore) get(owner, id string) (map[string]any, bool) {
+	if s == nil || owner == "" || id == "" {
 		return nil, false
 	}
 	now := time.Now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sweepLocked(now)
-	item, ok := s.items[id]
+	item, ok := s.items[responseStoreKey(owner, id)]
 	if !ok {
+		return nil, false
+	}
+	if item.Owner != owner {
 		return nil, false
 	}
 	return cloneAnyMap(item.Value), true

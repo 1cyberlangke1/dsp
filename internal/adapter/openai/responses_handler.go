@@ -12,19 +12,35 @@ import (
 	"github.com/google/uuid"
 
 	"ds2api/internal/auth"
-	"ds2api/internal/config"
 	"ds2api/internal/sse"
 	"ds2api/internal/util"
 )
 
 func (h *Handler) GetResponseByID(w http.ResponseWriter, r *http.Request) {
+	a, err := h.Auth.Determine(r)
+	if err != nil {
+		status := http.StatusUnauthorized
+		detail := err.Error()
+		if err == auth.ErrNoAccount {
+			status = http.StatusTooManyRequests
+		}
+		writeOpenAIError(w, status, detail)
+		return
+	}
+	defer h.Auth.Release(a)
+
 	id := strings.TrimSpace(chi.URLParam(r, "response_id"))
 	if id == "" {
 		writeOpenAIError(w, http.StatusBadRequest, "response_id is required.")
 		return
 	}
+	owner := responseStoreOwner(a)
+	if owner == "" {
+		writeOpenAIError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	st := h.getResponseStore()
-	item, ok := st.get(id)
+	item, ok := st.get(owner, id)
 	if !ok {
 		writeOpenAIError(w, http.StatusNotFound, "Response not found.")
 		return
@@ -45,32 +61,22 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 	}
 	defer h.Auth.Release(a)
 	r = r.WithContext(auth.WithAuth(r.Context(), a))
+	owner := responseStoreOwner(a)
+	if owner == "" {
+		writeOpenAIError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 
 	var req map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeOpenAIError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-
-	model, _ := req["model"].(string)
-	model = strings.TrimSpace(model)
-	if model == "" {
-		writeOpenAIError(w, http.StatusBadRequest, "Request must include 'model'.")
+	stdReq, err := normalizeOpenAIResponsesRequest(h.Store, req)
+	if err != nil {
+		writeOpenAIError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	resolvedModel, ok := config.ResolveModel(h.Store, model)
-	if !ok {
-		writeOpenAIError(w, http.StatusBadRequest, fmt.Sprintf("Model '%s' is not available.", model))
-		return
-	}
-	thinkingEnabled, searchEnabled, _ := config.GetModelConfig(resolvedModel)
-
-	messagesRaw := responsesMessagesFromRequest(req)
-	if len(messagesRaw) == 0 {
-		writeOpenAIError(w, http.StatusBadRequest, "Request must include 'input' or 'messages'.")
-		return
-	}
-	finalPrompt, toolNames := buildOpenAIFinalPrompt(messagesRaw, req["tools"])
 
 	sessionID, err := h.DS.CreateSession(r.Context(), a, 3)
 	if err != nil {
@@ -86,15 +92,7 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 		writeOpenAIError(w, http.StatusUnauthorized, "Failed to get PoW (invalid token or unknown error).")
 		return
 	}
-	payload := map[string]any{
-		"chat_session_id":   sessionID,
-		"parent_message_id": nil,
-		"prompt":            finalPrompt,
-		"ref_file_ids":      []any{},
-		"thinking_enabled":  thinkingEnabled,
-		"search_enabled":    searchEnabled,
-	}
-	applyOpenAIChatPassThrough(req, payload)
+	payload := stdReq.CompletionPayload(sessionID)
 	resp, err := h.DS.CallCompletion(r.Context(), a, payload, pow, 3)
 	if err != nil {
 		writeOpenAIError(w, http.StatusInternalServerError, "Failed to get completion.")
@@ -102,14 +100,14 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 	}
 
 	responseID := "resp_" + strings.ReplaceAll(uuid.NewString(), "-", "")
-	if util.ToBool(req["stream"]) {
-		h.handleResponsesStream(w, r, resp, responseID, model, finalPrompt, thinkingEnabled, searchEnabled, toolNames)
+	if stdReq.Stream {
+		h.handleResponsesStream(w, r, resp, owner, responseID, stdReq.ResponseModel, stdReq.FinalPrompt, stdReq.Thinking, stdReq.Search, stdReq.ToolNames)
 		return
 	}
-	h.handleResponsesNonStream(w, resp, responseID, model, finalPrompt, thinkingEnabled, toolNames)
+	h.handleResponsesNonStream(w, resp, owner, responseID, stdReq.ResponseModel, stdReq.FinalPrompt, stdReq.Thinking, stdReq.ToolNames)
 }
 
-func (h *Handler) handleResponsesNonStream(w http.ResponseWriter, resp *http.Response, responseID, model, finalPrompt string, thinkingEnabled bool, toolNames []string) {
+func (h *Handler) handleResponsesNonStream(w http.ResponseWriter, resp *http.Response, owner, responseID, model, finalPrompt string, thinkingEnabled bool, toolNames []string) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -118,11 +116,11 @@ func (h *Handler) handleResponsesNonStream(w http.ResponseWriter, resp *http.Res
 	}
 	result := sse.CollectStream(resp, thinkingEnabled, true)
 	responseObj := buildResponseObject(responseID, model, finalPrompt, result.Thinking, result.Text, toolNames)
-	h.getResponseStore().put(responseID, responseObj)
+	h.getResponseStore().put(owner, responseID, responseObj)
 	writeJSON(w, http.StatusOK, responseObj)
 }
 
-func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, resp *http.Response, responseID, model, finalPrompt string, thinkingEnabled, searchEnabled bool, toolNames []string) {
+func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, resp *http.Response, owner, responseID, model, finalPrompt string, thinkingEnabled, searchEnabled bool, toolNames []string) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -160,7 +158,8 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 		initialType = "thinking"
 	}
 	parsedLines, done := sse.StartParsedLinePump(r.Context(), resp.Body, thinkingEnabled, initialType)
-	bufferToolContent := len(toolNames) > 0
+	bufferToolContent := len(toolNames) > 0 && h.toolcallFeatureMatchEnabled()
+	emitEarlyToolDeltas := h.toolcallEarlyEmitHighConfidence()
 	var sieve toolStreamSieveState
 	thinking := strings.Builder{}
 	text := strings.Builder{}
@@ -194,7 +193,7 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 		if toolCallsEmitted {
 			obj["status"] = "completed"
 		}
-		h.getResponseStore().put(responseID, obj)
+		h.getResponseStore().put(owner, responseID, obj)
 		sendEvent("response.completed", map[string]any{
 			"type":     "response.completed",
 			"response": obj,
@@ -259,6 +258,9 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 						})
 					}
 					if len(evt.ToolCallDeltas) > 0 {
+						if !emitEarlyToolDeltas {
+							continue
+						}
 						toolCallsEmitted = true
 						sendEvent("response.output_tool_call.delta", map[string]any{
 							"type":       "response.output_tool_call.delta",

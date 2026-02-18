@@ -91,24 +91,11 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 		writeOpenAIError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	model, _ := req["model"].(string)
-	messagesRaw, _ := req["messages"].([]any)
-	if model == "" || len(messagesRaw) == 0 {
-		writeOpenAIError(w, http.StatusBadRequest, "Request must include 'model' and 'messages'.")
+	stdReq, err := normalizeOpenAIChatRequest(h.Store, req)
+	if err != nil {
+		writeOpenAIError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	resolvedModel, ok := config.ResolveModel(h.Store, model)
-	if !ok {
-		writeOpenAIError(w, http.StatusBadRequest, fmt.Sprintf("Model '%s' is not available.", model))
-		return
-	}
-	thinkingEnabled, searchEnabled, _ := config.GetModelConfig(resolvedModel)
-	responseModel := strings.TrimSpace(model)
-	if responseModel == "" {
-		responseModel = resolvedModel
-	}
-
-	finalPrompt, toolNames := buildOpenAIFinalPrompt(messagesRaw, req["tools"])
 
 	sessionID, err := h.DS.CreateSession(r.Context(), a, 3)
 	if err != nil {
@@ -124,25 +111,17 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 		writeOpenAIError(w, http.StatusUnauthorized, "Failed to get PoW (invalid token or unknown error).")
 		return
 	}
-	payload := map[string]any{
-		"chat_session_id":   sessionID,
-		"parent_message_id": nil,
-		"prompt":            finalPrompt,
-		"ref_file_ids":      []any{},
-		"thinking_enabled":  thinkingEnabled,
-		"search_enabled":    searchEnabled,
-	}
-	applyOpenAIChatPassThrough(req, payload)
+	payload := stdReq.CompletionPayload(sessionID)
 	resp, err := h.DS.CallCompletion(r.Context(), a, payload, pow, 3)
 	if err != nil {
 		writeOpenAIError(w, http.StatusInternalServerError, "Failed to get completion.")
 		return
 	}
-	if util.ToBool(req["stream"]) {
-		h.handleStream(w, r, resp, sessionID, responseModel, finalPrompt, thinkingEnabled, searchEnabled, toolNames)
+	if stdReq.Stream {
+		h.handleStream(w, r, resp, sessionID, stdReq.ResponseModel, stdReq.FinalPrompt, stdReq.Thinking, stdReq.Search, stdReq.ToolNames)
 		return
 	}
-	h.handleNonStream(w, r.Context(), resp, sessionID, responseModel, finalPrompt, thinkingEnabled, toolNames)
+	h.handleNonStream(w, r.Context(), resp, sessionID, stdReq.ResponseModel, stdReq.FinalPrompt, stdReq.Thinking, stdReq.ToolNames)
 }
 
 func (h *Handler) handleNonStream(w http.ResponseWriter, ctx context.Context, resp *http.Response, completionID, model, finalPrompt string, thinkingEnabled bool, toolNames []string) {
@@ -208,7 +187,8 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 
 	created := time.Now().Unix()
 	firstChunkSent := false
-	bufferToolContent := len(toolNames) > 0
+	bufferToolContent := len(toolNames) > 0 && h.toolcallFeatureMatchEnabled()
+	emitEarlyToolDeltas := h.toolcallEarlyEmitHighConfidence()
 	var toolSieve toolStreamSieveState
 	toolCallsEmitted := false
 	streamToolCallIDs := map[int]string{}
@@ -377,6 +357,9 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 						}
 						for _, evt := range events {
 							if len(evt.ToolCallDeltas) > 0 {
+								if !emitEarlyToolDeltas {
+									continue
+								}
 								toolCallsEmitted = true
 								tcDelta := map[string]any{
 									"tool_calls": formatIncrementalStreamToolCallDeltas(evt.ToolCallDeltas, streamToolCallIDs),
@@ -568,17 +551,23 @@ func openAIErrorCode(status int) string {
 }
 
 func applyOpenAIChatPassThrough(req map[string]any, payload map[string]any) {
-	for _, k := range []string{
-		"temperature",
-		"top_p",
-		"max_tokens",
-		"max_completion_tokens",
-		"presence_penalty",
-		"frequency_penalty",
-		"stop",
-	} {
-		if v, ok := req[k]; ok {
-			payload[k] = v
-		}
+	for k, v := range collectOpenAIChatPassThrough(req) {
+		payload[k] = v
 	}
+}
+
+func (h *Handler) toolcallFeatureMatchEnabled() bool {
+	if h == nil || h.Store == nil {
+		return true
+	}
+	mode := strings.TrimSpace(strings.ToLower(h.Store.ToolcallMode()))
+	return mode == "" || mode == "feature_match"
+}
+
+func (h *Handler) toolcallEarlyEmitHighConfidence() bool {
+	if h == nil || h.Store == nil {
+		return true
+	}
+	level := strings.TrimSpace(strings.ToLower(h.Store.ToolcallEarlyEmitConfidence()))
+	return level == "" || level == "high"
 }

@@ -63,32 +63,12 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 		writeClaudeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	model, _ := req["model"].(string)
-	messagesRaw, _ := req["messages"].([]any)
-	if model == "" || len(messagesRaw) == 0 {
-		writeClaudeError(w, http.StatusBadRequest, "Request must include 'model' and 'messages'.")
+	norm, err := normalizeClaudeRequest(h.Store, req)
+	if err != nil {
+		writeClaudeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if _, ok := req["max_tokens"]; !ok {
-		req["max_tokens"] = 8192
-	}
-
-	normalized := normalizeClaudeMessages(messagesRaw)
-	payload := cloneMap(req)
-	payload["messages"] = normalized
-	toolsRequested, _ := req["tools"].([]any)
-	if len(toolsRequested) > 0 && !hasSystemMessage(normalized) {
-		payload["messages"] = append([]any{map[string]any{"role": "system", "content": buildClaudeToolPrompt(toolsRequested)}}, normalized...)
-	}
-
-	dsPayload := util.ConvertClaudeToDeepSeek(payload, h.Store)
-	dsModel, _ := dsPayload["model"].(string)
-	thinkingEnabled, searchEnabled, ok := config.GetModelConfig(dsModel)
-	if !ok {
-		thinkingEnabled = false
-		searchEnabled = false
-	}
-	finalPrompt := util.MessagesPrepare(toMessageMaps(dsPayload["messages"]))
+	stdReq := norm.Standard
 
 	sessionID, err := h.DS.CreateSession(r.Context(), a, 3)
 	if err != nil {
@@ -100,14 +80,7 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 		writeClaudeError(w, http.StatusUnauthorized, "Failed to get PoW")
 		return
 	}
-	requestPayload := map[string]any{
-		"chat_session_id":   sessionID,
-		"parent_message_id": nil,
-		"prompt":            finalPrompt,
-		"ref_file_ids":      []any{},
-		"thinking_enabled":  thinkingEnabled,
-		"search_enabled":    searchEnabled,
-	}
+	requestPayload := stdReq.CompletionPayload(sessionID)
 	resp, err := h.DS.CallCompletion(r.Context(), a, requestPayload, pow, 3)
 	if err != nil {
 		writeClaudeError(w, http.StatusInternalServerError, "Failed to get Claude response.")
@@ -120,15 +93,14 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	toolNames := extractClaudeToolNames(toolsRequested)
-	if util.ToBool(req["stream"]) {
-		h.handleClaudeStreamRealtime(w, r, resp, model, normalized, thinkingEnabled, searchEnabled, toolNames)
+	if stdReq.Stream {
+		h.handleClaudeStreamRealtime(w, r, resp, stdReq.ResponseModel, norm.NormalizedMessages, stdReq.Thinking, stdReq.Search, stdReq.ToolNames)
 		return
 	}
-	result := sse.CollectStream(resp, thinkingEnabled, true)
+	result := sse.CollectStream(resp, stdReq.Thinking, true)
 	fullText := result.Text
 	fullThinking := result.Thinking
-	detected := util.ParseToolCalls(fullText, toolNames)
+	detected := util.ParseToolCalls(fullText, stdReq.ToolNames)
 	content := make([]map[string]any, 0, 4)
 	if fullThinking != "" {
 		content = append(content, map[string]any{"type": "thinking", "thinking": fullThinking})
@@ -154,12 +126,12 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 		"id":            fmt.Sprintf("msg_%d", time.Now().UnixNano()),
 		"type":          "message",
 		"role":          "assistant",
-		"model":         model,
+		"model":         stdReq.ResponseModel,
 		"content":       content,
 		"stop_reason":   stopReason,
 		"stop_sequence": nil,
 		"usage": map[string]any{
-			"input_tokens":  util.EstimateTokens(fmt.Sprintf("%v", normalized)),
+			"input_tokens":  util.EstimateTokens(fmt.Sprintf("%v", norm.NormalizedMessages)),
 			"output_tokens": util.EstimateTokens(fullThinking) + util.EstimateTokens(fullText),
 		},
 	})

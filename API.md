@@ -309,7 +309,7 @@ data: [DONE]
 
 ### `GET /v1/responses/{response_id}`
 
-需要业务鉴权。查询 `POST /v1/responses` 生成并缓存的 response 对象。
+需要业务鉴权。查询 `POST /v1/responses` 生成并缓存的 response 对象（按调用方鉴权隔离，仅同一 key/token 可读取）。
 
 > 当前为内存 TTL 存储，默认过期时间 `900s`（可用 `responses.store_ttl_seconds` 调整）。
 

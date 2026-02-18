@@ -37,6 +37,9 @@ func TestDetermineWithXAPIKeyUsesDirectToken(t *testing.T) {
 	if auth.DeepSeekToken != "direct-token" {
 		t.Fatalf("unexpected token: %q", auth.DeepSeekToken)
 	}
+	if auth.CallerID == "" {
+		t.Fatalf("expected caller id to be populated")
+	}
 }
 
 func TestDetermineWithXAPIKeyManagedKeyAcquiresAccount(t *testing.T) {
@@ -57,6 +60,24 @@ func TestDetermineWithXAPIKeyManagedKeyAcquiresAccount(t *testing.T) {
 	}
 	if auth.DeepSeekToken != "account-token" {
 		t.Fatalf("unexpected account token: %q", auth.DeepSeekToken)
+	}
+	if auth.CallerID == "" {
+		t.Fatalf("expected caller id to be populated")
+	}
+}
+
+func TestCallerTokenIDStable(t *testing.T) {
+	a := callerTokenID("token-a")
+	b := callerTokenID("token-a")
+	c := callerTokenID("token-b")
+	if a == "" || b == "" || c == "" {
+		t.Fatalf("expected non-empty caller ids")
+	}
+	if a != b {
+		t.Fatalf("expected stable caller id, got %q and %q", a, b)
+	}
+	if a == c {
+		t.Fatalf("expected different caller id for different tokens")
 	}
 }
 

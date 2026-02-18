@@ -309,7 +309,7 @@ data: [DONE]
 
 ### `GET /v1/responses/{response_id}`
 
-Business auth required. Fetches cached responses created by `POST /v1/responses`.
+Business auth required. Fetches cached responses created by `POST /v1/responses` (caller-scoped; only the same key/token can read).
 
 > Backed by in-memory TTL store. Default TTL is `900s` (configurable via `responses.store_ttl_seconds`).
 

@@ -54,12 +54,20 @@ func TestDeterministicEmbeddingStable(t *testing.T) {
 
 func TestResponseStorePutGet(t *testing.T) {
 	st := newResponseStore(100 * time.Millisecond)
-	st.put("resp_1", map[string]any{"id": "resp_1"})
-	got, ok := st.get("resp_1")
+	st.put("owner_1", "resp_1", map[string]any{"id": "resp_1"})
+	got, ok := st.get("owner_1", "resp_1")
 	if !ok {
 		t.Fatal("expected stored response")
 	}
 	if got["id"] != "resp_1" {
 		t.Fatalf("unexpected response payload: %#v", got)
+	}
+}
+
+func TestResponseStoreTenantIsolation(t *testing.T) {
+	st := newResponseStore(100 * time.Millisecond)
+	st.put("owner_a", "resp_1", map[string]any{"id": "resp_1"})
+	if _, ok := st.get("owner_b", "resp_1"); ok {
+		t.Fatal("expected owner_b to be isolated from owner_a response")
 	}
 }
