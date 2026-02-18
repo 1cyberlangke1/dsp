@@ -75,3 +75,10 @@ func TestParseStandaloneToolCallsOnlyMatchesStandalonePayload(t *testing.T) {
 		t.Fatalf("expected standalone parser to match, got %#v", calls)
 	}
 }
+
+func TestParseStandaloneToolCallsIgnoresFencedCodeBlock(t *testing.T) {
+	fenced := "```json\n{\"tool_calls\":[{\"name\":\"search\",\"input\":{\"q\":\"go\"}}]}\n```"
+	if calls := ParseStandaloneToolCalls(fenced, []string{"search"}); len(calls) != 0 {
+		t.Fatalf("expected fenced tool_call example to be ignored, got %#v", calls)
+	}
+}

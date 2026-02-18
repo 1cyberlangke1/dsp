@@ -241,6 +241,35 @@ func TestHandleNonStreamEmbeddedToolCallExampleNotIntercepted(t *testing.T) {
 	}
 }
 
+func TestHandleNonStreamFencedToolCallExampleNotIntercepted(t *testing.T) {
+	h := &Handler{}
+	resp := makeSSEHTTPResponse(
+		"data: {\"p\":\"response/content\",\"v\":\"```json\\n{\\\"tool_calls\\\":[{\\\"name\\\":\\\"search\\\",\\\"input\\\":{\\\"q\\\":\\\"go\\\"}}]}\\n```\"}",
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+
+	h.handleNonStream(rec, context.Background(), resp, "cid2d", "deepseek-chat", "prompt", false, false, []string{"search"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d", rec.Code)
+	}
+
+	out := decodeJSONBody(t, rec.Body.String())
+	choices, _ := out["choices"].([]any)
+	choice, _ := choices[0].(map[string]any)
+	if choice["finish_reason"] != "stop" {
+		t.Fatalf("expected finish_reason=stop, got %#v", choice["finish_reason"])
+	}
+	msg, _ := choice["message"].(map[string]any)
+	if _, ok := msg["tool_calls"]; ok {
+		t.Fatalf("did not expect tool_calls field for fenced example: %#v", msg["tool_calls"])
+	}
+	content, _ := msg["content"].(string)
+	if !strings.Contains(content, "```json") || !strings.Contains(content, `"tool_calls"`) {
+		t.Fatalf("expected fenced tool example to pass through as text, got %q", content)
+	}
+}
+
 func TestHandleStreamToolCallInterceptsWithoutRawContentLeak(t *testing.T) {
 	h := &Handler{}
 	resp := makeSSEHTTPResponse(
@@ -428,9 +457,9 @@ func TestHandleStreamToolsPlainTextStreamsBeforeFinish(t *testing.T) {
 func TestHandleStreamToolCallMixedWithPlainTextSegments(t *testing.T) {
 	h := &Handler{}
 	resp := makeSSEHTTPResponse(
-		`data: {"p":"response/content","v":"前置正文A。"}`,
+		`data: {"p":"response/content","v":"下面是示例："}`,
 		`data: {"p":"response/content","v":"{\"tool_calls\":[{\"name\":\"search\",\"input\":{\"q\":\"go\"}}]}"}`,
-		`data: {"p":"response/content","v":"后置正文B。"}`,
+		`data: {"p":"response/content","v":"请勿执行。"}`,
 		`data: [DONE]`,
 	)
 	rec := httptest.NewRecorder()
@@ -457,7 +486,7 @@ func TestHandleStreamToolCallMixedWithPlainTextSegments(t *testing.T) {
 		}
 	}
 	got := content.String()
-	if !strings.Contains(got, "前置正文A。") || !strings.Contains(got, "后置正文B。") {
+	if !strings.Contains(got, "下面是示例：") || !strings.Contains(got, "请勿执行。") {
 		t.Fatalf("expected pre/post plain text to pass sieve, got=%q", got)
 	}
 	if !strings.Contains(got, `"tool_calls"`) {
@@ -465,6 +494,48 @@ func TestHandleStreamToolCallMixedWithPlainTextSegments(t *testing.T) {
 	}
 	if streamFinishReason(frames) != "stop" {
 		t.Fatalf("expected finish_reason=stop for mixed prose, body=%s", rec.Body.String())
+	}
+}
+
+func TestHandleStreamToolCallAfterLeadingTextStillIntercepted(t *testing.T) {
+	h := &Handler{}
+	resp := makeSSEHTTPResponse(
+		`data: {"p":"response/content","v":"我将调用工具。"}`,
+		`data: {"p":"response/content","v":"{\"tool_calls\":[{\"name\":\"search\",\"input\":{\"q\":\"go\"}}]}"}`,
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	h.handleStream(rec, req, resp, "cid7b", "deepseek-chat", "prompt", false, false, []string{"search"})
+
+	frames, done := parseSSEDataFrames(t, rec.Body.String())
+	if !done {
+		t.Fatalf("expected [DONE], body=%s", rec.Body.String())
+	}
+	if !streamHasToolCallsDelta(frames) {
+		t.Fatalf("expected tool_calls delta, body=%s", rec.Body.String())
+	}
+	content := strings.Builder{}
+	for _, frame := range frames {
+		choices, _ := frame["choices"].([]any)
+		for _, item := range choices {
+			choice, _ := item.(map[string]any)
+			delta, _ := choice["delta"].(map[string]any)
+			if c, ok := delta["content"].(string); ok {
+				content.WriteString(c)
+			}
+		}
+	}
+	got := content.String()
+	if !strings.Contains(got, "我将调用工具。") {
+		t.Fatalf("expected leading text to keep streaming, got=%q", got)
+	}
+	if strings.Contains(strings.ToLower(got), "tool_calls") {
+		t.Fatalf("unexpected raw tool json leak, got=%q", got)
+	}
+	if streamFinishReason(frames) != "tool_calls" {
+		t.Fatalf("expected finish_reason=tool_calls, body=%s", rec.Body.String())
 	}
 }
 

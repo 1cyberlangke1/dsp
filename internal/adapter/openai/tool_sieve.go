@@ -11,6 +11,7 @@ type toolStreamSieveState struct {
 	capture           strings.Builder
 	capturing         bool
 	hasMeaningfulText bool
+	recentTextTail    string
 	toolNameSent      bool
 	toolName          string
 	toolArgsStart     int
@@ -32,6 +33,7 @@ type toolCallDelta struct {
 }
 
 const toolSieveCaptureLimit = 8 * 1024
+const toolSieveContextTailLimit = 256
 
 func (s *toolStreamSieveState) resetIncrementalToolState() {
 	s.toolNameSent = false
@@ -67,9 +69,7 @@ func processToolSieveChunk(state *toolStreamSieveState, chunk string, toolNames 
 					state.capture.Reset()
 					state.capturing = false
 					state.resetIncrementalToolState()
-					if strings.TrimSpace(content) != "" {
-						state.hasMeaningfulText = true
-					}
+					state.noteText(content)
 					events = append(events, toolStreamEvent{Content: content})
 					continue
 				}
@@ -79,9 +79,7 @@ func processToolSieveChunk(state *toolStreamSieveState, chunk string, toolNames 
 			state.capturing = false
 			state.resetIncrementalToolState()
 			if prefix != "" {
-				if strings.TrimSpace(prefix) != "" {
-					state.hasMeaningfulText = true
-				}
+				state.noteText(prefix)
 				events = append(events, toolStreamEvent{Content: prefix})
 			}
 			if len(calls) > 0 {
@@ -101,9 +99,7 @@ func processToolSieveChunk(state *toolStreamSieveState, chunk string, toolNames 
 		if start >= 0 {
 			prefix := pending[:start]
 			if prefix != "" {
-				if strings.TrimSpace(prefix) != "" {
-					state.hasMeaningfulText = true
-				}
+				state.noteText(prefix)
 				events = append(events, toolStreamEvent{Content: prefix})
 			}
 			state.pending.Reset()
@@ -119,9 +115,7 @@ func processToolSieveChunk(state *toolStreamSieveState, chunk string, toolNames 
 		}
 		state.pending.Reset()
 		state.pending.WriteString(hold)
-		if strings.TrimSpace(safe) != "" {
-			state.hasMeaningfulText = true
-		}
+		state.noteText(safe)
 		events = append(events, toolStreamEvent{Content: safe})
 	}
 
@@ -137,26 +131,20 @@ func flushToolSieve(state *toolStreamSieveState, toolNames []string) []toolStrea
 		consumedPrefix, consumedCalls, consumedSuffix, ready := consumeToolCapture(state, toolNames)
 		if ready {
 			if consumedPrefix != "" {
-				if strings.TrimSpace(consumedPrefix) != "" {
-					state.hasMeaningfulText = true
-				}
+				state.noteText(consumedPrefix)
 				events = append(events, toolStreamEvent{Content: consumedPrefix})
 			}
 			if len(consumedCalls) > 0 {
 				events = append(events, toolStreamEvent{ToolCalls: consumedCalls})
 			}
 			if consumedSuffix != "" {
-				if strings.TrimSpace(consumedSuffix) != "" {
-					state.hasMeaningfulText = true
-				}
+				state.noteText(consumedSuffix)
 				events = append(events, toolStreamEvent{Content: consumedSuffix})
 			}
 		} else {
 			content := state.capture.String()
 			if content != "" {
-				if strings.TrimSpace(content) != "" {
-					state.hasMeaningfulText = true
-				}
+				state.noteText(content)
 				events = append(events, toolStreamEvent{Content: content})
 			}
 		}
@@ -166,9 +154,7 @@ func flushToolSieve(state *toolStreamSieveState, toolNames []string) []toolStrea
 	}
 	if state.pending.Len() > 0 {
 		content := state.pending.String()
-		if strings.TrimSpace(content) != "" {
-			state.hasMeaningfulText = true
-		}
+		state.noteText(content)
 		events = append(events, toolStreamEvent{Content: content})
 		state.pending.Reset()
 	}
@@ -241,7 +227,7 @@ func consumeToolCapture(state *toolStreamSieveState, toolNames []string) (prefix
 	}
 	prefixPart := captured[:start]
 	suffixPart := captured[end:]
-	if !state.toolNameSent && (state.hasMeaningfulText || strings.TrimSpace(prefixPart) != "" || strings.TrimSpace(suffixPart) != "") {
+	if !state.toolNameSent && (strings.TrimSpace(prefixPart) != "" || strings.TrimSpace(suffixPart) != "" || looksLikeToolExampleContext(state.recentTextTail)) {
 		return captured, nil, "", true
 	}
 	parsed := util.ParseStandaloneToolCalls(obj, toolNames)
@@ -304,7 +290,10 @@ func extractJSONObjectFrom(text string, start int) (string, int, bool) {
 
 func buildIncrementalToolDeltas(state *toolStreamSieveState) []toolCallDelta {
 	captured := state.capture.String()
-	if captured == "" || state.hasMeaningfulText {
+	if captured == "" {
+		return nil
+	}
+	if looksLikeToolExampleContext(state.recentTextTail) {
 		return nil
 	}
 	lower := strings.ToLower(captured)
@@ -617,4 +606,47 @@ func skipSpaces(text string, i int) int {
 		}
 	}
 	return i
+}
+
+func (s *toolStreamSieveState) noteText(content string) {
+	if strings.TrimSpace(content) == "" {
+		return
+	}
+	s.hasMeaningfulText = true
+	s.recentTextTail = appendTail(s.recentTextTail, content, toolSieveContextTailLimit)
+}
+
+func appendTail(prev, next string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	combined := prev + next
+	if len(combined) <= max {
+		return combined
+	}
+	return combined[len(combined)-max:]
+}
+
+func looksLikeToolExampleContext(text string) bool {
+	t := strings.ToLower(strings.TrimSpace(text))
+	if t == "" {
+		return false
+	}
+	cues := []string{
+		"示例",
+		"例子",
+		"for example",
+		"example",
+		"demo",
+		"请勿执行",
+		"不要执行",
+		"do not execute",
+		"```",
+	}
+	for _, cue := range cues {
+		if strings.Contains(t, cue) {
+			return true
+		}
+	}
+	return false
 }

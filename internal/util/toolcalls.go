@@ -41,6 +41,9 @@ func ParseStandaloneToolCalls(text string, availableToolNames []string) []Parsed
 	if trimmed == "" {
 		return nil
 	}
+	if looksLikeToolExampleContext(trimmed) {
+		return nil
+	}
 	candidates := []string{trimmed}
 	if strings.HasPrefix(trimmed, "```") && strings.HasSuffix(trimmed, "```") {
 		if m := fencedJSONPattern.FindStringSubmatch(trimmed); len(m) >= 2 {
@@ -311,6 +314,30 @@ func extractJSONObject(text string, start int) (string, int, bool) {
 		}
 	}
 	return "", 0, false
+}
+
+func looksLikeToolExampleContext(text string) bool {
+	t := strings.ToLower(strings.TrimSpace(text))
+	if t == "" {
+		return false
+	}
+	cues := []string{
+		"```",
+		"示例",
+		"例子",
+		"for example",
+		"example",
+		"demo",
+		"请勿执行",
+		"不要执行",
+		"do not execute",
+	}
+	for _, cue := range cues {
+		if strings.Contains(t, cue) {
+			return true
+		}
+	}
+	return false
 }
 
 func FormatOpenAIToolCalls(calls []ParsedToolCall) []map[string]any {

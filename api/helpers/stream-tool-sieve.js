@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const TOOL_CALL_PATTERN = /\{\s*["']tool_calls["']\s*:\s*\[(.*?)\]\s*\}/s;
 const TOOL_SIEVE_CAPTURE_LIMIT = 8 * 1024;
+const TOOL_SIEVE_CONTEXT_TAIL_LIMIT = 256;
 
 function extractToolNames(tools) {
   if (!Array.isArray(tools) || tools.length === 0) {
@@ -28,6 +29,7 @@ function createToolSieveState() {
     capture: '',
     capturing: false,
     hasMeaningfulText: false,
+    recentTextTail: '',
     toolNameSent: false,
     toolName: '',
     toolArgsStart: -1,
@@ -68,9 +70,7 @@ function processToolSieveChunk(state, chunk, toolNames) {
       const consumed = consumeToolCapture(state, toolNames);
       if (!consumed.ready) {
         if (state.capture.length > TOOL_SIEVE_CAPTURE_LIMIT) {
-          if (hasMeaningfulText(state.capture)) {
-            state.hasMeaningfulText = true;
-          }
+          noteText(state, state.capture);
           events.push({ type: 'text', text: state.capture });
           state.capture = '';
           state.capturing = false;
@@ -83,9 +83,7 @@ function processToolSieveChunk(state, chunk, toolNames) {
       state.capturing = false;
       resetIncrementalToolState(state);
       if (consumed.prefix) {
-        if (hasMeaningfulText(consumed.prefix)) {
-          state.hasMeaningfulText = true;
-        }
+        noteText(state, consumed.prefix);
         events.push({ type: 'text', text: consumed.prefix });
       }
       if (Array.isArray(consumed.calls) && consumed.calls.length > 0) {
@@ -105,9 +103,7 @@ function processToolSieveChunk(state, chunk, toolNames) {
     if (start >= 0) {
       const prefix = state.pending.slice(0, start);
       if (prefix) {
-        if (hasMeaningfulText(prefix)) {
-          state.hasMeaningfulText = true;
-        }
+        noteText(state, prefix);
         events.push({ type: 'text', text: prefix });
       }
       state.capture = state.pending.slice(start);
@@ -122,9 +118,7 @@ function processToolSieveChunk(state, chunk, toolNames) {
       break;
     }
     state.pending = hold;
-    if (hasMeaningfulText(safe)) {
-      state.hasMeaningfulText = true;
-    }
+    noteText(state, safe);
     events.push({ type: 'text', text: safe });
   }
   return events;
@@ -139,24 +133,18 @@ function flushToolSieve(state, toolNames) {
     const consumed = consumeToolCapture(state, toolNames);
     if (consumed.ready) {
       if (consumed.prefix) {
-        if (hasMeaningfulText(consumed.prefix)) {
-          state.hasMeaningfulText = true;
-        }
+        noteText(state, consumed.prefix);
         events.push({ type: 'text', text: consumed.prefix });
       }
       if (Array.isArray(consumed.calls) && consumed.calls.length > 0) {
         events.push({ type: 'tool_calls', calls: consumed.calls });
       }
       if (consumed.suffix) {
-        if (hasMeaningfulText(consumed.suffix)) {
-          state.hasMeaningfulText = true;
-        }
+        noteText(state, consumed.suffix);
         events.push({ type: 'text', text: consumed.suffix });
       }
     } else if (state.capture) {
-      if (hasMeaningfulText(state.capture)) {
-        state.hasMeaningfulText = true;
-      }
+      noteText(state, state.capture);
       events.push({ type: 'text', text: state.capture });
     }
     state.capture = '';
@@ -164,9 +152,7 @@ function flushToolSieve(state, toolNames) {
     resetIncrementalToolState(state);
   }
   if (state.pending) {
-    if (hasMeaningfulText(state.pending)) {
-      state.hasMeaningfulText = true;
-    }
+    noteText(state, state.pending);
     events.push({ type: 'text', text: state.pending });
     state.pending = '';
   }
@@ -234,7 +220,7 @@ function consumeToolCapture(state, toolNames) {
   }
   const prefixPart = captured.slice(0, start);
   const suffixPart = captured.slice(obj.end);
-  if (!state.toolNameSent && (state.hasMeaningfulText || hasMeaningfulText(prefixPart) || hasMeaningfulText(suffixPart))) {
+  if (!state.toolNameSent && (hasMeaningfulText(prefixPart) || hasMeaningfulText(suffixPart) || looksLikeToolExampleContext(state.recentTextTail))) {
     return {
       ready: true,
       prefix: captured,
@@ -285,7 +271,10 @@ function consumeToolCapture(state, toolNames) {
 
 function buildIncrementalToolDeltas(state) {
   const captured = state.capture || '';
-  if (!captured || state.hasMeaningfulText) {
+  if (!captured) {
+    return [];
+  }
+  if (looksLikeToolExampleContext(state.recentTextTail)) {
     return [];
   }
   const lower = captured.toLowerCase();
@@ -651,6 +640,9 @@ function parseStandaloneToolCalls(text, toolNames) {
   if (!trimmed) {
     return [];
   }
+  if (looksLikeToolExampleContext(trimmed)) {
+    return [];
+  }
   const candidates = [trimmed];
   if (trimmed.startsWith('```') && trimmed.endsWith('```')) {
     const m = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
@@ -854,6 +846,46 @@ function filterToolCalls(parsed, toolNames) {
     }
   }
   return out;
+}
+
+function noteText(state, text) {
+  if (!state || !hasMeaningfulText(text)) {
+    return;
+  }
+  state.hasMeaningfulText = true;
+  state.recentTextTail = appendTail(state.recentTextTail, text, TOOL_SIEVE_CONTEXT_TAIL_LIMIT);
+}
+
+function appendTail(prev, next, max) {
+  const left = typeof prev === 'string' ? prev : '';
+  const right = typeof next === 'string' ? next : '';
+  if (!Number.isFinite(max) || max <= 0) {
+    return '';
+  }
+  const combined = left + right;
+  if (combined.length <= max) {
+    return combined;
+  }
+  return combined.slice(combined.length - max);
+}
+
+function looksLikeToolExampleContext(text) {
+  const t = toStringSafe(text).toLowerCase();
+  if (!t) {
+    return false;
+  }
+  const cues = [
+    '示例',
+    '例子',
+    'for example',
+    'example',
+    'demo',
+    '请勿执行',
+    '不要执行',
+    'do not execute',
+    '```',
+  ];
+  return cues.some((cue) => t.includes(cue));
 }
 
 function hasMeaningfulText(text) {

@@ -83,6 +83,12 @@ test('parseStandaloneToolCalls only matches standalone payload and ignores mixed
   assert.equal(standaloneCalls.length, 1);
 });
 
+test('parseStandaloneToolCalls ignores fenced code block tool_call examples', () => {
+  const fenced = ['```json', '{"tool_calls":[{"name":"read_file","input":{"path":"README.MD"}}]}', '```'].join('\n');
+  const calls = parseStandaloneToolCalls(fenced, ['read_file']);
+  assert.equal(calls.length, 0);
+});
+
 test('sieve emits tool_calls and does not leak suspicious prefix on late key convergence', () => {
   const events = runSieve(
     [
@@ -164,4 +170,16 @@ test('sieve emits incremental tool_call_deltas for split arguments payload', () 
   assert.equal(hasName, true);
   assert.equal(argsJoined.includes('"path":"README.MD"'), true);
   assert.equal(argsJoined.includes('"mode":"head"'), true);
+});
+
+test('sieve still intercepts tool call after leading plain text without suffix', () => {
+  const events = runSieve(
+    ['我将调用工具。', '{"tool_calls":[{"name":"read_file","input":{"path":"README.MD"}}]}'],
+    ['read_file'],
+  );
+  const hasTool = events.some((evt) => (evt.type === 'tool_calls' && evt.calls?.length > 0) || (evt.type === 'tool_call_deltas' && evt.deltas?.length > 0));
+  const leakedText = collectText(events);
+  assert.equal(hasTool, true);
+  assert.equal(leakedText.includes('我将调用工具。'), true);
+  assert.equal(leakedText.toLowerCase().includes('tool_calls'), false);
 });
