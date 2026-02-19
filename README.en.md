@@ -350,8 +350,10 @@ ds2api/
 │       ├── components/      # AccountManager / ApiTester / BatchImport / VercelSync / Login / LandingPage
 │       └── locales/         # Language packs (zh.json / en.json)
 ├── scripts/
-│   ├── build-webui.sh       # Manual WebUI build script
-│   └── testsuite/           # Testsuite runner scripts
+│   └── build-webui.sh       # Manual WebUI build script
+├── tests/
+│   ├── compat/              # Compatibility fixtures and expected outputs
+│   └── scripts/             # Unified test script entrypoints (unit/e2e)
 ├── static/admin/            # WebUI build output (not committed to Git)
 ├── .github/
 │   ├── workflows/           # GitHub Actions (Release artifact automation)
@@ -379,11 +381,11 @@ ds2api/
 ## Testing
 
 ```bash
-# Unit tests
-go test ./...
+# Unit tests (Go + Node)
+./tests/scripts/run-unit-all.sh
 
 # One-command live end-to-end tests (real accounts, full request/response logs)
-./scripts/testsuite/run-live.sh
+./tests/scripts/run-live.sh
 
 # Or with custom flags
 go run ./cmd/ds2api-tests \

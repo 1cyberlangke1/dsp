@@ -47,26 +47,45 @@ func BuildResponseObject(responseID, model, finalPrompt, finalThinking, finalTex
 	// produced a standalone structured payload. This prevents accidental
 	// empty output_text on normal prose that merely contains tool_call-like text.
 	detected := util.ParseStandaloneToolCalls(finalText, toolNames)
+	toolCallsFromThinking := false
+	if len(detected) == 0 && strings.TrimSpace(finalThinking) != "" {
+		detected = util.ParseStandaloneToolCalls(finalThinking, toolNames)
+		toolCallsFromThinking = len(detected) > 0
+	}
 	exposedOutputText := finalText
 	output := make([]any, 0, 2)
 	if len(detected) > 0 {
-		exposedOutputText = ""
+		if !toolCallsFromThinking || strings.TrimSpace(finalText) != "" {
+			exposedOutputText = ""
+		} else {
+			exposedOutputText = finalThinking
+		}
+		if strings.TrimSpace(finalThinking) != "" {
+			output = append(output, map[string]any{
+				"type": "reasoning",
+				"text": finalThinking,
+			})
+		}
 		output = append(output, map[string]any{
 			"type":       "tool_calls",
 			"tool_calls": util.FormatOpenAIToolCalls(detected),
 		})
 	} else {
-		content := []any{
-			map[string]any{
-				"type": "output_text",
-				"text": finalText,
-			},
-		}
+		content := make([]any, 0, 2)
 		if finalThinking != "" {
 			content = append([]any{map[string]any{
 				"type": "reasoning",
 				"text": finalThinking,
 			}}, content...)
+		}
+		if strings.TrimSpace(finalText) != "" {
+			content = append(content, map[string]any{
+				"type": "output_text",
+				"text": finalText,
+			})
+		}
+		if strings.TrimSpace(finalText) == "" && strings.TrimSpace(finalThinking) != "" {
+			exposedOutputText = finalThinking
 		}
 		output = append(output, map[string]any{
 			"type":    "message",

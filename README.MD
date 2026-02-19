@@ -350,8 +350,10 @@ ds2api/
 │       ├── components/      # AccountManager / ApiTester / BatchImport / VercelSync / Login / LandingPage
 │       └── locales/         # 中英文语言包（zh.json / en.json）
 ├── scripts/
-│   ├── build-webui.sh       # WebUI 手动构建脚本
-│   └── testsuite/           # 测试集运行脚本
+│   └── build-webui.sh       # WebUI 手动构建脚本
+├── tests/
+│   ├── compat/              # 兼容性测试夹具与期望输出
+│   └── scripts/             # 统一测试脚本入口（unit/e2e）
 ├── static/admin/            # WebUI 构建产物（不提交到 Git）
 ├── .github/
 │   ├── workflows/           # GitHub Actions（Release 自动构建）
@@ -379,11 +381,11 @@ ds2api/
 ## 测试
 
 ```bash
-# 单元测试
-go test ./...
+# 单元测试（Go + Node）
+./tests/scripts/run-unit-all.sh
 
 # 一键端到端全链路测试（真实账号，生成完整请求/响应日志）
-./scripts/testsuite/run-live.sh
+./tests/scripts/run-live.sh
 
 # 或自定义参数
 go run ./cmd/ds2api-tests \
