@@ -51,6 +51,9 @@ func MessagesPrepare(messages []map[string]any) string {
 }
 
 func NormalizeContent(v any) string {
+	if v == nil {
+		return ""
+	}
 	switch x := v.(type) {
 	case string:
 		return x
