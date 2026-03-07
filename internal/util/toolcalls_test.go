@@ -137,3 +137,11 @@ func TestParseToolCallsAllowsPunctuationVariantToolName(t *testing.T) {
 		t.Fatalf("expected canonical tool name read_file, got %q", calls[0].Name)
 	}
 }
+
+func TestParseToolCallsDoesNotAcceptMismatchedMarkupTags(t *testing.T) {
+	text := `<tool_call><name>read_file</function><arguments>{"path":"README.md"}</arguments></tool_call>`
+	calls := ParseToolCalls(text, []string{"read_file"})
+	if len(calls) != 0 {
+		t.Fatalf("expected mismatched tags to be rejected, got %#v", calls)
+	}
+}
