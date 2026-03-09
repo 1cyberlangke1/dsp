@@ -50,3 +50,14 @@ function.arguments: {"command": "ls"}
 		t.Fatalf("unexpected 2nd name: %s", calls[1].Name)
 	}
 }
+
+func TestParseTextKVToolCalls_Standalone(t *testing.T) {
+	text := "function.name: read_file\nfunction.arguments: {\"path\":\"README.md\"}"
+	calls := ParseStandaloneToolCalls(text, []string{"read_file"})
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 call, got %d", len(calls))
+	}
+	if calls[0].Name != "read_file" {
+		t.Fatalf("unexpected name: %s", calls[0].Name)
+	}
+}
