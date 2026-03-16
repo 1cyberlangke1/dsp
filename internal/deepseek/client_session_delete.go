@@ -107,7 +107,7 @@ func (c *Client) DeleteSessionForToken(ctx context.Context, token string, sessio
 	if status != http.StatusOK || code != 0 {
 		msg, _ := resp["msg"].(string)
 		result.ErrorMessage = fmt.Sprintf("request failed: status=%d, code=%d, msg=%s", status, code, msg)
-		return result, fmt.Errorf(result.ErrorMessage)
+		return result, errors.New(result.ErrorMessage)
 	}
 
 	result.Success = true
