@@ -1,9 +1,6 @@
 package util
 
-import (
-	"encoding/json"
-	"strings"
-)
+import "strings"
 
 type ParsedToolCall struct {
 	Name  string         `json:"name"`
@@ -83,31 +80,26 @@ func ParseStandaloneToolCallsDetailed(text string, availableToolNames []string) 
 		return result
 	}
 	result.SawToolCallSyntax = looksLikeToolCallSyntax(trimmed)
-	candidates := []string{trimmed}
-	for _, candidate := range candidates {
-		candidate = strings.TrimSpace(candidate)
-		if candidate == "" {
-			continue
-		}
-		parsed := parseToolCallsPayload(candidate)
-		if len(parsed) == 0 {
-			parsed = parseXMLToolCalls(candidate)
-		}
-		if len(parsed) == 0 {
-			parsed = parseMarkupToolCalls(candidate)
-		}
-		if len(parsed) == 0 {
-			parsed = parseTextKVToolCalls(candidate)
-		}
-		if len(parsed) > 0 {
-			result.SawToolCallSyntax = true
-			calls, rejectedNames := filterToolCallsDetailed(parsed, availableToolNames)
-			result.Calls = calls
-			result.RejectedToolNames = rejectedNames
-			result.RejectedByPolicy = len(rejectedNames) > 0 && len(calls) == 0
-			return result
-		}
+
+	parsed := parseToolCallsPayload(trimmed)
+	if len(parsed) == 0 {
+		parsed = parseXMLToolCalls(trimmed)
 	}
+	if len(parsed) == 0 {
+		parsed = parseMarkupToolCalls(trimmed)
+	}
+	if len(parsed) == 0 {
+		parsed = parseTextKVToolCalls(trimmed)
+	}
+	if len(parsed) == 0 {
+		return result
+	}
+
+	result.SawToolCallSyntax = true
+	calls, rejectedNames := filterToolCallsDetailed(parsed, availableToolNames)
+	result.Calls = calls
+	result.RejectedToolNames = rejectedNames
+	result.RejectedByPolicy = len(rejectedNames) > 0 && len(calls) == 0
 	return result
 }
 
@@ -140,6 +132,7 @@ func filterToolCallsDetailed(parsed []ParsedToolCall, availableToolNames []strin
 		}
 		return nil, rejected
 	}
+
 	out := make([]ParsedToolCall, 0, len(parsed))
 	rejectedSet := map[string]struct{}{}
 	rejected := make([]string, 0)
@@ -168,25 +161,6 @@ func resolveAllowedToolName(name string, allowed map[string]struct{}, allowedCan
 	return resolveAllowedToolNameWithLooseMatch(name, allowed, allowedCanonical)
 }
 
-func parseToolCallsPayload(payload string) []ParsedToolCall {
-	var decoded any
-	if err := json.Unmarshal([]byte(payload), &decoded); err != nil {
-		return nil
-	}
-	switch v := decoded.(type) {
-	case map[string]any:
-		if tc, ok := v["tool_calls"]; ok {
-			return parseToolCallList(tc)
-		}
-		if parsed, ok := parseToolCallItem(v); ok {
-			return []ParsedToolCall{parsed}
-		}
-	case []any:
-		return parseToolCallList(v)
-	}
-	return nil
-}
-
 func looksLikeToolCallSyntax(text string) bool {
 	lower := strings.ToLower(text)
 	return strings.Contains(lower, "tool_calls") ||
@@ -194,86 +168,4 @@ func looksLikeToolCallSyntax(text string) bool {
 		strings.Contains(lower, "<function_call") ||
 		strings.Contains(lower, "<invoke") ||
 		strings.Contains(lower, "function.name:")
-}
-
-func parseToolCallList(v any) []ParsedToolCall {
-	items, ok := v.([]any)
-	if !ok {
-		return nil
-	}
-	out := make([]ParsedToolCall, 0, len(items))
-	for _, item := range items {
-		m, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		if tc, ok := parseToolCallItem(m); ok {
-			out = append(out, tc)
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func parseToolCallItem(m map[string]any) (ParsedToolCall, bool) {
-	name, _ := m["name"].(string)
-	inputRaw, hasInput := m["input"]
-	if fn, ok := m["function"].(map[string]any); ok {
-		if name == "" {
-			name, _ = fn["name"].(string)
-		}
-		if !hasInput {
-			if v, ok := fn["arguments"]; ok {
-				inputRaw = v
-				hasInput = true
-			}
-		}
-	}
-	if !hasInput {
-		for _, key := range []string{"arguments", "args", "parameters", "params"} {
-			if v, ok := m[key]; ok {
-				inputRaw = v
-				hasInput = true
-				break
-			}
-		}
-	}
-	if strings.TrimSpace(name) == "" {
-		return ParsedToolCall{}, false
-	}
-	return ParsedToolCall{
-		Name:  strings.TrimSpace(name),
-		Input: parseToolCallInput(inputRaw),
-	}, true
-}
-
-func parseToolCallInput(v any) map[string]any {
-	switch x := v.(type) {
-	case nil:
-		return map[string]any{}
-	case map[string]any:
-		return x
-	case string:
-		raw := strings.TrimSpace(x)
-		if raw == "" {
-			return map[string]any{}
-		}
-		var parsed map[string]any
-		if err := json.Unmarshal([]byte(raw), &parsed); err == nil && parsed != nil {
-			return parsed
-		}
-		return map[string]any{"_raw": raw}
-	default:
-		b, err := json.Marshal(x)
-		if err != nil {
-			return map[string]any{}
-		}
-		var parsed map[string]any
-		if err := json.Unmarshal(b, &parsed); err == nil && parsed != nil {
-			return parsed
-		}
-		return map[string]any{}
-	}
 }
