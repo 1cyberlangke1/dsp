@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/json"
 	"strings"
+	"unicode"
 )
 
 type ParsedToolCall struct {
@@ -269,6 +270,7 @@ func parseToolCallInput(v any) map[string]any {
 		}
 		var parsed map[string]any
 		if err := json.Unmarshal([]byte(raw), &parsed); err == nil && parsed != nil {
+			repairPathLikeControlChars(parsed)
 			return parsed
 		}
 		// Try to repair invalid backslashes (common in Windows paths output by models)
@@ -297,4 +299,59 @@ func parseToolCallInput(v any) map[string]any {
 		}
 		return map[string]any{}
 	}
+}
+
+func repairPathLikeControlChars(m map[string]any) {
+	for k, v := range m {
+		switch vv := v.(type) {
+		case map[string]any:
+			repairPathLikeControlChars(vv)
+		case []any:
+			for _, item := range vv {
+				if child, ok := item.(map[string]any); ok {
+					repairPathLikeControlChars(child)
+				}
+			}
+		case string:
+			if isPathLikeKey(k) && containsControlRune(vv) {
+				m[k] = escapeControlRunes(vv)
+			}
+		}
+	}
+}
+
+func isPathLikeKey(key string) bool {
+	k := strings.ToLower(strings.TrimSpace(key))
+	return strings.Contains(k, "path") || strings.Contains(k, "file")
+}
+
+func containsControlRune(s string) bool {
+	for _, r := range s {
+		if unicode.IsControl(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func escapeControlRunes(s string) string {
+	var b strings.Builder
+	b.Grow(len(s) + 8)
+	for _, r := range s {
+		switch r {
+		case '\b':
+			b.WriteString(`\b`)
+		case '\f':
+			b.WriteString(`\f`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

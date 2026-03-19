@@ -419,6 +419,27 @@ func TestParseToolCallsWithMixedWindowsPaths(t *testing.T) {
 	}
 }
 
+func TestParseToolCallInputRepairsControlCharsInPath(t *testing.T) {
+	in := `{"path":"D:\tmp\new\readme.txt","content":"line1\nline2"}`
+	parsed := parseToolCallInput(in)
+
+	path, ok := parsed["path"].(string)
+	if !ok {
+		t.Fatalf("expected path string in parsed input, got %#v", parsed["path"])
+	}
+	if path != `D:\tmp\new\readme.txt` {
+		t.Fatalf("expected repaired windows path, got %q", path)
+	}
+
+	content, ok := parsed["content"].(string)
+	if !ok {
+		t.Fatalf("expected content string in parsed input, got %#v", parsed["content"])
+	}
+	if content != "line1\nline2" {
+		t.Fatalf("expected non-path field to keep decoded escapes, got %q", content)
+	}
+}
+
 func TestRepairLooseJSONWithNestedObjects(t *testing.T) {
 	// 测试嵌套对象的修复：DeepSeek 幻觉输出，每个元素内部包含嵌套 {}
 	// 注意：正则只支持单层嵌套，不支持更深层次的嵌套
