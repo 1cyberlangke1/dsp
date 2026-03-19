@@ -26,6 +26,7 @@ func parseToolCallInput(v any) map[string]any {
 		repaired := repairInvalidJSONBackslashes(raw)
 		if repaired != raw {
 			if err := json.Unmarshal([]byte(repaired), &parsed); err == nil && parsed != nil {
+				repairPathLikeControlChars(parsed)
 				return parsed
 			}
 		}
@@ -33,6 +34,7 @@ func parseToolCallInput(v any) map[string]any {
 		repairedLoose := RepairLooseJSON(raw)
 		if repairedLoose != raw {
 			if err := json.Unmarshal([]byte(repairedLoose), &parsed); err == nil && parsed != nil {
+				repairPathLikeControlChars(parsed)
 				return parsed
 			}
 		}
