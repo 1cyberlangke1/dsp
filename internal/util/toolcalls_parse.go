@@ -16,7 +16,6 @@ type ToolCallParseResult struct {
 	RejectedByPolicy  bool
 	RejectedToolNames []string
 }
-
 func ParseToolCalls(text string, availableToolNames []string) []ParsedToolCall {
 	return ParseToolCallsDetailed(text, availableToolNames).Calls
 }
@@ -64,7 +63,6 @@ func ParseToolCallsDetailed(text string, availableToolNames []string) ToolCallPa
 	result.RejectedByPolicy = len(rejectedNames) > 0 && len(calls) == 0
 	return result
 }
-
 func ParseStandaloneToolCalls(text string, availableToolNames []string) []ParsedToolCall {
 	return ParseStandaloneToolCallsDetailed(text, availableToolNames).Calls
 }
