@@ -26,10 +26,6 @@ func ParseToolCallsDetailed(text string, availableToolNames []string) ToolCallPa
 	if strings.TrimSpace(text) == "" {
 		return result
 	}
-	text = stripFencedCodeBlocks(text)
-	if strings.TrimSpace(text) == "" {
-		return result
-	}
 	result.SawToolCallSyntax = looksLikeToolCallSyntax(text)
 
 	candidates := buildToolCallCandidates(text)
@@ -75,7 +71,7 @@ func ParseStandaloneToolCalls(text string, availableToolNames []string) []Parsed
 
 func ParseStandaloneToolCallsDetailed(text string, availableToolNames []string) ToolCallParseResult {
 	result := ToolCallParseResult{}
-	trimmed := strings.TrimSpace(stripFencedCodeBlocks(text))
+	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
 		return result
 	}
