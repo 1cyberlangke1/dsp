@@ -99,10 +99,10 @@ func TestFormatOpenAIToolCalls(t *testing.T) {
 	}
 }
 
-func TestParseStandaloneToolCallsOnlyMatchesStandalonePayload(t *testing.T) {
+func TestParseStandaloneToolCallsSupportsMixedProsePayload(t *testing.T) {
 	mixed := `这里是示例：{"tool_calls":[{"name":"search","input":{"q":"go"}}]}`
-	if calls := ParseStandaloneToolCalls(mixed, []string{"search"}); len(calls) != 0 {
-		t.Fatalf("expected standalone parser to ignore mixed prose, got %#v", calls)
+	if calls := ParseStandaloneToolCalls(mixed, []string{"search"}); len(calls) != 1 {
+		t.Fatalf("expected standalone parser to parse mixed prose payload, got %#v", calls)
 	}
 
 	standalone := `{"tool_calls":[{"name":"search","input":{"q":"go"}}]}`

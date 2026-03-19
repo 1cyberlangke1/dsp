@@ -211,7 +211,7 @@ func TestHandleNonStreamUnknownToolNotIntercepted(t *testing.T) {
 	}
 }
 
-func TestHandleNonStreamEmbeddedToolCallExampleRemainsText(t *testing.T) {
+func TestHandleNonStreamEmbeddedToolCallExamplePromotesToolCall(t *testing.T) {
 	h := &Handler{}
 	resp := makeSSEHTTPResponse(
 		`data: {"p":"response/content","v":"下面是示例："}`,
@@ -229,16 +229,17 @@ func TestHandleNonStreamEmbeddedToolCallExampleRemainsText(t *testing.T) {
 	out := decodeJSONBody(t, rec.Body.String())
 	choices, _ := out["choices"].([]any)
 	choice, _ := choices[0].(map[string]any)
-	if choice["finish_reason"] != "stop" {
-		t.Fatalf("expected finish_reason=stop, got %#v", choice["finish_reason"])
+	if choice["finish_reason"] != "tool_calls" {
+		t.Fatalf("expected finish_reason=tool_calls, got %#v", choice["finish_reason"])
 	}
 	msg, _ := choice["message"].(map[string]any)
-	if _, ok := msg["tool_calls"]; ok {
-		t.Fatalf("did not expect tool_calls field for embedded example: %#v", msg["tool_calls"])
+	toolCalls, _ := msg["tool_calls"].([]any)
+	if len(toolCalls) != 1 {
+		t.Fatalf("expected one tool_call field for embedded example: %#v", msg["tool_calls"])
 	}
 	content, _ := msg["content"].(string)
-	if !strings.Contains(content, "下面是示例：") || !strings.Contains(content, "请勿执行。") || !strings.Contains(content, `"tool_calls"`) {
-		t.Fatalf("expected embedded example to remain plain text, got %#v", content)
+	if strings.Contains(content, `"tool_calls"`) {
+		t.Fatalf("expected raw tool_calls json stripped from content, got %#v", content)
 	}
 }
 

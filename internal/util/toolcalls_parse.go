@@ -75,21 +75,19 @@ func ParseStandaloneToolCalls(text string, availableToolNames []string) []Parsed
 
 func ParseStandaloneToolCallsDetailed(text string, availableToolNames []string) ToolCallParseResult {
 	result := ToolCallParseResult{}
-	trimmed := strings.TrimSpace(text)
+	trimmed := strings.TrimSpace(stripFencedCodeBlocks(text))
 	if trimmed == "" {
 		return result
 	}
-	if looksLikeToolExampleContext(trimmed) {
-		return result
-	}
 	result.SawToolCallSyntax = looksLikeToolCallSyntax(trimmed)
-	candidates := []string{trimmed}
+	candidates := buildToolCallCandidates(trimmed)
+	var parsed []ParsedToolCall
 	for _, candidate := range candidates {
 		candidate = strings.TrimSpace(candidate)
 		if candidate == "" {
 			continue
 		}
-		parsed := parseToolCallsPayload(candidate)
+		parsed = parseToolCallsPayload(candidate)
 		if len(parsed) == 0 {
 			parsed = parseXMLToolCalls(candidate)
 		}
@@ -100,14 +98,23 @@ func ParseStandaloneToolCallsDetailed(text string, availableToolNames []string) 
 			parsed = parseTextKVToolCalls(candidate)
 		}
 		if len(parsed) > 0 {
-			result.SawToolCallSyntax = true
-			calls, rejectedNames := filterToolCallsDetailed(parsed, availableToolNames)
-			result.Calls = calls
-			result.RejectedToolNames = rejectedNames
-			result.RejectedByPolicy = len(rejectedNames) > 0 && len(calls) == 0
-			return result
+			break
 		}
 	}
+	if len(parsed) == 0 {
+		parsed = parseXMLToolCalls(trimmed)
+		if len(parsed) == 0 {
+			parsed = parseTextKVToolCalls(trimmed)
+			if len(parsed) == 0 {
+				return result
+			}
+		}
+	}
+	result.SawToolCallSyntax = true
+	calls, rejectedNames := filterToolCallsDetailed(parsed, availableToolNames)
+	result.Calls = calls
+	result.RejectedToolNames = rejectedNames
+	result.RejectedByPolicy = len(rejectedNames) > 0 && len(calls) == 0
 	return result
 }
 
