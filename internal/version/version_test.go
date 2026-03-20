@@ -22,3 +22,18 @@ func TestCompare(t *testing.T) {
 		t.Fatal("expected greater")
 	}
 }
+
+func TestTagKeepsPreviewStyle(t *testing.T) {
+	if got := Tag("preview-dev.abcd123"); got != "preview-dev.abcd123" {
+		t.Fatalf("expected preview tag unchanged, got %q", got)
+	}
+}
+
+func TestVersionFromVercelEnv(t *testing.T) {
+	t.Setenv("VERCEL_GIT_COMMIT_TAG", "")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "dev")
+	t.Setenv("VERCEL_GIT_COMMIT_SHA", "abcdef123456")
+	if got := versionFromVercelEnv(); got != "preview-dev.abcdef1" {
+		t.Fatalf("unexpected vercel preview version: %q", got)
+	}
+}

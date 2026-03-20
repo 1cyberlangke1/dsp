@@ -31,6 +31,12 @@ func Current() (value string, source string) {
 			sourceVal = "file:VERSION"
 			return
 		}
+
+		if vv := versionFromVercelEnv(); vv != "" {
+			currentVal = vv
+			sourceVal = "env:vercel"
+			return
+		}
 		currentVal = "dev"
 		sourceVal = "default"
 	})
@@ -80,7 +86,57 @@ func Tag(v string) string {
 	if v == "" || v == "dev" {
 		return v
 	}
+	if v[0] < '0' || v[0] > '9' {
+		return v
+	}
 	return "v" + v
+}
+
+func versionFromVercelEnv() string {
+	if tag := normalize(strings.TrimSpace(os.Getenv("VERCEL_GIT_COMMIT_TAG"))); tag != "" {
+		return tag
+	}
+	ref := strings.TrimSpace(os.Getenv("VERCEL_GIT_COMMIT_REF"))
+	sha := strings.TrimSpace(os.Getenv("VERCEL_GIT_COMMIT_SHA"))
+	if len(sha) > 7 {
+		sha = sha[:7]
+	}
+	ref = sanitizeVersionLabel(ref)
+	sha = sanitizeVersionLabel(sha)
+	if ref == "" && sha == "" {
+		return ""
+	}
+	if ref != "" && sha != "" {
+		return "preview-" + ref + "." + sha
+	}
+	if ref != "" {
+		return "preview-" + ref
+	}
+	return "preview-" + sha
+}
+
+func sanitizeVersionLabel(in string) string {
+	in = strings.TrimSpace(strings.ToLower(in))
+	if in == "" {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(in))
+	prevDash := false
+	for i := 0; i < len(in); i++ {
+		c := in[i]
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') {
+			b.WriteByte(c)
+			prevDash = false
+			continue
+		}
+		if !prevDash {
+			b.WriteByte('-')
+			prevDash = true
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	return out
 }
 
 func Compare(a, b string) int {
