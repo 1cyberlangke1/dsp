@@ -165,8 +165,40 @@ func shouldAttemptRefresh(status int, code int, bizCode int, msg string, bizMsg 
 		return true
 	}
 	// Some DeepSeek failures come back as HTTP 200/code=0 but with non-zero biz_code.
-	// In managed-account mode this is commonly stale login state, so try one refresh.
-	return status == http.StatusOK && code == 0 && bizCode != 0
+	// Only attempt refresh when these biz failures still look auth-related.
+	return status == http.StatusOK &&
+		code == 0 &&
+		bizCode != 0 &&
+		isAuthIndicativeBizFailure(msg, bizMsg)
+}
+
+func isAuthIndicativeBizFailure(msg string, bizMsg string) bool {
+	combined := strings.ToLower(strings.TrimSpace(msg) + " " + strings.TrimSpace(bizMsg))
+	authKeywords := []string{
+		"auth",
+		"authorization",
+		"credential",
+		"expired",
+		"invalid jwt",
+		"jwt",
+		"login",
+		"not login",
+		"session expired",
+		"token",
+		"unauthorized",
+		"登录",
+		"未登录",
+		"认证",
+		"凭证",
+		"会话过期",
+		"令牌",
+	}
+	for _, keyword := range authKeywords {
+		if strings.Contains(combined, keyword) {
+			return true
+		}
+	}
+	return false
 }
 
 func extractResponseStatus(resp map[string]any) (code int, bizCode int, msg string, bizMsg string) {

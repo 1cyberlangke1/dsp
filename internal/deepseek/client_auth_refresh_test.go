@@ -8,9 +8,15 @@ func TestShouldAttemptRefreshOnTokenInvalidSignal(t *testing.T) {
 	}
 }
 
-func TestShouldAttemptRefreshOnBizCodeOnlyFailure(t *testing.T) {
-	if !shouldAttemptRefresh(200, 0, 400123, "", "session create failed") {
-		t.Fatal("expected refresh on non-zero biz_code with HTTP 200/code=0")
+func TestShouldAttemptRefreshOnAuthIndicativeBizCodeFailure(t *testing.T) {
+	if !shouldAttemptRefresh(200, 0, 400123, "", "login expired, token invalid") {
+		t.Fatal("expected refresh on auth-indicative biz_code failure")
+	}
+}
+
+func TestShouldAttemptRefreshFalseOnNonAuthBizCodeFailure(t *testing.T) {
+	if shouldAttemptRefresh(200, 0, 400123, "", "session create failed: quota reached") {
+		t.Fatal("did not expect refresh on non-auth biz_code failure")
 	}
 }
 
