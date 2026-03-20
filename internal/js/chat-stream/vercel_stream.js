@@ -24,6 +24,8 @@ const {
 } = require('./token_usage');
 const {
   resolveToolcallPolicy,
+  formatIncrementalToolCallDeltas,
+  filterIncrementalToolCallDeltasByAllowed,
 } = require('./toolcall_policy');
 const {
   createChatCompletionEmitter,
@@ -57,6 +59,7 @@ async function handleVercelStream(req, res, rawBody, payload) {
   const searchEnabled = toBool(prep.body.search_enabled);
   const toolPolicy = resolveToolcallPolicy(prep.body, payload.tools);
   const toolNames = toolPolicy.toolNames;
+  const emitEarlyToolDeltas = toolPolicy.emitEarlyToolDeltas;
 
   if (!model || !leaseID || !deepseekToken || !powHeader || !completionPayload) {
     writeOpenAIError(res, 500, 'invalid vercel prepare response');
@@ -132,6 +135,7 @@ async function handleVercelStream(req, res, rawBody, payload) {
     const toolSieveState = createToolSieveState();
     let toolCallsEmitted = false;
     const streamToolCallIDs = new Map();
+    const streamToolNames = new Map();
     const decoder = new TextDecoder();
     reader = completionRes.body.getReader();
     let buffered = '';
@@ -255,6 +259,18 @@ async function handleVercelStream(req, res, rawBody, payload) {
               }
               const events = processToolSieveChunk(toolSieveState, p.text, toolNames);
               for (const evt of events) {
+                if (evt.type === 'tool_call_deltas') {
+                  if (!emitEarlyToolDeltas) {
+                    continue;
+                  }
+                  const filtered = filterIncrementalToolCallDeltasByAllowed(evt.deltas, toolNames, streamToolNames);
+                  const formatted = formatIncrementalToolCallDeltas(filtered, streamToolCallIDs);
+                  if (formatted.length > 0) {
+                    toolCallsEmitted = true;
+                    sendDeltaFrame({ tool_calls: formatted });
+                  }
+                  continue;
+                }
                 if (evt.type === 'tool_calls') {
                   toolCallsEmitted = true;
                   sendDeltaFrame({ tool_calls: formatOpenAIStreamToolCalls(evt.calls, streamToolCallIDs) });
