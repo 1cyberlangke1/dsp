@@ -12,8 +12,8 @@ type Config struct {
 	Toolcall         ToolcallConfig    `json:"toolcall,omitempty"`
 	Responses        ResponsesConfig   `json:"responses,omitempty"`
 	Embeddings       EmbeddingsConfig  `json:"embeddings,omitempty"`
-		AutoDelete       AutoDeleteConfig  `json:"auto_delete"`
-		VercelSyncHash   string            `json:"_vercel_sync_hash,omitempty"`
+	AutoDelete       AutoDeleteConfig  `json:"auto_delete"`
+	VercelSyncHash   string            `json:"_vercel_sync_hash,omitempty"`
 	VercelSyncTime   int64             `json:"_vercel_sync_time,omitempty"`
 	AdditionalFields map[string]any    `json:"-"`
 }
@@ -24,6 +24,15 @@ type Account struct {
 	Password   string `json:"password,omitempty"`
 	Token      string `json:"token,omitempty"`
 	TestStatus string `json:"test_status,omitempty"`
+}
+
+func (c *Config) ClearAccountTokens() {
+	if c == nil {
+		return
+	}
+	for i := range c.Accounts {
+		c.Accounts[i].Token = ""
+	}
 }
 
 type CompatConfig struct {
