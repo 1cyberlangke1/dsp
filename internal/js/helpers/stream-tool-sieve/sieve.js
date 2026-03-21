@@ -220,6 +220,17 @@ function consumeToolCapture(state, toolNames) {
   }
   const start = captured.slice(0, keyIdx).lastIndexOf('{');
   const actualStart = start >= 0 ? start : keyIdx;
+  if (start < 0) {
+    const history = extractToolHistoryBlock(captured, keyIdx);
+    if (history.ok) {
+      return {
+        ready: true,
+        prefix: captured.slice(0, history.start),
+        calls: [],
+        suffix: captured.slice(history.end),
+      };
+    }
+  }
   
   const obj = extractJSONObjectFrom(captured, actualStart);
   if (!obj.ok) {
@@ -263,6 +274,30 @@ function consumeToolCapture(state, toolNames) {
     calls: parsed.calls,
     suffix: trimmedFence.suffix,
   };
+}
+
+function extractToolHistoryBlock(captured, keyIdx) {
+  if (typeof captured !== 'string' || keyIdx < 0 || keyIdx >= captured.length) {
+    return { ok: false, start: 0, end: 0 };
+  }
+  const rest = captured.slice(keyIdx).toLowerCase();
+  if (rest.startsWith('[tool_call_history]')) {
+    const closeTag = '[/tool_call_history]';
+    const closeIdx = rest.indexOf(closeTag);
+    if (closeIdx < 0) {
+      return { ok: false, start: 0, end: 0 };
+    }
+    return { ok: true, start: keyIdx, end: keyIdx + closeIdx + closeTag.length };
+  }
+  if (rest.startsWith('[tool_result_history]')) {
+    const closeTag = '[/tool_result_history]';
+    const closeIdx = rest.indexOf(closeTag);
+    if (closeIdx < 0) {
+      return { ok: false, start: 0, end: 0 };
+    }
+    return { ok: true, start: keyIdx, end: keyIdx + closeIdx + closeTag.length };
+  }
+  return { ok: false, start: 0, end: 0 };
 }
 
 function trimWrappingJSONFence(prefix, suffix) {
