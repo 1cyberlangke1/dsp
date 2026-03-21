@@ -260,6 +260,22 @@ test('sieve swallows leaked TOOL_RESULT_HISTORY marker blocks', () => {
   assert.equal(leakedText.includes('[TOOL_RESULT_HISTORY]'), false);
 });
 
+test('sieve preserves text spacing when TOOL_RESULT_HISTORY spans chunks', () => {
+  const events = runSieve(
+    [
+      'Hello ',
+      '[TOOL_RESULT_HISTORY]\nstatus: already_called\n',
+      'function.name: exec\nfunction.arguments: {}\n[/TOOL_RESULT_HISTORY]',
+      'world',
+    ],
+    ['exec'],
+  );
+  const leakedText = collectText(events);
+  const hasToolCall = events.some((evt) => evt.type === 'tool_calls' && evt.calls?.length > 0);
+  assert.equal(hasToolCall, false);
+  assert.equal(leakedText, 'Hello world');
+});
+
 test('sieve intercepts rejected unknown tool payload (no args) without raw leak', () => {
   const events = runSieve(
     ['{"tool_calls":[{"name":"not_in_schema"}]}', '后置正文G。'],
