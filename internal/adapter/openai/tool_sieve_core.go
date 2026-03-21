@@ -194,7 +194,6 @@ func consumeToolCapture(state *toolStreamSieveState, toolNames []string) (prefix
 		return "", nil, "", false
 	}
 	lower := strings.ToLower(captured)
-
 	keyIdx := -1
 	keywords := []string{"tool_calls", "function.name:", "[tool_call_history]", "[tool_result_history]"}
 	for _, kw := range keywords {
