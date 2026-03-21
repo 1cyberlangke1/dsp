@@ -29,7 +29,7 @@ func normalizeOpenAIMessagesForPrompt(raw []any, traceID string) []map[string]an
 		case "tool", "function":
 			content := normalizeOpenAIContentForPrompt(msg["content"])
 			if content == "" {
-				continue
+				content = "null"
 			}
 			out = append(out, map[string]any{
 				"role":    "user",
