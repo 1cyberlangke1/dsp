@@ -117,6 +117,33 @@ func TestNormalizeOpenAIMessagesForPrompt_FunctionRoleCompatible(t *testing.T) {
 	}
 }
 
+func TestNormalizeOpenAIMessagesForPrompt_EmptyToolContentPreservedAsNull(t *testing.T) {
+	raw := []any{
+		map[string]any{
+			"role":         "tool",
+			"tool_call_id": "call_5",
+			"name":         "noop_tool",
+			"content":      "",
+		},
+		map[string]any{
+			"role":    "assistant",
+			"content": "done",
+		},
+	}
+
+	normalized := normalizeOpenAIMessagesForPrompt(raw, "")
+	if len(normalized) != 2 {
+		t.Fatalf("expected tool completion turn to be preserved, got %#v", normalized)
+	}
+	if normalized[0]["role"] != "user" {
+		t.Fatalf("expected tool role mapped to user, got %#v", normalized[0]["role"])
+	}
+	got, _ := normalized[0]["content"].(string)
+	if got != "null" {
+		t.Fatalf("expected empty tool content to be preserved as null placeholder, got %q", got)
+	}
+}
+
 func TestNormalizeOpenAIMessagesForPrompt_AssistantMultipleToolCallsRemainSeparated(t *testing.T) {
 	raw := []any{
 		map[string]any{
