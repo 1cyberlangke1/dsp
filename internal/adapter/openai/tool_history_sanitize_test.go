@@ -10,6 +10,14 @@ func TestSanitizeLeakedToolHistoryRemovesMarkerBlocks(t *testing.T) {
 	}
 }
 
+func TestSanitizeLeakedToolHistoryPreservesChunkWhitespace(t *testing.T) {
+	raw := "Hello "
+	got := sanitizeLeakedToolHistory(raw)
+	if got != "Hello " {
+		t.Fatalf("expected trailing whitespace to be preserved, got %q", got)
+	}
+}
+
 func TestFlushToolSieveDropsToolHistoryLeak(t *testing.T) {
 	var state toolStreamSieveState
 	chunk := "[TOOL_CALL_HISTORY]\nstatus: already_called\nfunction.name: exec\nfunction.arguments: {}\n[/TOOL_CALL_HISTORY]"
@@ -20,5 +28,18 @@ func TestFlushToolSieveDropsToolHistoryLeak(t *testing.T) {
 	flushed := flushToolSieve(&state, []string{"exec"})
 	if len(flushed) != 0 {
 		t.Fatalf("expected history block to be swallowed, got %+v", flushed)
+	}
+}
+
+func TestFlushToolSieveDropsToolResultHistoryLeak(t *testing.T) {
+	var state toolStreamSieveState
+	chunk := "[TOOL_RESULT_HISTORY]\nstatus: already_called\nfunction.name: exec\nfunction.arguments: {}\n[/TOOL_RESULT_HISTORY]"
+	evts := processToolSieveChunk(&state, chunk, []string{"exec"})
+	if len(evts) != 0 {
+		t.Fatalf("expected no immediate output before result history block is complete, got %+v", evts)
+	}
+	flushed := flushToolSieve(&state, []string{"exec"})
+	if len(flushed) != 0 {
+		t.Fatalf("expected result history block to be swallowed, got %+v", flushed)
 	}
 }

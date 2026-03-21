@@ -168,7 +168,7 @@ function findToolSegmentStart(s) {
     return -1;
   }
   const lower = s.toLowerCase();
-  const keywords = ['tool_calls', 'function.name:', '[tool_call_history]'];
+  const keywords = ['tool_calls', 'function.name:', '[tool_call_history]', '[tool_result_history]'];
   let offset = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -207,7 +207,7 @@ function consumeToolCapture(state, toolNames) {
   const lower = captured.toLowerCase();
   
   let keyIdx = -1;
-  const keywords = ['tool_calls', 'function.name:', '[tool_call_history]'];
+  const keywords = ['tool_calls', 'function.name:', '[tool_call_history]', '[tool_result_history]'];
   for (const kw of keywords) {
     const idx = lower.indexOf(kw);
     if (idx >= 0 && (keyIdx < 0 || idx < keyIdx)) {
