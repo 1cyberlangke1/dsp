@@ -1,5 +1,9 @@
 'use strict';
-const { resetIncrementalToolState, noteText, insideCodeFence } = require('./state');
+const {
+  resetIncrementalToolState,
+  noteText,
+  insideCodeFenceWithState,
+} = require('./state');
 const { parseStandaloneToolCallsDetailed } = require('./parse');
 const { extractJSONObjectFrom } = require('./jsonscan');
 
@@ -53,7 +57,7 @@ function processToolSieveChunk(state, chunk, toolNames) {
     if (!pending) {
       break;
     }
-    const start = findToolSegmentStart(pending);
+    const start = findToolSegmentStart(state, pending);
     if (start >= 0) {
       const prefix = pending.slice(0, start);
       if (prefix) {
@@ -143,7 +147,7 @@ function findSuspiciousPrefixStart(s) {
   return start;
 }
 
-function findToolSegmentStart(s) {
+function findToolSegmentStart(state, s) {
   if (!s) {
     return -1;
   }
@@ -168,7 +172,7 @@ function findToolSegmentStart(s) {
     const keyIdx = bestKeyIdx;
     const start = s.slice(0, keyIdx).lastIndexOf('{');
     const candidateStart = start >= 0 ? start : keyIdx;
-    if (!insideCodeFence(s.slice(0, candidateStart))) {
+    if (!insideCodeFenceWithState(state, s.slice(0, candidateStart))) {
       return candidateStart;
     }
     offset = keyIdx + matchedKeyword.length;
@@ -211,7 +215,7 @@ function consumeToolCapture(state, toolNames) {
   }
   const prefixPart = captured.slice(0, actualStart);
   const suffixPart = captured.slice(obj.end);
-  if (insideCodeFence((state.recentTextTail || '') + prefixPart)) {
+  if (insideCodeFenceWithState(state, prefixPart)) {
     return {
       ready: true,
       prefix: captured,

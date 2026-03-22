@@ -8,6 +8,7 @@ const {
   parseToolCallsPayload,
   parseMarkupToolCalls,
   parseTextKVToolCalls,
+  stripFencedCodeBlocks,
 } = require('./parse_payload');
 
 const TOOL_NAME_LOOSE_PATTERN = /[^a-z0-9]+/g;
@@ -44,6 +45,9 @@ function parseToolCallsDetailed(text, toolNames) {
     return result;
   }
   result.sawToolCallSyntax = looksLikeToolCallSyntax(normalized);
+  if (shouldSkipToolCallParsingForCodeFenceExample(normalized)) {
+    return result;
+  }
 
   const candidates = buildToolCallCandidates(normalized);
   let parsed = [];
@@ -89,6 +93,9 @@ function parseStandaloneToolCallsDetailed(text, toolNames) {
     return result;
   }
   result.sawToolCallSyntax = looksLikeToolCallSyntax(trimmed);
+  if (shouldSkipToolCallParsingForCodeFenceExample(trimmed)) {
+    return result;
+  }
   const candidates = buildToolCallCandidates(trimmed);
   let parsed = [];
   for (const c of candidates) {
@@ -228,6 +235,24 @@ function looksLikeToolCallSyntax(text) {
     || lower.includes('<function_call')
     || lower.includes('<invoke')
     || lower.includes('function.name:');
+}
+
+function shouldSkipToolCallParsingForCodeFenceExample(text) {
+  if (!looksLikeToolCallSyntax(text) || looksLikeMarkupToolSyntax(text)) {
+    return false;
+  }
+  const stripped = stripFencedCodeBlocks(text);
+  return !looksLikeToolCallSyntax(stripped);
+}
+
+function looksLikeMarkupToolSyntax(text) {
+  const raw = toStringSafe(text);
+  if (!raw) {
+    return false;
+  }
+  return /<(?:(?:[a-z0-9_:-]+:)?(?:tool_call|function_call|invoke)\b)/i.test(raw)
+    || /<(?:[a-z0-9_:-]+:)?function_calls\b/i.test(raw)
+    || /<(?:[a-z0-9_:-]+:)?tool_use\b/i.test(raw);
 }
 
 module.exports = {
