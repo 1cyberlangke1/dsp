@@ -77,6 +77,22 @@ func TestFlushToolSieveDropsToolResultHistoryLeak(t *testing.T) {
 	}
 }
 
+func TestSanitizeLeakedToolHistoryRemovesLeakedWireToolCallAndResult(t *testing.T) {
+	raw := "开始\n[{\"function\":{\"arguments\":\"{\\\"command\\\":\\\"java -version\\\"}\",\"name\":\"exec\"},\"id\":\"callb9a321\",\"type\":\"function\"}]< | Tool | >{\"content\":\"openjdk version 21\",\"tool_call_id\":\"callb9a321\"}\n结束"
+	got := sanitizeLeakedToolHistory(raw)
+	if got != "开始\n\n结束" {
+		t.Fatalf("unexpected sanitize result for leaked wire format: %q", got)
+	}
+}
+
+func TestSanitizeLeakedToolHistoryRemovesStandaloneMetaMarkers(t *testing.T) {
+	raw := "A<| end_of_sentence |><| Assistant |>B<| end_of_thinking |>C"
+	got := sanitizeLeakedToolHistory(raw)
+	if got != "ABC" {
+		t.Fatalf("unexpected sanitize result for meta markers: %q", got)
+	}
+}
+
 func TestProcessToolSieveChunkSplitsResultHistoryBoundary(t *testing.T) {
 	var state toolStreamSieveState
 	parts := []string{
