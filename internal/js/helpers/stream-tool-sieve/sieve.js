@@ -6,6 +6,7 @@ const {
 } = require('./state');
 const { parseStandaloneToolCallsDetailed } = require('./parse');
 const { extractJSONObjectFrom } = require('./jsonscan');
+const { TOOL_SEGMENT_KEYWORDS, earliestKeywordIndex } = require('./tool-keywords');
 function processToolSieveChunk(state, chunk, toolNames) {
   if (!state) {
     return [];
@@ -151,20 +152,9 @@ function findToolSegmentStart(state, s) {
     return -1;
   }
   const lower = s.toLowerCase();
-  const keywords = ['tool_calls', 'function.name:', '[tool_call_history]', '[tool_result_history]'];
   let offset = 0;
   while (true) {
-    let bestKeyIdx = -1;
-    let matchedKeyword = '';
-    for (const kw of keywords) {
-      const idx = lower.indexOf(kw, offset);
-      if (idx >= 0) {
-        if (bestKeyIdx < 0 || idx < bestKeyIdx) {
-          bestKeyIdx = idx;
-          matchedKeyword = kw;
-        }
-      }
-    }
+    const { index: bestKeyIdx, keyword: matchedKeyword } = earliestKeywordIndex(lower, TOOL_SEGMENT_KEYWORDS, offset);
     if (bestKeyIdx < 0) {
       return -1;
     }
@@ -184,14 +174,7 @@ function consumeToolCapture(state, toolNames) {
     return { ready: false, prefix: '', calls: [], suffix: '' };
   }
   const lower = captured.toLowerCase();
-  let keyIdx = -1;
-  const keywords = ['tool_calls', 'function.name:', '[tool_call_history]', '[tool_result_history]'];
-  for (const kw of keywords) {
-    const idx = lower.indexOf(kw);
-    if (idx >= 0 && (keyIdx < 0 || idx < keyIdx)) {
-      keyIdx = idx;
-    }
-  }
+  const { index: keyIdx } = earliestKeywordIndex(lower, TOOL_SEGMENT_KEYWORDS);
   if (keyIdx < 0) {
     return { ready: false, prefix: '', calls: [], suffix: '' };
   }
