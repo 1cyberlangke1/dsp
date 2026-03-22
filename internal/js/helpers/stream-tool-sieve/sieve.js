@@ -6,7 +6,6 @@ const {
 } = require('./state');
 const { parseStandaloneToolCallsDetailed } = require('./parse');
 const { extractJSONObjectFrom } = require('./jsonscan');
-
 function processToolSieveChunk(state, chunk, toolNames) {
   if (!state) {
     return [];
@@ -285,7 +284,6 @@ function trimWrappingJSONFence(prefix, suffix) {
   if (header && header !== 'json') {
     return { prefix, suffix };
   }
-
   const leftTrimmedSuffix = (suffix || '').replace(/^[ \t\r\n]+/g, '');
   if (!leftTrimmedSuffix.startsWith('```')) {
     return { prefix, suffix };
@@ -296,7 +294,6 @@ function trimWrappingJSONFence(prefix, suffix) {
     suffix: (suffix || '').slice(consumed + 3),
   };
 }
-
 module.exports = {
   processToolSieveChunk,
   flushToolSieve,
