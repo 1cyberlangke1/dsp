@@ -15,6 +15,7 @@ const {
   consumeXMLToolCapture: consumeXMLToolCaptureImpl,
   hasOpenXMLToolTag,
   findPartialXMLToolTagStart,
+  looksLikeXMLToolTagFragment,
 } = require('./sieve-xml');
 function processToolSieveChunk(state, chunk, toolNames) {
   if (!state) {
@@ -123,8 +124,10 @@ function flushToolSieve(state, toolNames) {
     resetIncrementalToolState(state);
   }
   if (state.pending) {
-    noteText(state, state.pending);
-    events.push({ type: 'text', text: state.pending });
+    if (!hasOpenXMLToolTag(state.pending) && !looksLikeXMLToolTagFragment(state.pending)) {
+      noteText(state, state.pending);
+      events.push({ type: 'text', text: state.pending });
+    }
     state.pending = '';
   }
   return events;

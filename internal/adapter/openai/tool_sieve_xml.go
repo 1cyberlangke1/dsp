@@ -104,3 +104,27 @@ func findPartialXMLToolTagStart(s string) int {
 	}
 	return -1
 }
+
+// looksLikeXMLToolTagFragment returns true if s looks like a fragment from a
+// split XML tool call tag — for example "tool_calls>" or "/tool_call>\n".
+// These fragments arise when '<' was consumed separately and the tail remains.
+func looksLikeXMLToolTagFragment(s string) bool {
+	trimmed := strings.TrimSpace(s)
+	if trimmed == "" {
+		return false
+	}
+	lower := strings.ToLower(trimmed)
+	// Check for closing tag tails like "tool_calls>" or "/tool_calls>"
+	fragments := []string{
+		"tool_calls>", "tool_call>", "/tool_calls>", "/tool_call>",
+		"function_calls>", "function_call>", "/function_calls>", "/function_call>",
+		"invoke>", "/invoke>", "tool_use>", "/tool_use>",
+		"tool_name>", "/tool_name>", "parameters>", "/parameters>",
+	}
+	for _, f := range fragments {
+		if strings.Contains(lower, f) {
+			return true
+		}
+	}
+	return false
+}

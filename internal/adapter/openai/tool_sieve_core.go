@@ -130,8 +130,14 @@ func flushToolSieve(state *toolStreamSieveState, toolNames []string) []toolStrea
 	}
 	if state.pending.Len() > 0 {
 		content := state.pending.String()
-		state.noteText(content)
-		events = append(events, toolStreamEvent{Content: content})
+		// Safety: if pending contains XML tool tag fragments (e.g. "tool_calls>"
+		// from a split closing tag), swallow them instead of leaking.
+		if hasOpenXMLToolTag(content) || looksLikeXMLToolTagFragment(content) {
+			// Drop it — likely an incomplete tool call fragment.
+		} else {
+			state.noteText(content)
+			events = append(events, toolStreamEvent{Content: content})
+		}
 		state.pending.Reset()
 	}
 	return events

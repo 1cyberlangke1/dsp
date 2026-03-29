@@ -79,8 +79,22 @@ function findPartialXMLToolTagStart(s) {
   return -1;
 }
 
+function looksLikeXMLToolTagFragment(s) {
+  const trimmed = (s || '').trim();
+  if (!trimmed) return false;
+  const lower = trimmed.toLowerCase();
+  const fragments = [
+    'tool_calls>', 'tool_call>', '/tool_calls>', '/tool_call>',
+    'function_calls>', 'function_call>', '/function_calls>', '/function_call>',
+    'invoke>', '/invoke>', 'tool_use>', '/tool_use>',
+    'tool_name>', '/tool_name>', 'parameters>', '/parameters>',
+  ];
+  return fragments.some(f => lower.includes(f));
+}
+
 module.exports = {
   consumeXMLToolCapture,
   hasOpenXMLToolTag,
   findPartialXMLToolTagStart,
+  looksLikeXMLToolTagFragment,
 };
