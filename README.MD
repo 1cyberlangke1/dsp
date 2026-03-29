@@ -8,7 +8,7 @@
 ![Stars](https://img.shields.io/github/stars/CJackHwang/ds2api.svg)
 ![Forks](https://img.shields.io/github/forks/CJackHwang/ds2api.svg)
 [![Release](https://img.shields.io/github/v/release/CJackHwang/ds2api?display_name=tag)](https://github.com/CJackHwang/ds2api/releases)
-[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](DEPLOY.md)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docs/DEPLOY.md)
 [![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/L4CFHP)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/CJackHwang/ds2api)
 
@@ -213,7 +213,7 @@ base64 < config.json | tr -d '\n'
 
 > **流式说明**：`/v1/chat/completions` 在 Vercel 上默认走 `api/chat-stream.js`（Node Runtime）以保证实时 SSE。鉴权、账号选择、会话/PoW 准备仍由 Go 内部 prepare 接口完成；流式响应（含 `tools`）在 Node 侧执行与 Go 对齐的输出组装与防泄漏处理。
 
-详细部署说明请参阅 [部署指南](DEPLOY.md)。
+详细部署说明请参阅 [部署指南](docs/DEPLOY.md)。
 
 ### 方式四：下载 Release 构建包
 
@@ -447,6 +447,7 @@ ds2api/
 ├── tests/
 │   ├── compat/              # 兼容性测试夹具与期望输出
 │   └── scripts/             # 统一测试脚本入口（unit/e2e）
+├── docs/                    # 部署 / 贡献 / 测试等辅助文档
 ├── static/admin/            # WebUI 构建产物（不提交到 Git）
 ├── .github/
 │   ├── workflows/           # GitHub Actions（质量门禁 + Release 自动构建）
@@ -466,9 +467,9 @@ ds2api/
 | 文档 | 说明 |
 | --- | --- |
 | [API.md](API.md) / [API.en.md](API.en.md) | API 接口文档（含请求/响应示例） |
-| [DEPLOY.md](DEPLOY.md) / [DEPLOY.en.md](DEPLOY.en.md) | 部署指南（本地/Docker/Vercel/systemd） |
-| [CONTRIBUTING.md](CONTRIBUTING.md) / [CONTRIBUTING.en.md](CONTRIBUTING.en.md) | 贡献指南 |
-| [TESTING.md](TESTING.md) | 测试集使用指南 |
+| [DEPLOY.md](docs/DEPLOY.md) / [DEPLOY.en.md](docs/DEPLOY.en.md) | 部署指南（本地/Docker/Vercel/systemd） |
+| [CONTRIBUTING.md](docs/CONTRIBUTING.md) / [CONTRIBUTING.en.md](docs/CONTRIBUTING.en.md) | 贡献指南 |
+| [TESTING.md](docs/TESTING.md) | 测试集使用指南 |
 
 ## 测试
 
@@ -498,7 +499,7 @@ npm ci --prefix webui && npm run build --prefix webui
 
 ## 测试
 
-详细测试指南请参阅 [TESTING.md](TESTING.md)。
+详细测试指南请参阅 [docs/TESTING.md](docs/TESTING.md)。
 
 ### 快速测试命令
 

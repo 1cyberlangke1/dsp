@@ -8,7 +8,7 @@
 ![Stars](https://img.shields.io/github/stars/CJackHwang/ds2api.svg)
 ![Forks](https://img.shields.io/github/forks/CJackHwang/ds2api.svg)
 [![Release](https://img.shields.io/github/v/release/CJackHwang/ds2api?display_name=tag)](https://github.com/CJackHwang/ds2api/releases)
-[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](DEPLOY.en.md)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docs/DEPLOY.en.md)
 [![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/L4CFHP)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/CJackHwang/ds2api)
 
@@ -213,7 +213,7 @@ base64 < config.json | tr -d '\n'
 
 > **Streaming note**: `/v1/chat/completions` on Vercel is routed to `api/chat-stream.js` (Node Runtime) for real-time SSE. Auth, account selection, and session/PoW preparation are still handled by the Go internal prepare endpoint; streaming output (including `tools`) is assembled on Node with Go-aligned anti-leak handling.
 
-For detailed deployment instructions, see the [Deployment Guide](DEPLOY.en.md).
+For detailed deployment instructions, see the [Deployment Guide](docs/DEPLOY.en.md).
 
 ### Option 4: Download Release Binaries
 
@@ -441,6 +441,7 @@ ds2api/
 ├── tests/
 │   ├── compat/              # Compatibility fixtures and expected outputs
 │   └── scripts/             # Unified test script entrypoints (unit/e2e)
+├── docs/                    # Deployment / contributing / testing docs
 ├── static/admin/            # WebUI build output (not committed to Git)
 ├── .github/
 │   ├── workflows/           # GitHub Actions (quality gates + release automation)
@@ -460,9 +461,9 @@ ds2api/
 | Document | Description |
 | --- | --- |
 | [API.md](API.md) / [API.en.md](API.en.md) | API reference with request/response examples |
-| [DEPLOY.md](DEPLOY.md) / [DEPLOY.en.md](DEPLOY.en.md) | Deployment guide (local/Docker/Vercel/systemd) |
-| [CONTRIBUTING.md](CONTRIBUTING.md) / [CONTRIBUTING.en.md](CONTRIBUTING.en.md) | Contributing guide |
-| [TESTING.md](TESTING.md) | Testsuite guide |
+| [DEPLOY.md](docs/DEPLOY.md) / [DEPLOY.en.md](docs/DEPLOY.en.md) | Deployment guide (local/Docker/Vercel/systemd) |
+| [CONTRIBUTING.md](docs/CONTRIBUTING.md) / [CONTRIBUTING.en.md](docs/CONTRIBUTING.en.md) | Contributing guide |
+| [TESTING.md](docs/TESTING.md) | Testsuite guide |
 
 ## Testing
 
