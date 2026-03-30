@@ -1,6 +1,6 @@
 'use strict';
 
-const TOOL_SIEVE_CONTEXT_TAIL_LIMIT = 4096;
+const TOOL_SIEVE_CONTEXT_TAIL_LIMIT = 256;
 
 function createToolSieveState() {
   return {

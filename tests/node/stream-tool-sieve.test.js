@@ -252,7 +252,7 @@ test('sieve keeps plain text intact in tool mode when no tool call appears', () 
   assert.equal(leakedText, '你好，这是普通文本回复。请继续。');
 });
 
-test('sieve does not start capture on plain "tool_calls" prose without opening json brace', () => {
+test('sieve keeps plain "tool_calls" prose as text when no valid payload follows', () => {
   const events = runSieve(
     ['前置。', '这里提到 tool_calls 只是解释，不是调用。', '后置。'],
     ['read_file'],
