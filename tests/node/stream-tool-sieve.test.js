@@ -227,6 +227,24 @@ test('sieve flushes incomplete captured XML tool blocks without leaking raw tags
   assert.equal(leakedText.includes('<tool_call'), false);
 });
 
+test('sieve captures XML wrapper tags with attributes without leaking wrapper text', () => {
+  const events = runSieve(
+    [
+      '前置正文H。',
+      '<tool_calls id="x"><tool_call><tool_name>read_file</tool_name><parameters>{"path":"README.MD"}</parameters></tool_call></tool_calls>',
+      '后置正文I。',
+    ],
+    ['read_file'],
+  );
+  const leakedText = collectText(events);
+  const hasToolCall = events.some((evt) => evt.type === 'tool_calls' && evt.calls?.length > 0);
+  assert.equal(hasToolCall, true);
+  assert.equal(leakedText.includes('前置正文H。'), true);
+  assert.equal(leakedText.includes('后置正文I。'), true);
+  assert.equal(leakedText.includes('<tool_calls id=\"x\">'), false);
+  assert.equal(leakedText.includes('</tool_calls>'), false);
+});
+
 test('sieve still intercepts large tool json payloads over previous capture limit', () => {
   const large = 'a'.repeat(9000);
   const payload = `{"tool_calls":[{"name":"read_file","input":{"path":"${large}"}}]}`;
