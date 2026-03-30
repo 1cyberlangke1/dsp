@@ -40,8 +40,29 @@ func loadConfig() (Config, bool, error) {
 	}
 	if rawCfg != "" {
 		cfg, err := parseConfigString(rawCfg)
+		if err != nil {
+			return cfg, true, err
+		}
 		cfg.ClearAccountTokens()
 		cfg.DropInvalidAccounts()
+		if IsVercel() || !envWritebackEnabled() {
+			return cfg, true, err
+		}
+		content, fileErr := os.ReadFile(ConfigPath())
+		if fileErr == nil {
+			var fileCfg Config
+			if unmarshalErr := json.Unmarshal(content, &fileCfg); unmarshalErr == nil {
+				fileCfg.DropInvalidAccounts()
+				return fileCfg, false, err
+			}
+		}
+		if errors.Is(fileErr, os.ErrNotExist) {
+			if writeErr := writeConfigFile(ConfigPath(), cfg.Clone()); writeErr == nil {
+				return cfg, false, err
+			} else {
+				Logger.Warn("[config] env writeback bootstrap failed", "error", writeErr)
+			}
+		}
 		return cfg, true, err
 	}
 
@@ -177,7 +198,7 @@ func (s *Store) Update(mutator func(*Config) error) error {
 func (s *Store) Save() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.fromEnv {
+	if s.fromEnv && (IsVercel() || !envWritebackEnabled()) {
 		Logger.Info("[save_config] source from env, skip write")
 		return nil
 	}
@@ -187,11 +208,15 @@ func (s *Store) Save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.path, b, 0o644)
+	if err := writeConfigBytes(s.path, b); err != nil {
+		return err
+	}
+	s.fromEnv = false
+	return nil
 }
 
 func (s *Store) saveLocked() error {
-	if s.fromEnv {
+	if s.fromEnv && (IsVercel() || !envWritebackEnabled()) {
 		Logger.Info("[save_config] source from env, skip write")
 		return nil
 	}
@@ -201,7 +226,11 @@ func (s *Store) saveLocked() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.path, b, 0o644)
+	if err := writeConfigBytes(s.path, b); err != nil {
+		return err
+	}
+	s.fromEnv = false
+	return nil
 }
 
 func (s *Store) IsEnvBacked() bool {
