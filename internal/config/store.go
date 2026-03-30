@@ -267,6 +267,22 @@ func (s *Store) IsEnvBacked() bool {
 	return s.fromEnv
 }
 
+func (s *Store) IsEnvWritebackEnabled() bool {
+	return envWritebackEnabled()
+}
+
+func (s *Store) HasEnvConfigSource() bool {
+	rawCfg := strings.TrimSpace(os.Getenv("DS2API_CONFIG_JSON"))
+	if rawCfg == "" {
+		rawCfg = strings.TrimSpace(os.Getenv("CONFIG_JSON"))
+	}
+	return rawCfg != ""
+}
+
+func (s *Store) ConfigPath() string {
+	return s.path
+}
+
 func (s *Store) SetVercelSync(hash string, ts int64) error {
 	return s.Update(func(c *Config) error {
 		c.VercelSyncHash = hash
