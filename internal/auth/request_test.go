@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sync/atomic"
 	"testing"
@@ -299,5 +300,68 @@ func TestDetermineManagedAccountUsesUpdatedRefreshInterval(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&loginCount); got != 1 {
 		t.Fatalf("expected exactly one login after runtime update, got %d", got)
+	}
+}
+
+func TestDetermineManagedAccountRetriesOtherAccountOnLoginFailure(t *testing.T) {
+	t.Setenv("DS2API_CONFIG_JSON", `{
+		"keys":["managed-key"],
+		"accounts":[
+			{"email":"bad@example.com","password":"pwd"},
+			{"email":"good@example.com","password":"pwd","token":"good-token"}
+		]
+	}`)
+	store := config.LoadStore()
+	pool := account.NewPool(store)
+	resolver := NewResolver(store, pool, func(_ context.Context, acc config.Account) (string, error) {
+		if acc.Email == "bad@example.com" {
+			return "", errors.New("stale account")
+		}
+		return "fresh-good-token", nil
+	})
+
+	req, _ := http.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	req.Header.Set("x-api-key", "managed-key")
+
+	a, err := resolver.Determine(req)
+	if err != nil {
+		t.Fatalf("determine failed: %v", err)
+	}
+	defer resolver.Release(a)
+	if a.AccountID != "good@example.com" {
+		t.Fatalf("expected fallback to good account, got %q", a.AccountID)
+	}
+	if a.DeepSeekToken == "" {
+		t.Fatal("expected non-empty token from fallback account")
+	}
+	if !a.TriedAccounts["bad@example.com"] {
+		t.Fatalf("expected bad account to be tracked as tried")
+	}
+}
+
+func TestDetermineTargetAccountDoesNotFallbackOnLoginFailure(t *testing.T) {
+	t.Setenv("DS2API_CONFIG_JSON", `{
+		"keys":["managed-key"],
+		"accounts":[
+			{"email":"bad@example.com","password":"pwd"},
+			{"email":"good@example.com","password":"pwd","token":"good-token"}
+		]
+	}`)
+	store := config.LoadStore()
+	pool := account.NewPool(store)
+	resolver := NewResolver(store, pool, func(_ context.Context, acc config.Account) (string, error) {
+		if acc.Email == "bad@example.com" {
+			return "", errors.New("stale account")
+		}
+		return "fresh-good-token", nil
+	})
+
+	req, _ := http.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	req.Header.Set("x-api-key", "managed-key")
+	req.Header.Set("X-Ds2-Target-Account", "bad@example.com")
+
+	_, err := resolver.Determine(req)
+	if err == nil {
+		t.Fatal("expected determine to fail for broken target account")
 	}
 }
