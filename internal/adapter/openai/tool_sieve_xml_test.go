@@ -135,6 +135,21 @@ func TestFindToolSegmentStartDetectsQuotedFunctionCallKey(t *testing.T) {
 	}
 }
 
+func TestFindToolSegmentStartDetectsLooseFunctionCallKey(t *testing.T) {
+	input := `prefix {functionCall: {"name":"search_web","args":{"query":"x"}}}`
+	want := strings.Index(input, "{")
+	if got := findToolSegmentStart(input); got != want {
+		t.Fatalf("expected JSON object start %d, got %d", want, got)
+	}
+}
+
+func TestFindToolSegmentStartIgnoresLooseFunctionCallProse(t *testing.T) {
+	input := "Please explain why functionCall: is used in documentation examples."
+	if got := findToolSegmentStart(input); got != -1 {
+		t.Fatalf("expected no tool segment start for prose, got %d", got)
+	}
+}
+
 func TestProcessToolSieveDoesNotBufferFunctionCallProse(t *testing.T) {
 	var state toolStreamSieveState
 	chunk := "Please explain the functionCall API field and keep streaming this sentence."
