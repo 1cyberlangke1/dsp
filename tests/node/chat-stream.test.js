@@ -17,6 +17,7 @@ const {
   normalizePreparedToolNames,
   boolDefaultTrue,
   filterIncrementalToolCallDeltasByAllowed,
+  shouldSkipPath,
 } = handler.__test;
 
 test('chat-stream exposes parser test hooks', () => {
@@ -217,4 +218,10 @@ test('parseChunkForContent supports wrapped response.fragments object shape', ()
   const parsed = parseChunkForContent(chunk, false, 'text');
   assert.equal(parsed.finished, false);
   assert.equal(parsed.parts.map((p) => p.text).join(''), 'AB');
+});
+
+test('shouldSkipPath skips dynamic response/fragments/*/status paths only', () => {
+  assert.equal(shouldSkipPath('response/fragments/-16/status'), true);
+  assert.equal(shouldSkipPath('response/fragments/8/status'), true);
+  assert.equal(shouldSkipPath('response/status'), false);
 });
