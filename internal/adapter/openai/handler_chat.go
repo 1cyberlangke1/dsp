@@ -106,6 +106,9 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, ctx context.Context, re
 
 	finalThinking := result.Thinking
 	finalText := sanitizeLeakedOutput(result.Text)
+	if writeUpstreamEmptyOutputError(w, result) {
+		return
+	}
 	respBody := openaifmt.BuildChatCompletion(completionID, model, finalPrompt, finalThinking, finalText, toolNames)
 	if result.OutputTokens > 0 {
 		if usage, ok := respBody["usage"].(map[string]any); ok {

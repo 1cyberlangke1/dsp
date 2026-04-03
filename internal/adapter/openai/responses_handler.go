@@ -114,6 +114,9 @@ func (h *Handler) handleResponsesNonStream(w http.ResponseWriter, resp *http.Res
 	}
 	result := sse.CollectStream(resp, thinkingEnabled, true)
 	sanitizedText := sanitizeLeakedOutput(result.Text)
+	if writeUpstreamEmptyOutputError(w, result) {
+		return
+	}
 	textParsed := util.ParseStandaloneToolCallsDetailed(sanitizedText, toolNames)
 	logResponsesToolPolicyRejection(traceID, toolChoice, textParsed, "text")
 
