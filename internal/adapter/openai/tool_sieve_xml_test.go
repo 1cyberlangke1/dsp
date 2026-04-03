@@ -78,6 +78,26 @@ func TestProcessToolSieveXMLWithLeadingText(t *testing.T) {
 	}
 }
 
+func TestProcessToolSievePassesThroughNonToolXMLBlock(t *testing.T) {
+	var state toolStreamSieveState
+	chunk := `<tool_call><title>示例 XML</title><body>plain text xml payload</body></tool_call>`
+	events := processToolSieveChunk(&state, chunk, []string{"read_file"})
+	events = append(events, flushToolSieve(&state, []string{"read_file"})...)
+
+	var textContent strings.Builder
+	toolCalls := 0
+	for _, evt := range events {
+		textContent.WriteString(evt.Content)
+		toolCalls += len(evt.ToolCalls)
+	}
+	if toolCalls != 0 {
+		t.Fatalf("expected no tool calls for plain XML payload, got %d events=%#v", toolCalls, events)
+	}
+	if textContent.String() != chunk {
+		t.Fatalf("expected XML payload to pass through unchanged, got %q", textContent.String())
+	}
+}
+
 func TestProcessToolSievePartialXMLTagHeldBack(t *testing.T) {
 	var state toolStreamSieveState
 	// Chunk ends with a partial XML tool tag.
