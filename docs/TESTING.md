@@ -237,6 +237,7 @@ go run ./cmd/ds2api-tests --no-preflight
 - 默认校验不出现 `FINISHED` 文本泄露，并要求存在结束信号。
 - 每次运行都会把本地派生结果写入 `artifacts/raw-stream-sim/<run-id>/<sample-id>/replay.output.txt`，并输出结构化报告。
 - 如果你有历史基线目录，可以通过 `--baseline-root` 让工具直接做文本对比。
+- 更完整的协议级行为结构说明见 [DeepSeekSSE行为结构说明-2026-04-05.md](./DeepSeekSSE行为结构说明-2026-04-05.md)。
 
 ### 对单个样本做回放比对
 

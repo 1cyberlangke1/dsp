@@ -10,6 +10,7 @@
 - `content-filter-trigger-20260405-jwt3`：真实命中的 `CONTENT_FILTER` 风控流，用于验证终态处理与拒答格式。
 
 默认回放工具会优先读取 [`manifest.json`](./manifest.json) 中的 `default_samples`，以稳定固定回放集。
+更完整的协议级行为结构说明见 [docs/DeepSeekSSE行为结构说明-2026-04-05.md](../../docs/DeepSeekSSE行为结构说明-2026-04-05.md)。
 
 ## 自动采集接口
 
