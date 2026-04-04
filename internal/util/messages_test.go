@@ -12,7 +12,7 @@ func TestMessagesPrepareBasic(t *testing.T) {
 	if got == "" {
 		t.Fatal("expected non-empty prompt")
 	}
-	if got != "<｜User｜>Hello" {
+	if got != "<｜User｜>\nHello" {
 		t.Fatalf("unexpected prompt: %q", got)
 	}
 }
@@ -25,6 +25,15 @@ func TestMessagesPrepareRoles(t *testing.T) {
 		{"role": "user", "content": "How are you"},
 	}
 	got := MessagesPrepare(messages)
+	if !contains(got, "<system_instructions>\nYou are helper\n</system_instructions>\n\n<｜User｜>\nHi") {
+		t.Fatalf("expected system/user separation in %q", got)
+	}
+	if !contains(got, "<｜User｜>\nHi\n\n<｜Assistant｜>\nHello") {
+		t.Fatalf("expected user/assistant separation in %q", got)
+	}
+	if !contains(got, "<｜Assistant｜>\nHello\n<｜end▁of▁sentence｜>\n\n<｜User｜>\nHow are you") {
+		t.Fatalf("expected assistant/user separation in %q", got)
+	}
 	if !contains(got, "<｜Assistant｜>") {
 		t.Fatalf("expected assistant marker in %q", got)
 	}
@@ -55,7 +64,7 @@ func TestMessagesPrepareArrayTextVariants(t *testing.T) {
 		},
 	}
 	got := MessagesPrepare(messages)
-	if got != "<｜User｜>line1\nline2" {
+	if got != "<｜User｜>\nline1\nline2" {
 		t.Fatalf("unexpected content from text variants: %q", got)
 	}
 }

@@ -32,30 +32,31 @@ func MessagesPrepare(messages []map[string]any) string {
 		merged = append(merged, msg)
 	}
 	parts := make([]string, 0, len(merged))
-	for i, m := range merged {
+	for _, m := range merged {
 		switch m.Role {
 		case "assistant":
-			parts = append(parts, "<｜Assistant｜>"+m.Text+"<｜end▁of▁sentence｜>")
+			// Keep assistant turns on their own block so the model sees a clear
+			// boundary between prior answer text and the EOS marker.
+			parts = append(parts, "<｜Assistant｜>\n"+m.Text+"\n<｜end▁of▁sentence｜>")
 		case "tool":
-			if i > 0 {
-				parts = append(parts, "<｜Tool｜>"+m.Text)
-			} else {
-				parts = append(parts, m.Text)
+			if strings.TrimSpace(m.Text) != "" {
+				parts = append(parts, "<｜Tool｜>\n"+m.Text)
 			}
 		case "system":
-			// Clear system boundary improves R1 and V3 context understanding significantly
-			if strings.TrimSpace(m.Text) != "" {
-				parts = append(parts, "<system_instructions>\n"+strings.TrimSpace(m.Text)+"\n</system_instructions>\n\n")
+			// Clear system boundary improves R1 and V3 context understanding significantly.
+			if text := strings.TrimSpace(m.Text); text != "" {
+				parts = append(parts, "<system_instructions>\n"+text+"\n</system_instructions>")
 			}
 		case "user":
-			// Always prepend <｜User｜> to user messages. DeepSeek R1 reasoning triggers best
-			// and aligns context perfectly when the user turn is explicitly marked.
-			parts = append(parts, "<｜User｜>"+m.Text)
+			// Put user turns on their own line so the role transition is explicit.
+			parts = append(parts, "<｜User｜>\n"+m.Text)
 		default:
-			parts = append(parts, m.Text)
+			if strings.TrimSpace(m.Text) != "" {
+				parts = append(parts, m.Text)
+			}
 		}
 	}
-	out := strings.Join(parts, "")
+	out := strings.Join(parts, "\n\n")
 	return markdownImagePattern.ReplaceAllString(out, `[${1}](${2})`)
 }
 

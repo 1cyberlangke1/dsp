@@ -157,7 +157,7 @@ func (h *Handler) testAccount(ctx context.Context, acc config.Account, model, me
 		result["message"] = "获取 PoW 失败: " + err.Error()
 		return result
 	}
-	payload := map[string]any{"chat_session_id": sessionID, "prompt": "<｜User｜>" + message, "ref_file_ids": []any{}, "thinking_enabled": thinking, "search_enabled": search}
+	payload := map[string]any{"chat_session_id": sessionID, "prompt": "<｜User｜>\n" + message, "ref_file_ids": []any{}, "thinking_enabled": thinking, "search_enabled": search}
 	resp, err := h.DS.CallCompletion(ctx, authCtx, payload, pow, 1)
 	if err != nil {
 		result["message"] = "请求失败: " + err.Error()
