@@ -74,6 +74,20 @@ func (s *Store) EmbeddingsProvider() string {
 	return strings.TrimSpace(s.cfg.Embeddings.Provider)
 }
 
+func (s *Store) AutoDeleteMode() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	mode := strings.ToLower(strings.TrimSpace(s.cfg.AutoDelete.Mode))
+	switch mode {
+	case "none", "single", "all":
+		return mode
+	}
+	if s.cfg.AutoDelete.Sessions {
+		return "all"
+	}
+	return "none"
+}
+
 func (s *Store) AdminPasswordHash() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -173,7 +187,5 @@ func (s *Store) RuntimeTokenRefreshIntervalHours() int {
 }
 
 func (s *Store) AutoDeleteSessions() bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.cfg.AutoDelete.Sessions
+	return s.AutoDeleteMode() != "none"
 }

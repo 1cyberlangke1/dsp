@@ -132,6 +132,31 @@ func TestUpdateSettingsWithoutRuntimeSkipsMergedRuntimeValidation(t *testing.T) 
 	}
 }
 
+func TestUpdateSettingsAutoDeleteMode(t *testing.T) {
+	h := newAdminTestHandler(t, `{"keys":["k1"],"auto_delete":{"sessions":true}}`)
+
+	payload := map[string]any{
+		"auto_delete": map[string]any{
+			"mode": "single",
+		},
+	}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings", bytes.NewReader(b))
+	rec := httptest.NewRecorder()
+	h.updateSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	snap := h.Store.Snapshot()
+	if got := snap.AutoDelete.Mode; got != "single" {
+		t.Fatalf("auto_delete.mode=%q want=single", got)
+	}
+	if got := h.Store.AutoDeleteMode(); got != "single" {
+		t.Fatalf("AutoDeleteMode()=%q want=single", got)
+	}
+}
+
 func TestUpdateSettingsHotReloadRuntime(t *testing.T) {
 	h := newAdminTestHandler(t, `{
 		"keys":["k1"],

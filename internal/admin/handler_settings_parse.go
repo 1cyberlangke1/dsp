@@ -141,6 +141,17 @@ func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *confi
 
 	if raw, ok := req["auto_delete"].(map[string]any); ok {
 		cfg := &config.AutoDeleteConfig{}
+		if v, exists := raw["mode"]; exists {
+			mode := strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", v)))
+			switch mode {
+			case "", "none":
+				cfg.Mode = "none"
+			case "single", "all":
+				cfg.Mode = mode
+			default:
+				return nil, nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("auto_delete.mode must be one of none, single, all")
+			}
+		}
 		if v, exists := raw["sessions"]; exists {
 			cfg.Sessions = boolFrom(v)
 		}

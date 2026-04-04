@@ -32,6 +32,7 @@ type ConfigStore interface {
 	RuntimeAccountMaxQueue(defaultSize int) int
 	RuntimeGlobalMaxInflight(defaultSize int) int
 	RuntimeTokenRefreshIntervalHours() int
+	AutoDeleteMode() string
 	CompatStripReferenceMarkers() bool
 	AutoDeleteSessions() bool
 }

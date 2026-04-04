@@ -652,7 +652,7 @@ data: {"type":"message_stop"}
 - `admin`（`has_password_hash`、`jwt_expire_hours`、`jwt_valid_after_unix`、`default_password_warning`）
 - `runtime`（`account_max_inflight`、`account_max_queue`、`global_max_inflight`、`token_refresh_interval_hours`）
 - `responses` / `embeddings`
-- `auto_delete`（`sessions`）
+- `auto_delete`（`mode`：`none` / `single` / `all`；旧配置 `sessions=true` 仍按 `all` 处理）
 - `claude_mapping` / `model_aliases`
 - `env_backed`、`needs_vercel_sync`
 - `toolcall` 策略已固定为 `feature_match + high`，不再通过 settings 返回或修改
@@ -665,7 +665,7 @@ data: {"type":"message_stop"}
 - `runtime.account_max_inflight` / `runtime.account_max_queue` / `runtime.global_max_inflight` / `runtime.token_refresh_interval_hours`
 - `responses.store_ttl_seconds`
 - `embeddings.provider`
-- `auto_delete.sessions`
+- `auto_delete.mode`
 - `claude_mapping`
 - `model_aliases`
 - `toolcall` 策略已固定，不再作为可写入字段

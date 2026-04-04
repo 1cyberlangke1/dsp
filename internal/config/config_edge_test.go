@@ -106,6 +106,9 @@ func TestConfigJSONRoundtrip(t *testing.T) {
 			"fast": "deepseek-chat",
 			"slow": "deepseek-reasoner",
 		},
+		AutoDelete: AutoDeleteConfig{
+			Mode: "single",
+		},
 		Runtime: RuntimeConfig{
 			TokenRefreshIntervalHours: 12,
 		},
@@ -142,6 +145,9 @@ func TestConfigJSONRoundtrip(t *testing.T) {
 	if decoded.Runtime.TokenRefreshIntervalHours != 12 {
 		t.Fatalf("unexpected runtime refresh interval: %#v", decoded.Runtime.TokenRefreshIntervalHours)
 	}
+	if decoded.AutoDelete.Mode != "single" {
+		t.Fatalf("unexpected auto delete mode: %#v", decoded.AutoDelete.Mode)
+	}
 	if decoded.Compat.WideInputStrictOutput == nil || !*decoded.Compat.WideInputStrictOutput {
 		t.Fatalf("unexpected compat wide_input_strict_output: %#v", decoded.Compat.WideInputStrictOutput)
 	}
@@ -153,6 +159,29 @@ func TestConfigJSONRoundtrip(t *testing.T) {
 	}
 	if decoded.AdditionalFields["custom_field"] != "custom_value" {
 		t.Fatalf("unexpected additional fields: %#v", decoded.AdditionalFields)
+	}
+}
+
+func TestAutoDeleteModeResolution(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  AutoDeleteConfig
+		want string
+	}{
+		{name: "default", cfg: AutoDeleteConfig{}, want: "none"},
+		{name: "legacy all", cfg: AutoDeleteConfig{Sessions: true}, want: "all"},
+		{name: "single", cfg: AutoDeleteConfig{Mode: "single"}, want: "single"},
+		{name: "all", cfg: AutoDeleteConfig{Mode: "all"}, want: "all"},
+		{name: "none", cfg: AutoDeleteConfig{Mode: "none"}, want: "none"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			store := &Store{cfg: Config{AutoDelete: tc.cfg}}
+			if got := store.AutoDeleteMode(); got != tc.want {
+				t.Fatalf("AutoDeleteMode()=%q want=%q", got, tc.want)
+			}
+		})
 	}
 }
 

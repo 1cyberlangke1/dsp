@@ -64,6 +64,7 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 			c.Embeddings.Provider = strings.TrimSpace(embeddingsCfg.Provider)
 		}
 		if autoDeleteCfg != nil {
+			c.AutoDelete.Mode = autoDeleteCfg.Mode
 			c.AutoDelete.Sessions = autoDeleteCfg.Sessions
 		}
 		if claudeMap != nil {

@@ -77,5 +77,6 @@ type EmbeddingsConfig struct {
 }
 
 type AutoDeleteConfig struct {
-	Sessions bool `json:"sessions"`
+	Mode     string `json:"mode,omitempty"`
+	Sessions bool   `json:"sessions,omitempty"`
 }

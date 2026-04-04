@@ -643,7 +643,7 @@ Reads runtime settings and status, including:
 - `admin` (`has_password_hash`, `jwt_expire_hours`, `jwt_valid_after_unix`, `default_password_warning`)
 - `runtime` (`account_max_inflight`, `account_max_queue`, `global_max_inflight`, `token_refresh_interval_hours`)
 - `responses` / `embeddings`
-- `auto_delete` (`sessions`)
+- `auto_delete` (`mode`: `none` / `single` / `all`; legacy `sessions=true` is still treated as `all`)
 - `claude_mapping` / `model_aliases`
 - `env_backed`, `needs_vercel_sync`
 - `toolcall` policy is fixed to `feature_match + high` and is no longer returned or editable via settings
@@ -656,7 +656,7 @@ Hot-updates runtime settings. Supported fields:
 - `runtime.account_max_inflight` / `runtime.account_max_queue` / `runtime.global_max_inflight` / `runtime.token_refresh_interval_hours`
 - `responses.store_ttl_seconds`
 - `embeddings.provider`
-- `auto_delete.sessions`
+- `auto_delete.mode`
 - `claude_mapping`
 - `model_aliases`
 - `toolcall` policy is fixed and is no longer writable through settings
