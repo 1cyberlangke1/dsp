@@ -25,17 +25,21 @@ func TestMessagesPrepareNilContentNoNullLiteral(t *testing.T) {
 	}
 }
 
-func TestMessagesPrepareUsesUnifiedSystemMarkerAndNoEOSTag(t *testing.T) {
+func TestMessagesPrepareUsesTurnSuffixes(t *testing.T) {
 	messages := []map[string]any{
 		{"role": "system", "content": "System rule"},
+		{"role": "user", "content": "Question"},
 		{"role": "assistant", "content": "Answer"},
 	}
 	got := MessagesPrepare(messages)
-	if !strings.Contains(got, "<｜System｜>\nSystem rule") {
-		t.Fatalf("expected unified system marker, got %q", got)
+	if !strings.Contains(got, "<｜System｜>\nSystem rule<｜end▁of▁instructions｜>") {
+		t.Fatalf("expected system instructions suffix, got %q", got)
 	}
-	if strings.Contains(got, "<｜end▁of▁sentence｜>") {
-		t.Fatalf("did not expect EOS marker, got %q", got)
+	if !strings.Contains(got, "<｜User｜>\nQuestion<｜end▁of▁sentence｜>") {
+		t.Fatalf("expected user sentence suffix, got %q", got)
+	}
+	if !strings.Contains(got, "<｜Assistant｜>\nAnswer<｜end▁of▁sentence｜>") {
+		t.Fatalf("expected assistant sentence suffix, got %q", got)
 	}
 }
 

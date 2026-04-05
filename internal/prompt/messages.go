@@ -10,10 +10,13 @@ import (
 var markdownImagePattern = regexp.MustCompile(`!\[(.*?)\]\((.*?)\)`)
 
 const (
-	systemMarker    = "<｜System｜>"
-	userMarker      = "<｜User｜>"
-	assistantMarker = "<｜Assistant｜>"
-	toolMarker      = "<｜Tool｜>"
+	systemMarker          = "<｜System｜>"
+	userMarker            = "<｜User｜>"
+	assistantMarker       = "<｜Assistant｜>"
+	toolMarker            = "<｜Tool｜>"
+	endSentenceMarker     = "<｜end▁of▁sentence｜>"
+	endToolResultsMarker  = "<｜end▁of▁toolresults｜>"
+	endInstructionsMarker = "<｜end▁of▁instructions｜>"
 )
 
 func MessagesPrepare(messages []map[string]any) string {
@@ -42,17 +45,17 @@ func MessagesPrepare(messages []map[string]any) string {
 	for _, m := range merged {
 		switch m.Role {
 		case "assistant":
-			parts = append(parts, formatRoleBlock(assistantMarker, m.Text))
+			parts = append(parts, formatRoleBlock(assistantMarker, m.Text, endSentenceMarker))
 		case "tool":
 			if strings.TrimSpace(m.Text) != "" {
-				parts = append(parts, formatRoleBlock(toolMarker, m.Text))
+				parts = append(parts, formatRoleBlock(toolMarker, m.Text, endToolResultsMarker))
 			}
 		case "system":
 			if text := strings.TrimSpace(m.Text); text != "" {
-				parts = append(parts, formatRoleBlock(systemMarker, text))
+				parts = append(parts, formatRoleBlock(systemMarker, text, endInstructionsMarker))
 			}
 		case "user":
-			parts = append(parts, formatRoleBlock(userMarker, m.Text))
+			parts = append(parts, formatRoleBlock(userMarker, m.Text, endSentenceMarker))
 		default:
 			if strings.TrimSpace(m.Text) != "" {
 				parts = append(parts, m.Text)
@@ -63,8 +66,13 @@ func MessagesPrepare(messages []map[string]any) string {
 	return markdownImagePattern.ReplaceAllString(out, `[${1}](${2})`)
 }
 
-func formatRoleBlock(marker, text string) string {
-	return marker + "\n" + text
+// DeepSeek-style turn suffixes stay attached to the same block as the role content.
+func formatRoleBlock(marker, text, endMarker string) string {
+	out := marker + "\n" + text
+	if strings.TrimSpace(endMarker) != "" {
+		out += endMarker
+	}
+	return out
 }
 
 func NormalizeContent(v any) string {
