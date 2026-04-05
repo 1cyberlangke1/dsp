@@ -178,7 +178,9 @@ cp config.example.json config.json
 go run ./cmd/ds2api
 ```
 
-默认监听地址：`http://localhost:5001`
+默认本地访问地址：`http://127.0.0.1:5001`
+
+服务实际绑定：`0.0.0.0:5001`，因此同一局域网设备通常也可以通过你的内网 IP 访问。
 
 > **WebUI 自动构建**：本地首次启动时，若 `static/admin` 不存在，会自动尝试执行 `npm ci`（仅在缺少依赖时）和 `npm run build -- --outDir static/admin --emptyOutDir`（需要本机有 Node.js）。你也可以手动构建：`./scripts/build-webui.sh`
 
