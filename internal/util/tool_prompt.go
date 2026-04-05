@@ -36,7 +36,7 @@ func BuildToolCallInstructions(toolNames []string) string {
 
 	return `TOOL CALL FORMAT — FOLLOW EXACTLY:
 
-When calling tools, the final block of your response MUST be raw XML. Do not use markdown fences. Do not put any text after the XML block.
+When calling tools, emit ONLY raw XML at the very end of your response. No text before, no text after, no markdown fences.
 
 <tool_calls>
   <tool_call>
@@ -46,17 +46,14 @@ When calling tools, the final block of your response MUST be raw XML. Do not use
 </tool_calls>
 
 RULES:
-1) When calling tools, the final block of your response MUST be the XML above. Any explanatory text must appear before that block, never after it.
+1) Output ONLY the XML above when calling tools. Do NOT mix tool XML with regular text.
 2) <parameters> MUST contain a strict JSON object. All JSON keys and strings use double quotes.
 3) Multiple tools → multiple <tool_call> blocks inside ONE <tool_calls> root.
 4) Do NOT wrap the XML in markdown code fences (no triple backticks).
 5) After receiving a tool result, use it directly. Only call another tool if the result is insufficient.
-6) If you want to say something AND call a tool, output text first, then the XML block on its own. Do not narrate pseudo-tool calls in plain text.
+6) If you want to say something AND call a tool, output text first, then the XML block on its own.
 7) Parameters MUST use the exact field names from the selected tool schema.
 8) CRITICAL: Do NOT invent or add any extra fields (such as "_raw", "_xml"). Use ONLY the fields strictly defined in the schema. Extra fields will cause execution failure.
-9) Never claim that a tool was run, or that you saw search/browser/file results, unless you actually received a tool result for that tool call.
-10) If a tool call fails, is rejected, or returns no usable result: do NOT fabricate the missing result. Either retry once with corrected parameters when the fix is obvious, or ask the user / answer with the limitation.
-11) Never output internal tool-planning traces such as "let me search", "calling tool", "<tool_calls>", "<tool_call>", or fake tool transcripts unless you are emitting a real tool call block at the end.
 
 ❌ WRONG — Do NOT do these:
 Wrong 1 — mixed text and XML:
@@ -67,11 +64,6 @@ Wrong 3 — missing <tool_calls> wrapper:
   <tool_call><tool_name>` + ex1 + `</tool_name><parameters>{}</parameters></tool_call>
 Wrong 4 — extra/invented fields:
   <parameters>{"_raw": "...", "command": "ls"}</parameters>
-Wrong 5 — fake tool execution/result narration:
-  Let me search the web first.
-  Search results show the answer is 42.
-Wrong 6 — tool failed, but model pretends it succeeded:
-  The tool returned three skills, so install review-implementing.
 
 
 ✅ CORRECT EXAMPLES:
@@ -104,7 +96,7 @@ Example C — Tool with complex nested JSON parameters:
   </tool_call>
 </tool_calls>
 
-Remember: when calling tools, end with ONE real <tool_calls>...</tool_calls> XML block and do not invent tool results.`
+Remember: Output ONLY the <tool_calls>...</tool_calls> XML block when calling tools.`
 }
 
 func matchAny(name string, candidates ...string) bool {
