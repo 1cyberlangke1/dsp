@@ -7,7 +7,7 @@ func isLikelyJSONToolPayloadCandidate(candidate string) bool {
 	if trimmed == "" {
 		return false
 	}
-	if !(strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[")) {
+	if !strings.HasPrefix(trimmed, "{") && !strings.HasPrefix(trimmed, "[") {
 		return false
 	}
 	lower := strings.ToLower(trimmed)
@@ -73,7 +73,6 @@ func parseToolCallItem(m map[string]any) (ParsedToolCall, bool) {
 		for _, key := range []string{"arguments", "args", "parameters", "params"} {
 			if v, ok := m[key]; ok {
 				inputRaw = v
-				hasInput = true
 				break
 			}
 		}
