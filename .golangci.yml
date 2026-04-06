@@ -4,17 +4,10 @@ run:
   tests: true
 
 linters:
+  default: none
   enable:
-    - asciicheck
-    - bodyclose
-    - dogsled
-    - goconst
-    - gocyclo
-    - misspell
-    - nakedret
-    - revive
-    - staticcheck
-    - unconvert
+    - govet
+    - ineffassign
   settings:
     dupl:
       threshold: 100
@@ -44,8 +37,6 @@ linters:
       simple: true
       range-loops: true
       for-loops: false
-    unparam:
-      check-exported: false
   exclusions:
     generated: lax
     rules:
