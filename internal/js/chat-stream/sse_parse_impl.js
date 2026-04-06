@@ -29,7 +29,7 @@ function parseChunkForContent(chunk, thinkingEnabled, currentType, stripReferenc
       finished: true,
       contentFilter: false,
       errorMessage: formatErrorMessage(chunk.error),
-      outputTokens,
+      outputTokens: 0,
       newType: currentType,
     };
   }
