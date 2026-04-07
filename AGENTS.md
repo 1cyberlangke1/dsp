@@ -6,6 +6,7 @@ These rules apply to all agent-made changes in this repository.
 
 - Before opening or updating a PR, run the same local gates as `.github/workflows/quality-gates.yml`.
 - Required commands:
+  - `./scripts/lint.sh`
   - `./tests/scripts/check-refactor-line-gate.sh`
   - `./tests/scripts/run-unit-all.sh`
   - `npm run build --prefix webui`
