@@ -40,8 +40,8 @@ func TestRawStreamSamplesTokenReplay(t *testing.T) {
 			if expectedTokens <= 0 {
 				t.Fatalf("expected positive token usage from raw stream, got %d", expectedTokens)
 			}
-			if parsedTokens != expectedTokens {
-				t.Fatalf("token mismatch parsed=%d expected=%d", parsedTokens, expectedTokens)
+			if parsedTokens != 0 {
+				t.Fatalf("expected parser to ignore upstream token usage, got parsed=%d expectedRaw=%d", parsedTokens, expectedTokens)
 			}
 		})
 	}

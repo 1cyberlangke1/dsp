@@ -28,8 +28,8 @@ func TestExtractTokenUsage(t *testing.T) {
 		},
 	}
 	p, c := extractAccumulatedTokenUsage(chunk)
-	if p != 123 || c != 456 {
-		t.Fatalf("expected 123/456, got %d/%d", p, c)
+	if p != 0 || c != 0 {
+		t.Fatalf("expected upstream usage ignored as 0/0, got %d/%d", p, c)
 	}
 }
 
