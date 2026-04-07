@@ -145,12 +145,12 @@ func parseSingleXMLToolCall(block string) (ParsedToolCall, bool) {
 						params[t.Name.Local] = strings.TrimSpace(v)
 						break
 					}
-					name = strings.TrimSpace(html.UnescapeString(v))
+					name = strings.TrimSpace(v)
 				}
 			case "input", "arguments", "argument", "args", "params":
 				var v string
 				if err := dec.DecodeElement(&v, &t); err == nil && strings.TrimSpace(v) != "" {
-					if parsed := parseToolCallInput(strings.TrimSpace(html.UnescapeString(v))); len(parsed) > 0 {
+					if parsed := parseToolCallInput(strings.TrimSpace(v)); len(parsed) > 0 {
 						for k, vv := range parsed {
 							params[k] = vv
 						}
