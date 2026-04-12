@@ -52,8 +52,18 @@ func appendOpenAIRefFileIDs(out *[]string, seen map[string]struct{}, raw any) {
 				addOpenAIRefFileID(out, seen, fileID)
 			}
 		}
+		// Recurse into potential containers. Note: we do NOT recurse into 'content' or 'input'
+		// if they are plain strings (handled by the top-level switch), but they are usually
+		// nested inside the map branch anyway.
+		// To be safe, we only recurse into these known container keys.
 		for _, key := range []string{"ref_file_ids", "file_ids", "attachments", "messages", "input", "content", "files", "items", "data", "source"} {
 			if nested, ok := x[key]; ok {
+				// If it's a message content that is a string, we must NOT treat it as an ID.
+				if key == "content" || key == "input" {
+					if _, ok := nested.(string); ok {
+						continue
+					}
+				}
 				appendOpenAIRefFileIDs(out, seen, nested)
 			}
 		}
