@@ -9,7 +9,6 @@ var emptyJSONFencePattern = regexp.MustCompile("(?is)```json\\s*```")
 var leakedToolCallArrayPattern = regexp.MustCompile(`(?is)\[\{\s*"function"\s*:\s*\{[\s\S]*?\}\s*,\s*"id"\s*:\s*"call[^"]*"\s*,\s*"type"\s*:\s*"function"\s*}\]`)
 var leakedToolResultBlobPattern = regexp.MustCompile(`(?is)<\s*\|\s*tool\s*\|\s*>\s*\{[\s\S]*?"tool_call_id"\s*:\s*"call[^"]*"\s*}`)
 
-var leakedDanglingThinkOpenPattern = regexp.MustCompile(`(?is)<\s*think\b[^>]*>[\s\S]*$`)
 var leakedThinkTagPattern = regexp.MustCompile(`(?is)</?\s*think\s*>`)
 
 // leakedBOSMarkerPattern matches DeepSeek BOS markers in BOTH forms:
