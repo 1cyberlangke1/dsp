@@ -147,7 +147,7 @@ func (s *inlineUploadState) tryUploadBlock(block map[string]any) (map[string]any
 }
 
 func (s *inlineUploadState) uploadInlineFile(file inlineDecodedFile) (string, error) {
-	sum := sha256.Sum256(append(append([]byte(file.ContentType+"\x00"+file.Filename+"\x00"), file.Data...)))
+	sum := sha256.Sum256(append([]byte(file.ContentType+"\x00"+file.Filename+"\x00"), file.Data...))
 	cacheKey := fmt.Sprintf("%x", sum[:])
 	if fileID, ok := s.uploadedByID[cacheKey]; ok && strings.TrimSpace(fileID) != "" {
 		return fileID, nil

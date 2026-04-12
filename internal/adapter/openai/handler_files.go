@@ -33,7 +33,7 @@ func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.MultipartForm != nil {
-		defer r.MultipartForm.RemoveAll()
+		defer func() { _ = r.MultipartForm.RemoveAll() }()
 	}
 	r = r.WithContext(auth.WithAuth(r.Context(), a))
 	file, header, err := r.FormFile("file")
@@ -41,7 +41,7 @@ func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		writeOpenAIError(w, http.StatusBadRequest, "file is required")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	data, err := io.ReadAll(file)
 	if err != nil {
 		writeOpenAIError(w, http.StatusBadRequest, "failed to read uploaded file")
