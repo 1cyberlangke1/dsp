@@ -70,6 +70,10 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 		writeOpenAIError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
+	if err := h.preprocessInlineFileInputs(r.Context(), a, req); err != nil {
+		writeOpenAIInlineFileError(w, err)
+		return
+	}
 	traceID := requestTraceID(r)
 	stdReq, err := normalizeOpenAIResponsesRequest(h.Store, req, traceID)
 	if err != nil {

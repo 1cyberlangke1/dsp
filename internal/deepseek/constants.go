@@ -12,16 +12,19 @@ const (
 	DeepSeekCreatePowURL         = "https://chat.deepseek.com/api/v0/chat/create_pow_challenge"
 	DeepSeekCompletionURL        = "https://chat.deepseek.com/api/v0/chat/completion"
 	DeepSeekContinueURL          = "https://chat.deepseek.com/api/v0/chat/continue"
+	DeepSeekUploadFileURL        = "https://chat.deepseek.com/api/v0/file/upload_file"
+	DeepSeekFetchFilesURL        = "https://chat.deepseek.com/api/v0/file/fetch_files"
 	DeepSeekFetchSessionURL      = "https://chat.deepseek.com/api/v0/chat_session/fetch_page"
 	DeepSeekDeleteSessionURL     = "https://chat.deepseek.com/api/v0/chat_session/delete"
 	DeepSeekDeleteAllSessionsURL = "https://chat.deepseek.com/api/v0/chat_session/delete_all"
+	DeepSeekCompletionTargetPath = "/api/v0/chat/completion"
+	DeepSeekUploadTargetPath     = "/api/v0/file/upload_file"
 )
 
 var defaultBaseHeaders = map[string]string{
 	"Host":              "chat.deepseek.com",
 	"User-Agent":        "DeepSeek/1.8.0 Android/35",
 	"Accept":            "application/json",
-	"Content-Type":      "application/json",
 	"x-client-platform": "android",
 	"x-client-version":  "1.8.0",
 	"x-client-locale":   "zh_CN",

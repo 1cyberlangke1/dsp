@@ -46,6 +46,7 @@ func RegisterRoutes(r chi.Router, h *Handler) {
 	r.Post("/v1/chat/completions", h.ChatCompletions)
 	r.Post("/v1/responses", h.Responses)
 	r.Get("/v1/responses/{response_id}", h.GetResponseByID)
+	r.Post("/v1/files", h.UploadFile)
 	r.Post("/v1/embeddings", h.Embeddings)
 }
 

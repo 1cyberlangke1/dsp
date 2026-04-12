@@ -48,6 +48,10 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 		writeOpenAIError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
+	if err := h.preprocessInlineFileInputs(r.Context(), a, req); err != nil {
+		writeOpenAIInlineFileError(w, err)
+		return
+	}
 	stdReq, err := normalizeOpenAIChatRequest(h.Store, req, requestTraceID(r))
 	if err != nil {
 		writeOpenAIError(w, http.StatusBadRequest, err.Error())
