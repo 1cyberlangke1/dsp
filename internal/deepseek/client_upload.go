@@ -31,6 +31,7 @@ type UploadFileResult struct {
 	Bytes      int64
 	Status     string
 	Purpose    string
+	AccountID  string
 	IsImage    bool
 	Raw        map[string]any
 	RawHeaders http.Header
@@ -116,6 +117,9 @@ func (c *Client) UploadFile(ctx context.Context, a *auth.RequestAuth, req Upload
 			}
 			if result.Purpose == "" {
 				result.Purpose = purpose
+			}
+			if result.AccountID == "" {
+				result.AccountID = a.AccountID
 			}
 			if result.ID == "" {
 				return nil, errors.New("upload file succeeded without file id")
@@ -233,6 +237,9 @@ func extractUploadFileResult(resp map[string]any) *UploadFileResult {
 		}
 		if result.Purpose == "" {
 			result.Purpose = firstNonEmptyString(m, "purpose")
+		}
+		if result.AccountID == "" {
+			result.AccountID = firstNonEmptyString(m, "account_id", "accountId", "owner_account_id", "ownerAccountId")
 		}
 		if result.Bytes == 0 {
 			result.Bytes = firstPositiveInt64(m, "bytes", "size", "file_size")

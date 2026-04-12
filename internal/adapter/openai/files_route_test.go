@@ -16,6 +16,30 @@ import (
 	"ds2api/internal/deepseek"
 )
 
+type managedFilesAuthStub struct{}
+
+func (managedFilesAuthStub) Determine(_ *http.Request) (*auth.RequestAuth, error) {
+	return &auth.RequestAuth{
+		UseConfigToken: true,
+		DeepSeekToken:  "managed-token",
+		CallerID:       "caller:test",
+		AccountID:      "acct-123",
+		TriedAccounts:  map[string]bool{},
+	}, nil
+}
+
+func (managedFilesAuthStub) DetermineCaller(_ *http.Request) (*auth.RequestAuth, error) {
+	return &auth.RequestAuth{
+		UseConfigToken: true,
+		DeepSeekToken:  "managed-token",
+		CallerID:       "caller:test",
+		AccountID:      "acct-123",
+		TriedAccounts:  map[string]bool{},
+	}, nil
+}
+
+func (managedFilesAuthStub) Release(_ *auth.RequestAuth) {}
+
 type filesRouteDSStub struct {
 	lastReq deepseek.UploadFileRequest
 	upload  *deepseek.UploadFileResult
@@ -112,6 +136,28 @@ func TestFilesRouteUploadSuccess(t *testing.T) {
 	}
 	if out["filename"] != "notes.txt" {
 		t.Fatalf("expected filename notes.txt, got %#v", out["filename"])
+	}
+}
+
+func TestFilesRouteUploadIncludesAccountIDForManagedAccount(t *testing.T) {
+	ds := &filesRouteDSStub{}
+	h := &Handler{Store: mockOpenAIConfig{wideInput: true}, Auth: managedFilesAuthStub{}, DS: ds}
+	r := chi.NewRouter()
+	RegisterRoutes(r, h)
+
+	req := newMultipartUploadRequest(t, "assistants", "notes.txt", []byte("hello world"))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var out map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode response failed: %v body=%s", err, rec.Body.String())
+	}
+	if out["account_id"] != "acct-123" {
+		t.Fatalf("expected account_id acct-123, got %#v", out["account_id"])
 	}
 }
 

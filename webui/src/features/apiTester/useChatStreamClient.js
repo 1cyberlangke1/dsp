@@ -1,5 +1,7 @@
 import { useCallback } from 'react'
 
+import { getAttachedFileAccountIds } from './fileAccountBinding'
+
 export function useChatStreamClient({
     t,
     onMessage,
@@ -47,6 +49,20 @@ export function useChatStreamClient({
         }
     }, [t])
 
+    const resolveAttachmentAccount = useCallback(() => {
+        const ids = getAttachedFileAccountIds(attachedFiles)
+        if (ids.length > 1) {
+            return {
+                accountId: '',
+                error: t('apiTester.fileAccountConflict'),
+            }
+        }
+        return {
+            accountId: ids[0] || '',
+            error: '',
+        }
+    }, [attachedFiles, t])
+
     const runTest = useCallback(async () => {
         if (!effectiveKey) {
             onMessage('error', t('apiTester.missingApiKey'))
@@ -63,12 +79,31 @@ export function useChatStreamClient({
         abortControllerRef.current = new AbortController()
 
         try {
+            const selectedAccountId = String(selectedAccount || '').trim()
+            const attachmentBinding = resolveAttachmentAccount()
+            if (attachmentBinding.error) {
+                setResponse({ success: false, error: attachmentBinding.error })
+                onMessage('error', attachmentBinding.error)
+                setLoading(false)
+                setIsStreaming(false)
+                return
+            }
+            if (attachmentBinding.accountId && selectedAccountId && selectedAccountId !== attachmentBinding.accountId) {
+                const errorMsg = t('apiTester.fileAccountMismatch', { account: attachmentBinding.accountId })
+                setResponse({ success: false, error: errorMsg })
+                onMessage('error', errorMsg)
+                setLoading(false)
+                setIsStreaming(false)
+                return
+            }
+            const requestAccount = selectedAccountId || attachmentBinding.accountId
+
             const headers = {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${effectiveKey}`,
             }
-            if (selectedAccount) {
-                headers['X-Ds2-Target-Account'] = selectedAccount
+            if (requestAccount) {
+                headers['X-Ds2-Target-Account'] = requestAccount
             }
 
             const body = {
@@ -104,6 +139,8 @@ export function useChatStreamClient({
                 const reader = res.body.getReader()
                 const decoder = new TextDecoder()
                 let buffer = ''
+                let accumulatedThinking = ''
+                let accumulatedContent = ''
 
                 while (true) {
                     const { done, value } = await reader.read()
@@ -126,9 +163,11 @@ export function useChatStreamClient({
                             if (choice?.delta) {
                                 const delta = choice.delta
                                 if (delta.reasoning_content) {
+                                    accumulatedThinking += delta.reasoning_content
                                     setStreamingThinking(prev => prev + delta.reasoning_content)
                                 }
                                 if (delta.content) {
+                                    accumulatedContent += delta.content
                                     setStreamingContent(prev => prev + delta.content)
                                 }
                             }
@@ -137,11 +176,26 @@ export function useChatStreamClient({
                         }
                     }
                 }
+
+                setResponse({
+                    success: true,
+                    status_code: res.status,
+                    choices: [{
+                        finish_reason: 'stop',
+                        index: 0,
+                        message: {
+                            role: 'assistant',
+                            content: accumulatedContent,
+                            reasoning_content: accumulatedThinking,
+                        },
+                    }],
+                })
+                onMessage('success', t('apiTester.testSuccess', { account: requestAccount || selectedAccountId || 'Auto', time: Math.max(0, Date.now() - startedAt) }))
             } else {
                 const data = await res.json()
                 setResponse({ success: true, status_code: res.status, ...data })
                 const elapsed = Math.max(0, Date.now() - startedAt)
-                onMessage('success', t('apiTester.testSuccess', { account: selectedAccount || 'Auto', time: elapsed }))
+                onMessage('success', t('apiTester.testSuccess', { account: requestAccount || 'Auto', time: elapsed }))
             }
         } catch (e) {
             if (e.name === 'AbortError') {
@@ -163,6 +217,7 @@ export function useChatStreamClient({
         message,
         model,
         onMessage,
+        resolveAttachmentAccount,
         selectedAccount,
         setIsStreaming,
         setLoading,

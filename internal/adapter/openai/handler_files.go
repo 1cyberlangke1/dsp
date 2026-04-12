@@ -61,12 +61,15 @@ func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		writeOpenAIError(w, http.StatusInternalServerError, "Failed to upload file.")
 		return
 	}
+	if result != nil && result.AccountID == "" {
+		result.AccountID = a.AccountID
+	}
 	writeJSON(w, http.StatusOK, buildOpenAIFileObject(result))
 }
 
 func buildOpenAIFileObject(result *deepseek.UploadFileResult) map[string]any {
 	if result == nil {
-		return map[string]any{
+		obj := map[string]any{
 			"id":             "",
 			"object":         "file",
 			"bytes":          0,
@@ -76,8 +79,9 @@ func buildOpenAIFileObject(result *deepseek.UploadFileResult) map[string]any {
 			"status":         "uploaded",
 			"status_details": nil,
 		}
+		return obj
 	}
-	return map[string]any{
+	obj := map[string]any{
 		"id":             result.ID,
 		"object":         "file",
 		"bytes":          result.Bytes,
@@ -87,4 +91,8 @@ func buildOpenAIFileObject(result *deepseek.UploadFileResult) map[string]any {
 		"status":         result.Status,
 		"status_details": nil,
 	}
+	if result.AccountID != "" {
+		obj["account_id"] = result.AccountID
+	}
+	return obj
 }
