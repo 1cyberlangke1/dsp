@@ -131,7 +131,7 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, ctx context.Context, re
 	stripReferenceMarkers := h.compatStripReferenceMarkers()
 	finalThinking := cleanVisibleOutput(result.Thinking, stripReferenceMarkers)
 	finalText := cleanVisibleOutput(result.Text, stripReferenceMarkers)
-	if writeUpstreamEmptyOutputError(w, finalThinking, finalText, result.ContentFilter) {
+	if writeUpstreamEmptyOutputError(w, finalText, result.ContentFilter) {
 		return
 	}
 	respBody := openaifmt.BuildChatCompletion(completionID, model, finalPrompt, finalThinking, finalText, toolNames)

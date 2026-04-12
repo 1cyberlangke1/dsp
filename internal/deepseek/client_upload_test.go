@@ -15,7 +15,7 @@ import (
 )
 
 func TestBuildUploadMultipartBodyOmitsPurposeAndIncludesFilePart(t *testing.T) {
-	body, contentType, err := buildUploadMultipartBody(`../demo.txt`, "text/plain", "assistants", []byte("hello"))
+	body, contentType, err := buildUploadMultipartBody(`../demo.txt`, "text/plain", []byte("hello"))
 	if err != nil {
 		t.Fatalf("buildUploadMultipartBody error: %v", err)
 	}

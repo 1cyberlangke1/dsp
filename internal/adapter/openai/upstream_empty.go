@@ -2,7 +2,7 @@ package openai
 
 import "net/http"
 
-func writeUpstreamEmptyOutputError(w http.ResponseWriter, thinking, text string, contentFilter bool) bool {
+func writeUpstreamEmptyOutputError(w http.ResponseWriter, text string, contentFilter bool) bool {
 	if text != "" {
 		return false
 	}

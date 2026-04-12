@@ -51,7 +51,7 @@ func (c *Client) UploadFile(ctx context.Context, a *auth.RequestAuth, req Upload
 		contentType = "application/octet-stream"
 	}
 	purpose := strings.TrimSpace(req.Purpose)
-	body, contentTypeHeader, err := buildUploadMultipartBody(filename, contentType, purpose, req.Data)
+	body, contentTypeHeader, err := buildUploadMultipartBody(filename, contentType, req.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (c *Client) UploadFile(ctx context.Context, a *auth.RequestAuth, req Upload
 	return nil, errors.New("upload file failed")
 }
 
-func buildUploadMultipartBody(filename, contentType, purpose string, data []byte) ([]byte, string, error) {
+func buildUploadMultipartBody(filename, contentType string, data []byte) ([]byte, string, error) {
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
 	partHeader := textproto.MIMEHeader{}
