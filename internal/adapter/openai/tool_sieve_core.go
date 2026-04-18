@@ -147,35 +147,13 @@ func splitSafeContentForToolDetection(s string) (safe, hold string) {
 	if s == "" {
 		return "", ""
 	}
-	suspiciousStart := findSuspiciousPrefixStart(s)
-	if suspiciousStart < 0 {
-		return s, ""
-	}
-	if suspiciousStart > 0 {
-		return s[:suspiciousStart], s[suspiciousStart:]
-	}
-	// If suspicious content starts at position 0, keep holding until we can
-	// parse a complete tool JSON block or reach stream flush.
-	return "", s
-}
-
-func findSuspiciousPrefixStart(s string) int {
-	start := -1
-	indices := []int{
-		strings.LastIndex(s, "{"),
-		strings.LastIndex(s, "["),
-		strings.LastIndex(s, "```"),
-	}
-	for _, idx := range indices {
-		if idx > start {
-			start = idx
+	if xmlIdx := findPartialXMLToolTagStart(s); xmlIdx >= 0 {
+		if xmlIdx > 0 {
+			return s[:xmlIdx], s[xmlIdx:]
 		}
+		return "", s
 	}
-	// Also check for partial XML tool tag at end of string.
-	if xmlIdx := findPartialXMLToolTagStart(s); xmlIdx >= 0 && xmlIdx > start {
-		start = xmlIdx
-	}
-	return start
+	return s, ""
 }
 
 func findToolSegmentStart(s string) int {
@@ -183,47 +161,14 @@ func findToolSegmentStart(s string) int {
 		return -1
 	}
 	lower := strings.ToLower(s)
-	keywords := []string{"tool_calls", "\"function\"", "function.name:", "\"tool_use\""}
 	bestKeyIdx := -1
-	for _, kw := range keywords {
-		idx := strings.Index(lower, kw)
-		if idx >= 0 && (bestKeyIdx < 0 || idx < bestKeyIdx) {
-			bestKeyIdx = idx
-		}
-	}
-	if fnKeyIdx := findQuotedFunctionCallKeyStart(s); fnKeyIdx >= 0 && (bestKeyIdx < 0 || fnKeyIdx < bestKeyIdx) {
-		bestKeyIdx = fnKeyIdx
-	}
-	// Also detect XML tool call tags.
 	for _, tag := range xmlToolTagsToDetect {
 		idx := strings.Index(lower, tag)
 		if idx >= 0 && (bestKeyIdx < 0 || idx < bestKeyIdx) {
 			bestKeyIdx = idx
 		}
 	}
-	if bestKeyIdx < 0 {
-		return -1
-	}
-	// For XML tags, the '<' is itself the segment start.
-	if bestKeyIdx < len(s) && s[bestKeyIdx] == '<' {
-		if fenceStart, ok := openFenceStartBefore(s, bestKeyIdx); ok {
-			return fenceStart
-		}
-		return bestKeyIdx
-	}
-	start := strings.LastIndex(s[:bestKeyIdx], "{")
-	if start < 0 {
-		start = bestKeyIdx
-	}
-	// If the keyword matched inside an XML tag (e.g. "tool_calls" in "<tool_calls>"),
-	// back up past the '<' to capture the full tag.
-	if start > 0 && s[start-1] == '<' {
-		start--
-	}
-	if fenceStart, ok := openFenceStartBefore(s, start); ok {
-		return fenceStart
-	}
-	return start
+	return bestKeyIdx
 }
 
 func consumeToolCapture(state *toolStreamSieveState, toolNames []string) (prefix string, calls []toolcall.ParsedToolCall, suffix string, ready bool) {
@@ -232,7 +177,7 @@ func consumeToolCapture(state *toolStreamSieveState, toolNames []string) (prefix
 		return "", nil, "", false
 	}
 
-	// Try XML tool call extraction first.
+	// XML tool call extraction only.
 	if xmlPrefix, xmlCalls, xmlSuffix, xmlReady := consumeXMLToolCapture(captured, toolNames); xmlReady {
 		return xmlPrefix, xmlCalls, xmlSuffix, true
 	}
@@ -240,45 +185,5 @@ func consumeToolCapture(state *toolStreamSieveState, toolNames []string) (prefix
 	if hasOpenXMLToolTag(captured) {
 		return "", nil, "", false
 	}
-
-	lower := strings.ToLower(captured)
-	keyIdx := -1
-	keywords := []string{"tool_calls", "\"function\"", "function.name:", "\"tool_use\""}
-	for _, kw := range keywords {
-		idx := strings.Index(lower, kw)
-		if idx >= 0 && (keyIdx < 0 || idx < keyIdx) {
-			keyIdx = idx
-		}
-	}
-	if fnKeyIdx := findQuotedFunctionCallKeyStart(captured); fnKeyIdx >= 0 && (keyIdx < 0 || fnKeyIdx < keyIdx) {
-		keyIdx = fnKeyIdx
-	}
-
-	if keyIdx < 0 {
-		return "", nil, "", false
-	}
-	start := strings.LastIndex(captured[:keyIdx], "{")
-	if start < 0 {
-		start = keyIdx
-	}
-	obj, end, ok := extractJSONObjectFrom(captured, start)
-	if !ok {
-		return "", nil, "", false
-	}
-	prefixPart := captured[:start]
-	suffixPart := captured[end:]
-	parsed := toolcall.ParseStandaloneToolCallsDetailed(obj, toolNames)
-	if len(parsed.Calls) == 0 {
-		if parsed.SawToolCallSyntax && parsed.RejectedByPolicy {
-			// Parsed as tool-call payload but rejected by schema/policy:
-			// consume it to avoid leaking raw tool_calls JSON to user content.
-			return prefixPart, nil, suffixPart, true
-		}
-		// If it has obvious keywords but failed to parse even after loose repair,
-		// we still might want to intercept it if it looks like an attempt at tool call.
-		// For now, keep the original logic but rely on loose JSON repair.
-		return captured, nil, "", true
-	}
-	prefixPart, suffixPart = trimWrappingJSONFence(prefixPart, suffixPart)
-	return prefixPart, parsed.Calls, suffixPart, true
+	return "", nil, "", false
 }

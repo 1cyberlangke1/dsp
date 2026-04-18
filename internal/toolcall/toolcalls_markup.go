@@ -68,8 +68,31 @@ func parseMarkupToolCalls(text string) []ParsedToolCall {
 }
 
 func parseMarkupSingleToolCall(attrs string, inner string) ParsedToolCall {
-	if parsed := parseToolCallsPayload(inner); len(parsed) > 0 {
-		return parsed[0]
+	// Try parsing inner content as a JSON tool call object.
+	if raw := strings.TrimSpace(inner); raw != "" && strings.HasPrefix(raw, "{") {
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(raw), &obj); err == nil {
+			name, _ := obj["name"].(string)
+			if name == "" {
+				if fn, ok := obj["function"].(map[string]any); ok {
+					name, _ = fn["name"].(string)
+				}
+			}
+			if name == "" {
+				if fc, ok := obj["functionCall"].(map[string]any); ok {
+					name, _ = fc["name"].(string)
+				}
+			}
+			if strings.TrimSpace(name) != "" {
+				input := parseToolCallInput(obj["input"])
+				if input == nil || len(input) == 0 {
+					if args, ok := obj["arguments"]; ok {
+						input = parseToolCallInput(args)
+					}
+				}
+				return ParsedToolCall{Name: strings.TrimSpace(name), Input: input}
+			}
+		}
 	}
 
 	name := ""
