@@ -215,6 +215,13 @@ Gemini 兼容客户端还可以使用 `x-goog-api-key`、`?key=` 或 `?api_key=`
 3. 未命中时按模型家族规则回退（如 `o*`、`gpt-*`、`claude-*`）。
 4. 仍未命中则返回 `invalid_request_error`。
 
+当前内置默认 alias（节选）：
+
+- OpenAI：`gpt-4o`、`gpt-4.1`、`gpt-4.1-mini`、`gpt-4.1-nano`、`gpt-5`、`gpt-5-mini`、`gpt-5-codex`
+- OpenAI Reasoning：`o1`、`o1-mini`、`o3`、`o3-mini`
+- Claude：`claude-sonnet-4-5`、`claude-haiku-4-5`、`claude-opus-4-6`（及 `claude-3-5-sonnet` / `claude-3-5-haiku` / `claude-3-opus` 兼容别名）
+- Gemini：`gemini-2.5-pro`、`gemini-2.5-flash`
+
 ### `POST /v1/chat/completions`
 
 **请求头**：
@@ -228,7 +235,7 @@ Content-Type: application/json
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `model` | string | ✅ | 支持 DeepSeek 原生模型 + 常见 alias（如 `gpt-4o`、`gpt-5-codex`、`o3`、`claude-sonnet-4-5`、`gemini-2.5-pro` 等） |
+| `model` | string | ✅ | 支持 DeepSeek 原生模型 + 常见 alias（如 `gpt-5`、`gpt-5-mini`、`gpt-5-codex`、`o3`、`claude-opus-4-6`、`gemini-2.5-pro`、`gemini-2.5-flash` 等） |
 | `messages` | array | ✅ | OpenAI 风格消息数组 |
 | `stream` | boolean | ❌ | 默认 `false` |
 | `tools` | array | ❌ | Function Calling 定义 |

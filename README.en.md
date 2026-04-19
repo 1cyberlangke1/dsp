@@ -135,7 +135,7 @@ For the full module-by-module architecture and directory responsibilities, see [
 | vision | `deepseek-vision-chat-search` | ❌ | ✅ |
 | vision | `deepseek-vision-reasoner-search` | ✅ | ✅ |
 
-Besides native IDs, DS2API also accepts common aliases as input (for example `gpt-4o`, `gpt-5-codex`, `o3`, `claude-sonnet-4-5`, `gemini-2.5-pro`), but `/v1/models` returns normalized DeepSeek native model IDs.
+Besides native IDs, DS2API also accepts common aliases as input (for example `gpt-5`, `gpt-5-mini`, `gpt-5-codex`, `gpt-4.1`, `o3`, `claude-opus-4-6`, `claude-sonnet-4-5`, `gemini-2.5-pro`, `gemini-2.5-flash`), but `/v1/models` returns normalized DeepSeek native model IDs.
 
 ### Claude Endpoint (`GET /anthropic/v1/models`)
 
@@ -291,8 +291,12 @@ The server actually binds to `0.0.0.0:5001`, so devices on the same LAN can usua
   ],
   "model_aliases": {
     "gpt-4o": "deepseek-chat",
+    "gpt-5": "deepseek-chat",
+    "gpt-5-mini": "deepseek-chat",
     "gpt-5-codex": "deepseek-reasoner",
-    "o3": "deepseek-reasoner"
+    "o3": "deepseek-reasoner",
+    "claude-opus-4-6": "deepseek-reasoner",
+    "gemini-2.5-flash": "deepseek-chat"
   },
   "compat": {
     "wide_input_strict_output": true,

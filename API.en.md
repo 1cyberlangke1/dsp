@@ -215,6 +215,13 @@ For `chat` / `responses` / `embeddings`, DS2API follows a wide-input/strict-outp
 3. If still unmatched, fall back by known family heuristics (`o*`, `gpt-*`, `claude-*`, etc.).
 4. If still unmatched, return `invalid_request_error`.
 
+Current built-in default aliases (excerpt):
+
+- OpenAI: `gpt-4o`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `gpt-5`, `gpt-5-mini`, `gpt-5-codex`
+- OpenAI reasoning: `o1`, `o1-mini`, `o3`, `o3-mini`
+- Claude: `claude-sonnet-4-5`, `claude-haiku-4-5`, `claude-opus-4-6` (plus compatibility aliases `claude-3-5-sonnet` / `claude-3-5-haiku` / `claude-3-opus`)
+- Gemini: `gemini-2.5-pro`, `gemini-2.5-flash`
+
 ### `POST /v1/chat/completions`
 
 **Headers**:
@@ -228,7 +235,7 @@ Content-Type: application/json
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `model` | string | ✅ | DeepSeek native models + common aliases (`gpt-4o`, `gpt-5-codex`, `o3`, `claude-sonnet-4-5`, `gemini-2.5-pro`, etc.) |
+| `model` | string | ✅ | DeepSeek native models + common aliases (`gpt-5`, `gpt-5-mini`, `gpt-5-codex`, `o3`, `claude-opus-4-6`, `gemini-2.5-pro`, `gemini-2.5-flash`, etc.) |
 | `messages` | array | ✅ | OpenAI-style messages |
 | `stream` | boolean | ❌ | Default `false` |
 | `tools` | array | ❌ | Function calling schema |

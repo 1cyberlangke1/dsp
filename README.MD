@@ -137,7 +137,7 @@ flowchart LR
 | vision | `deepseek-vision-chat-search` | ❌ | ✅ |
 | vision | `deepseek-vision-reasoner-search` | ✅ | ✅ |
 
-除原生模型外，也支持常见 alias 输入（如 `gpt-4o`、`gpt-5-codex`、`o3`、`claude-sonnet-4-5`、`gemini-2.5-pro` 等），但 `/v1/models` 返回的是规范化后的 DeepSeek 原生模型 ID。
+除原生模型外，也支持常见 alias 输入（如 `gpt-5`、`gpt-5-mini`、`gpt-5-codex`、`gpt-4.1`、`o3`、`claude-opus-4-6`、`claude-sonnet-4-5`、`gemini-2.5-pro`、`gemini-2.5-flash` 等），但 `/v1/models` 返回的是规范化后的 DeepSeek 原生模型 ID。
 
 ### Claude 接口（`GET /anthropic/v1/models`）
 
@@ -293,8 +293,12 @@ go run ./cmd/ds2api
   ],
   "model_aliases": {
     "gpt-4o": "deepseek-chat",
+    "gpt-5": "deepseek-chat",
+    "gpt-5-mini": "deepseek-chat",
     "gpt-5-codex": "deepseek-reasoner",
-    "o3": "deepseek-reasoner"
+    "o3": "deepseek-reasoner",
+    "claude-opus-4-6": "deepseek-reasoner",
+    "gemini-2.5-flash": "deepseek-chat"
   },
   "compat": {
     "wide_input_strict_output": true,
