@@ -37,7 +37,7 @@
 
 - OpenAI / Claude / Gemini 三套协议已统一挂在同一 `chi` 路由树上，由 `internal/server/router.go` 负责装配。
 - 适配器层职责收敛为：**请求归一化 → DeepSeek 调用 → 协议形态渲染**，减少历史版本中“同能力多处实现”的分叉。
-- Tool Calling 的解析策略在 Go 与 Node Runtime 间保持一致：优先结构化解析（JSON/XML/invoke/markup），并在流式场景执行防泄漏筛分。
+- Tool Calling 的解析策略在 Go 与 Node Runtime 间保持一致：当前以 XML/Markup 家族解析为主（含 `<tool_call>` / `<function_call>` / `<invoke>` / `tool_use` / antml 变体），并在流式场景执行防泄漏筛分。
 - `Admin API` 将配置与运行时策略分开：`/admin/config*` 管静态配置，`/admin/settings*` 管运行时行为。
 
 ---
@@ -319,12 +319,12 @@ data: [DONE]
 }
 ```
 
-**流式**：命中高置信特征后立即输出 `delta.tool_calls`（不等待完整 JSON 闭合），并持续发送 arguments 增量；已确认的 toolcall 原始 JSON 不会回流到 `delta.content`。
+**流式**：命中高置信特征后立即输出 `delta.tool_calls`（不等待完整工具参数闭合），并持续发送 arguments 增量；已确认的工具调用片段不会回流到 `delta.content`。
 
 补充说明：
 
 - **非代码块上下文**下，工具负载即使与普通文本混合，也会按特征识别并产出可执行 tool call（前后普通文本仍可透传）。
-- 解析器以 XML/Markup 为最高优先级，并兼容 JSON、ANTML、text-kv 等格式输入；最终按客户端协议转译为对应 tool call 结构（OpenAI/Claude/Gemini）。
+- 解析器当前走 XML/Markup 家族（包含 `<tool_call>`、`<function_call>`、`<invoke>`、`tool_use`、antml 风格）；纯 JSON `tool_calls` 片段默认不会直接作为可执行调用解析。
 - Markdown fenced code block（例如 ```json ... ```）中的 `tool_calls` 仅视为示例文本，不会被执行。
 
 ---
