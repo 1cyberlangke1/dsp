@@ -19,6 +19,8 @@ const TOOL_CALL_MARKUP_ARGS_PATTERNS = [
   /<(?:[a-z0-9_:-]+:)?args\b[^>]*>([\s\S]*?)<\/(?:[a-z0-9_:-]+:)?args>/i,
   /<(?:[a-z0-9_:-]+:)?params\b[^>]*>([\s\S]*?)<\/(?:[a-z0-9_:-]+:)?params>/i,
 ];
+const CDATA_PATTERN = /<!\[CDATA\[([\s\S]*?)]]>/i;
+const HTML_ENTITIES_PATTERN = /&[a-z0-9#]+;/gi;
 
 const {
   toStringSafe,
@@ -74,7 +76,7 @@ function parseMarkupSingleToolCall(attrs, inner) {
     name = toStringSafe(attrMatch[2]).trim();
   }
   if (!name) {
-    name = stripTagText(findMarkupTagValue(inner, TOOL_CALL_MARKUP_NAME_PATTERNS));
+    name = extractRawTagValue(findMarkupTagValue(inner, TOOL_CALL_MARKUP_NAME_PATTERNS));
   }
   if (!name) {
     return null;
@@ -95,18 +97,21 @@ function parseMarkupSingleToolCall(attrs, inner) {
 
 function parseMarkupInput(raw) {
   const s = toStringSafe(raw).trim();
-  if (!s) {
-    return {};
-  }
-  const parsed = parseToolCallInput(s);
-  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length > 0) {
-    return parsed;
-  }
+  // Prioritize XML-style KV tags (e.g., <arg>val</arg>)
   const kv = parseMarkupKVObject(s);
   if (Object.keys(kv).length > 0) {
     return kv;
   }
-  return { _raw: stripTagText(s) };
+
+  // Fallback to JSON parsing
+  const parsed = parseToolCallInput(s);
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    if (Object.keys(parsed).length > 0) {
+      return parsed;
+    }
+  }
+
+  return { _raw: extractRawTagValue(s) };
 }
 
 function parseMarkupKVObject(text) {
@@ -120,7 +125,7 @@ function parseMarkupKVObject(text) {
     if (!key) {
       continue;
     }
-    const valueRaw = stripTagText(m[2]);
+    const valueRaw = extractRawTagValue(m[2]);
     if (!valueRaw) {
       continue;
     }
@@ -133,6 +138,33 @@ function parseMarkupKVObject(text) {
   return out;
 }
 
+function extractRawTagValue(inner) {
+  const s = toStringSafe(inner).trim();
+  if (!s) {
+    return '';
+  }
+
+  // 1. Check for CDATA
+  const cdataMatch = s.match(CDATA_PATTERN);
+  if (cdataMatch && cdataMatch[1] !== undefined) {
+    return cdataMatch[1];
+  }
+
+  // 2. Fallback to unescaping standard HTML entities
+  // Note: we avoid broad tag stripping here to preserve user content (like < symbols in code)
+  return unescapeHtml(inner);
+}
+
+function unescapeHtml(safe) {
+  if (!safe) return '';
+  return safe.replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&#x27;/g, "'");
+}
+
 function stripTagText(text) {
   return toStringSafe(text).replace(/<[^>]+>/g, ' ').trim();
 }
@@ -141,7 +173,7 @@ function findMarkupTagValue(text, patterns) {
   const source = toStringSafe(text);
   for (const p of patterns) {
     const m = source.match(p);
-    if (m && m[1]) {
+    if (m && m[1] !== undefined) {
       return toStringSafe(m[1]);
     }
   }

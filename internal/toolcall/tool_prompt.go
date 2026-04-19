@@ -41,20 +41,21 @@ When calling tools, emit ONLY raw XML at the very end of your response. No text 
 <tool_calls>
   <tool_call>
     <tool_name>TOOL_NAME_HERE</tool_name>
-    <parameters>{"key":"value"}</parameters>
+    <parameters>
+      <PARAMETER_NAME>PARAMETER_VALUE</PARAMETER_NAME>
+    </parameters>
   </tool_call>
 </tool_calls>
 
 RULES:
 1) When calling tools, you MUST use the <tool_calls> XML format.
 2) No text is allowed AFTER the XML block.
-3) <parameters> MUST be a single-line strict JSON object. Use double quotes.
-4) Multiple tools must be inside the same <tool_calls> root.
-5) Do NOT wrap XML in markdown fences (` + "```" + `).
-6) Do NOT invent parameters. Use only the provided schema.
-7) CRITICAL: Do NOT use native tool markers like "<｜Tool｜>" or "<｜tool｜>".
-8) CRITICAL: Do NOT output role markers like "<｜System｜>", "<｜User｜>", or "<｜Assistant｜>".
-9) CRITICAL: Do NOT output internal monologues (e.g. "I will list files now..."). Just output your answer or the XML.
+3) <parameters> should be a list of XML tags (e.g., <param_name>value</param_name>). For simple inputs, a single-line JSON string is also acceptable.
+4) For long text, scripts, or code content, YOU MUST wrap the value in <![CDATA[ content ]]> to preserve formatting and avoid character escaping errors.
+5) Multiple tools must be inside the same <tool_calls> root.
+6) Do NOT wrap XML in markdown fences (` + "```" + `).
+7) Do NOT invent parameters. Use only the provided schema.
+8) CRITICAL: Do NOT output internal monologues (e.g. "I will list files now..."). Just output your answer or the XML.
 
 ❌ WRONG — Do NOT do these:
 Wrong 1 — mixed text after XML:
@@ -103,6 +104,22 @@ Example C — Tool with complex nested JSON parameters:
     <parameters>` + ex3Params + `</parameters>
   </tool_call>
 </tool_calls>
+ 
+Example D — Tool with long script using CDATA (RELIABLE FOR CODE/SCRIPTS):
+<tool_calls>
+  <tool_call>
+    <tool_name>` + ex2 + `</tool_name>
+    <parameters>
+      <path>script.sh</path>
+      <content><![CDATA[
+#!/bin/bash
+if [ "$1" == "test" ]; then
+  echo "Success!"
+fi
+]]></content>
+    </parameters>
+  </tool_call>
+</tool_calls>
 
 Remember: Output ONLY the <tool_calls>...</tool_calls> XML block when calling tools.`
 }
@@ -119,34 +136,34 @@ func matchAny(name string, candidates ...string) bool {
 func exampleReadParams(name string) string {
 	switch strings.TrimSpace(name) {
 	case "Read":
-		return `{"file_path":"README.md"}`
+		return `<file_path>README.md</file_path>`
 	case "Glob":
-		return `{"pattern":"**/*.go","path":"."}`
+		return `<pattern>**/*.go</pattern><path>.</path>`
 	default:
-		return `{"path":"src/main.go"}`
+		return `<path>src/main.go</path>`
 	}
 }
 
 func exampleWriteOrExecParams(name string) string {
 	switch strings.TrimSpace(name) {
 	case "Bash", "execute_command":
-		return `{"command":"pwd"}`
+		return `<command>pwd</command>`
 	case "exec_command":
-		return `{"cmd":"pwd"}`
+		return `<cmd>pwd</cmd>`
 	case "Edit":
-		return `{"file_path":"README.md","old_string":"foo","new_string":"bar"}`
+		return `<file_path>README.md</file_path><old_string>foo</old_string><new_string>bar</new_string>`
 	case "MultiEdit":
-		return `{"file_path":"README.md","edits":[{"old_string":"foo","new_string":"bar"}]}`
+		return `<file_path>README.md</file_path><edits><old_string>foo</old_string><new_string>bar</new_string></edits>`
 	default:
-		return `{"path":"output.txt","content":"Hello world"}`
+		return `<path>output.txt</path><content>Hello world</content>`
 	}
 }
 
 func exampleInteractiveParams(name string) string {
 	switch strings.TrimSpace(name) {
 	case "Task":
-		return `{"description":"Investigate flaky tests","prompt":"Run targeted tests and summarize failures"}`
+		return `<description>Investigate flaky tests</description><prompt>Run targeted tests and summarize failures</prompt>`
 	default:
-		return `{"question":"Which approach do you prefer?","follow_up":[{"text":"Option A"},{"text":"Option B"}]}`
+		return `<question>Which approach do you prefer?</question><follow_up><text>Option A</text></follow_up><follow_up><text>Option B</text></follow_up>`
 	}
 }

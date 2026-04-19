@@ -115,11 +115,12 @@ func parseSingleXMLToolCall(block string) (ParsedToolCall, bool) {
 				if err := dec.DecodeElement(&node, &t); err == nil {
 					inner := strings.TrimSpace(node.Inner)
 					if inner != "" {
-						unescapedInner := html.UnescapeString(inner)
-						if parsed := parseToolCallInput(unescapedInner); len(parsed) > 0 {
+						// Cleanly extract content (handles CDATA, entities, etc.)
+						extracted := extractRawTagValue(inner)
+						if parsed := parseToolCallInput(extracted); len(parsed) > 0 {
 							if len(parsed) == 1 {
 								if _, onlyRaw := parsed["_raw"]; onlyRaw {
-									if kv := parseMarkupKVObject(unescapedInner); len(kv) > 0 {
+									if kv := parseMarkupKVObject(extracted); len(kv) > 0 {
 										for k, vv := range kv {
 											params[k] = vv
 										}
@@ -130,7 +131,7 @@ func parseSingleXMLToolCall(block string) (ParsedToolCall, bool) {
 							for k, vv := range parsed {
 								params[k] = vv
 							}
-						} else if kv := parseMarkupKVObject(unescapedInner); len(kv) > 0 {
+						} else if kv := parseMarkupKVObject(extracted); len(kv) > 0 {
 							for k, vv := range kv {
 								params[k] = vv
 							}
@@ -293,7 +294,7 @@ func parseSingleAntmlFunctionCallMatch(m []string) (ParsedToolCall, bool) {
 			continue
 		}
 		k := strings.TrimSpace(am[1])
-		v := strings.TrimSpace(html.UnescapeString(am[2]))
+		v := extractRawTagValue(am[2])
 		if k != "" {
 			input[k] = v
 		}
@@ -316,7 +317,7 @@ func parseInvokeFunctionCallStyle(text string) (ParsedToolCall, bool) {
 			continue
 		}
 		k := strings.TrimSpace(pm[1])
-		v := strings.TrimSpace(html.UnescapeString(pm[2]))
+		v := extractRawTagValue(pm[2])
 		if k != "" {
 			input[k] = v
 		}
@@ -347,7 +348,7 @@ func parseToolUseFunctionStyle(text string) (ParsedToolCall, bool) {
 			continue
 		}
 		k := strings.TrimSpace(pm[1])
-		v := strings.TrimSpace(html.UnescapeString(pm[2]))
+		v := extractRawTagValue(pm[2])
 		if k != "" {
 			input[k] = v
 		}

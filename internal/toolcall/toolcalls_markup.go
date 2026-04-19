@@ -22,6 +22,9 @@ var toolCallMarkupNamePatternByTag = map[string]*regexp.Regexp{
 	"name":     regexp.MustCompile(`(?is)<(?:[a-z0-9_:-]+:)?name\b[^>]*>(.*?)</(?:[a-z0-9_:-]+:)?name>`),
 	"function": regexp.MustCompile(`(?is)<(?:[a-z0-9_:-]+:)?function\b[^>]*>(.*?)</(?:[a-z0-9_:-]+:)?function>`),
 }
+
+// cdataPattern matches CDATA sections to handle them separately from normal tags.
+var cdataPattern = regexp.MustCompile(`(?is)<!\[CDATA\[(.*?)]]>`)
 var toolCallMarkupArgsTagNames = []string{"input", "arguments", "argument", "parameters", "parameter", "args", "params"}
 var toolCallMarkupArgsPatternByTag = map[string]*regexp.Regexp{
 	"input":      regexp.MustCompile(`(?is)<(?:[a-z0-9_:-]+:)?input\b[^>]*>(.*?)</(?:[a-z0-9_:-]+:)?input>`),
@@ -120,11 +123,14 @@ func parseMarkupInput(raw string) map[string]any {
 	if raw == "" {
 		return map[string]any{}
 	}
-	if parsed := parseToolCallInput(raw); len(parsed) > 0 {
-		return parsed
-	}
+	// Prioritize XML-style KV tags as they are more robust for long text/scripts.
 	if kv := parseMarkupKVObject(raw); len(kv) > 0 {
 		return kv
+	}
+
+	// Fallback to JSON parsing for standard/legacy tool calls.
+	if parsed := parseToolCallInput(raw); len(parsed) > 0 {
+		return parsed
 	}
 	return map[string]any{"_raw": html.UnescapeString(stripTagText(raw))}
 }
@@ -147,7 +153,13 @@ func parseMarkupKVObject(text string) map[string]any {
 		if !strings.EqualFold(key, endKey) {
 			continue
 		}
-		value := strings.TrimSpace(html.UnescapeString(stripTagText(m[2])))
+		// Robustly extract value to handle CDATA and mixed content
+		value := extractRawTagValue(m[2])
+		if value == "" && m[2] != "" {
+			// If it wasn't empty but extracted to empty, could be whitespace or just tags
+			value = strings.TrimSpace(m[2])
+		}
+
 		if value == "" {
 			continue
 		}
@@ -164,6 +176,30 @@ func parseMarkupKVObject(text string) map[string]any {
 	return out
 }
 
+// extractRawTagValue treats the inner content of a tag robustly.
+// It detects CDATA and strips it, otherwise it unescapes standard HTML entities.
+// It avoids over-aggressive tag stripping that might break user content.
+func extractRawTagValue(inner string) string {
+	trimmed := strings.TrimSpace(inner)
+	if trimmed == "" {
+		return ""
+	}
+
+	// 1. Check for CDATA - if present, it's the ultimate "safe" container.
+	if cdataMatches := cdataPattern.FindStringSubmatch(trimmed); len(cdataMatches) >= 2 {
+		return cdataMatches[1] // Return raw content between CDATA brackets
+	}
+
+	// 2. If no CDATA, we still want to be robust.
+	// We unescape standard HTML entities (like &lt; &gt; &amp;)
+	// but we DON'T recursively strip tags unless they are actually valid XML tags
+	// at the start/end (which should have been handled by the outer matcher anyway).
+
+	// If it contains what looks like a single tag and no other text, it might be nested XML
+	// but for KV objects we usually want the value.
+	return html.UnescapeString(inner)
+}
+
 func stripTagText(text string) string {
 	return strings.TrimSpace(anyTagPattern.ReplaceAllString(text, ""))
 }
@@ -175,7 +211,7 @@ func findMarkupTagValue(text string, tagNames []string, patternByTag map[string]
 			continue
 		}
 		if m := pattern.FindStringSubmatch(text); len(m) >= 2 {
-			value := strings.TrimSpace(m[1])
+			value := extractRawTagValue(m[1])
 			if value != "" {
 				return value
 			}
