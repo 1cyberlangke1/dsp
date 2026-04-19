@@ -230,6 +230,8 @@ func renderPromptToolXMLNode(name string, value any, indent string) (string, boo
 	}
 }
 
+// renderPromptXMLText emits CDATA for every string so prompt-visible tool
+// history stays uniform and does not drift back toward ad-hoc escaping.
 func renderPromptXMLText(text string) string {
 	if text == "" {
 		return ""
@@ -237,10 +239,7 @@ func renderPromptXMLText(text string) string {
 	if strings.Contains(text, "]]>") {
 		return "<![CDATA[" + strings.ReplaceAll(text, "]]>", "]]]]><![CDATA[>") + "]]>"
 	}
-	if strings.ContainsAny(text, "<>&\n\r") {
-		return "<![CDATA[" + text + "]]>"
-	}
-	return escapeXMLText(text)
+	return "<![CDATA[" + text + "]]>"
 }
 
 func isValidPromptXMLName(name string) bool {
