@@ -1,12 +1,42 @@
 package chathistory
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 )
+
+func blockDetailDir(t *testing.T, detailDir string) func() {
+	t.Helper()
+	blockedDir := detailDir + ".blocked"
+	if err := os.RemoveAll(blockedDir); err != nil {
+		t.Fatalf("remove blocked detail dir failed: %v", err)
+	}
+	if err := os.Rename(detailDir, blockedDir); err != nil {
+		t.Fatalf("move detail dir aside failed: %v", err)
+	}
+	if err := os.RemoveAll(detailDir); err != nil {
+		t.Fatalf("remove blocked detail path failed: %v", err)
+	}
+	if err := os.WriteFile(detailDir, []byte("blocked"), 0o644); err != nil {
+		t.Fatalf("write blocked detail path failed: %v", err)
+	}
+	var once sync.Once
+	return func() {
+		t.Helper()
+		once.Do(func() {
+			if err := os.RemoveAll(detailDir); err != nil {
+				t.Fatalf("remove blocking detail path failed: %v", err)
+			}
+			if err := os.Rename(blockedDir, detailDir); err != nil {
+				t.Fatalf("restore detail dir failed: %v", err)
+			}
+		})
+	}
+}
 
 func TestStoreCreatesAndPersistsEntries(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "chat_history.json")
@@ -252,5 +282,151 @@ func TestStoreAutoMigratesLegacyMonolith(t *testing.T) {
 	}
 	if full.Content != "world" {
 		t.Fatalf("expected migrated detail content preserved, got %#v", full)
+	}
+}
+
+func TestStoreAutoMigratesMetadataOnlyLegacyMonolith(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "chat_history.json")
+	legacy := legacyFile{
+		Version: 1,
+		Limit:   20,
+		Items: []Entry{{
+			ID:           "chat_metadata_only",
+			Revision:     0,
+			CreatedAt:    1,
+			UpdatedAt:    2,
+			Status:       "error",
+			CallerID:     "caller:test",
+			AccountID:    "acct:test",
+			Model:        "deepseek-chat",
+			Stream:       true,
+			UserInput:    "hello",
+			Error:        "boom",
+			StatusCode:   500,
+			ElapsedMs:    12,
+			FinishReason: "error",
+		}},
+	}
+	body, _ := json.MarshalIndent(legacy, "", "  ")
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatalf("write legacy file failed: %v", err)
+	}
+
+	store := New(path)
+	if err := store.Err(); err != nil {
+		t.Fatalf("expected legacy metadata-only migration success, got %v", err)
+	}
+	snapshot, err := store.Snapshot()
+	if err != nil {
+		t.Fatalf("snapshot failed: %v", err)
+	}
+	if len(snapshot.Items) != 1 {
+		t.Fatalf("expected one migrated summary, got %#v", snapshot.Items)
+	}
+	full, err := store.Get("chat_metadata_only")
+	if err != nil {
+		t.Fatalf("get migrated detail failed: %v", err)
+	}
+	if full.Error != "boom" || full.UserInput != "hello" {
+		t.Fatalf("expected metadata-only legacy fields preserved, got %#v", full)
+	}
+	if _, err := os.Stat(filepath.Join(store.DetailDir(), "chat_metadata_only.json")); err != nil {
+		t.Fatalf("expected migrated detail file to exist: %v", err)
+	}
+}
+
+func TestStoreTransientPersistenceFailureDoesNotLatch(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "chat_history.json")
+	store := New(path)
+
+	first, err := store.Start(StartParams{UserInput: "first"})
+	if err != nil {
+		t.Fatalf("start first failed: %v", err)
+	}
+	restore := blockDetailDir(t, store.DetailDir())
+	t.Cleanup(restore)
+
+	blocked, err := store.Start(StartParams{UserInput: "blocked"})
+	if err == nil {
+		t.Fatalf("expected start failure while detail dir is blocked")
+	}
+	if blocked.ID == "" {
+		t.Fatalf("expected in-memory entry from failed start")
+	}
+	if err := store.Err(); err != nil {
+		t.Fatalf("transient start failure should not latch store error: %v", err)
+	}
+	if _, err := store.Update(first.ID, UpdateParams{Status: "success", Content: "one", Completed: true}); err == nil {
+		t.Fatalf("expected update failure while detail dir is blocked")
+	}
+	if err := store.Err(); err != nil {
+		t.Fatalf("transient update failure should not latch store error: %v", err)
+	}
+
+	restore()
+
+	if _, err := store.Update(blocked.ID, UpdateParams{Status: "success", Content: "two", Completed: true}); err != nil {
+		t.Fatalf("update after restore failed: %v", err)
+	}
+	if _, err := store.Start(StartParams{UserInput: "later"}); err != nil {
+		t.Fatalf("start after restore failed: %v", err)
+	}
+	full, err := store.Get(blocked.ID)
+	if err != nil {
+		t.Fatalf("get restored entry failed: %v", err)
+	}
+	if full.Content != "two" || full.Status != "success" {
+		t.Fatalf("expected restored entry persisted, got %#v", full)
+	}
+}
+
+func TestStoreWritesOnlyChangedDetailFiles(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "chat_history.json")
+	store := New(path)
+
+	first, err := store.Start(StartParams{UserInput: "one"})
+	if err != nil {
+		t.Fatalf("start first failed: %v", err)
+	}
+	if _, err := store.Update(first.ID, UpdateParams{Status: "success", Content: "first", Completed: true}); err != nil {
+		t.Fatalf("update first failed: %v", err)
+	}
+	second, err := store.Start(StartParams{UserInput: "two"})
+	if err != nil {
+		t.Fatalf("start second failed: %v", err)
+	}
+	if _, err := store.Update(second.ID, UpdateParams{Status: "success", Content: "second", Completed: true}); err != nil {
+		t.Fatalf("update second failed: %v", err)
+	}
+
+	firstPath := filepath.Join(store.DetailDir(), first.ID+".json")
+	secondPath := filepath.Join(store.DetailDir(), second.ID+".json")
+	beforeFirst, err := os.ReadFile(firstPath)
+	if err != nil {
+		t.Fatalf("read first detail before update failed: %v", err)
+	}
+	beforeSecond, err := os.ReadFile(secondPath)
+	if err != nil {
+		t.Fatalf("read second detail before update failed: %v", err)
+	}
+
+	if _, err := store.Update(first.ID, UpdateParams{Status: "success", Content: "first-updated", Completed: true}); err != nil {
+		t.Fatalf("update first again failed: %v", err)
+	}
+
+	afterFirst, err := os.ReadFile(firstPath)
+	if err != nil {
+		t.Fatalf("read first detail after update failed: %v", err)
+	}
+	afterSecond, err := os.ReadFile(secondPath)
+	if err != nil {
+		t.Fatalf("read second detail after update failed: %v", err)
+	}
+
+	if bytes.Equal(beforeFirst, afterFirst) {
+		t.Fatalf("expected first detail file to change after update")
+	}
+	if !bytes.Equal(beforeSecond, afterSecond) {
+		t.Fatalf("expected untouched detail file to remain byte-identical")
 	}
 }

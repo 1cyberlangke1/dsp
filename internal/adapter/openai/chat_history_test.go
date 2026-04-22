@@ -4,12 +4,16 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"ds2api/internal/auth"
 	"ds2api/internal/chathistory"
+	"ds2api/internal/util"
 )
 
 func newTestChatHistoryStore(t *testing.T) *chathistory.Store {
@@ -19,6 +23,35 @@ func newTestChatHistoryStore(t *testing.T) *chathistory.Store {
 		t.Fatalf("chat history store unavailable: %v", err)
 	}
 	return store
+}
+
+func blockChatHistoryDetailDir(t *testing.T, detailDir string) func() {
+	t.Helper()
+	blockedDir := detailDir + ".blocked"
+	if err := os.RemoveAll(blockedDir); err != nil {
+		t.Fatalf("remove blocked detail dir failed: %v", err)
+	}
+	if err := os.Rename(detailDir, blockedDir); err != nil {
+		t.Fatalf("move detail dir aside failed: %v", err)
+	}
+	if err := os.RemoveAll(detailDir); err != nil {
+		t.Fatalf("remove blocked detail path failed: %v", err)
+	}
+	if err := os.WriteFile(detailDir, []byte("blocked"), 0o644); err != nil {
+		t.Fatalf("write blocked detail path failed: %v", err)
+	}
+	var once sync.Once
+	return func() {
+		t.Helper()
+		once.Do(func() {
+			if err := os.RemoveAll(detailDir); err != nil {
+				t.Fatalf("remove blocking detail path failed: %v", err)
+			}
+			if err := os.Rename(blockedDir, detailDir); err != nil {
+				t.Fatalf("restore detail dir failed: %v", err)
+			}
+		})
+	}
 }
 
 func TestChatCompletionsNonStreamPersistsHistory(t *testing.T) {
@@ -66,6 +99,72 @@ func TestChatCompletionsNonStreamPersistsHistory(t *testing.T) {
 	}
 	if item.CallerID != "caller:test" {
 		t.Fatalf("expected caller hash persisted in summary, got %#v", item.CallerID)
+	}
+}
+
+func TestStartChatHistoryRecoversFromTransientWriteFailure(t *testing.T) {
+	historyStore := newTestChatHistoryStore(t)
+	restore := blockChatHistoryDetailDir(t, historyStore.DetailDir())
+	t.Cleanup(restore)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	req.Header.Set("Authorization", "Bearer direct-token")
+	req.Header.Set("Content-Type", "application/json")
+	a := &auth.RequestAuth{
+		CallerID:  "caller:test",
+		AccountID: "acct:test",
+	}
+	stdReq := util.StandardRequest{
+		ResponseModel: "deepseek-chat",
+		Stream:        true,
+		Messages: []any{
+			map[string]any{"role": "user", "content": "hello"},
+		},
+		FinalPrompt: "hello",
+	}
+
+	session := startChatHistory(historyStore, req, a, stdReq)
+	if session == nil {
+		t.Fatalf("expected session even when initial persistence fails")
+	}
+	if session.disabled {
+		t.Fatalf("expected session to remain active after transient start failure")
+	}
+	if session.entryID == "" {
+		t.Fatalf("expected session entry id to be retained")
+	}
+	if err := historyStore.Err(); err != nil {
+		t.Fatalf("transient start failure should not latch store error: %v", err)
+	}
+
+	session.lastPersist = time.Now().Add(-time.Second)
+	session.progress("thinking", "partial")
+	if session.disabled {
+		t.Fatalf("expected session to remain active after transient update failure")
+	}
+	if session.entryID == "" {
+		t.Fatalf("expected session entry id to remain set after update failure")
+	}
+	if err := historyStore.Err(); err != nil {
+		t.Fatalf("transient update failure should not latch store error: %v", err)
+	}
+
+	restore()
+
+	session.success(http.StatusOK, "thinking", "final answer", "stop", map[string]any{"total_tokens": 7})
+	snapshot, err := historyStore.Snapshot()
+	if err != nil {
+		t.Fatalf("snapshot failed after restore: %v", err)
+	}
+	if len(snapshot.Items) != 1 {
+		t.Fatalf("expected one persisted item after restore, got %#v", snapshot.Items)
+	}
+	full, err := historyStore.Get(session.entryID)
+	if err != nil {
+		t.Fatalf("get restored entry failed: %v", err)
+	}
+	if full.Status != "success" || full.Content != "final answer" {
+		t.Fatalf("expected restored entry to persist final success, got %#v", full)
 	}
 }
 

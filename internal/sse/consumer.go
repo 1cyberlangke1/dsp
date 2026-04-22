@@ -36,8 +36,12 @@ func CollectStream(resp *http.Response, thinkingEnabled bool, closeBody bool) Co
 		currentType = "thinking"
 	}
 	_ = deepseek.ScanSSELines(resp, func(line []byte) bool {
-		if chunk, done, parsed := ParseDeepSeekSSELine(line); parsed && !done {
+		chunk, done, parsed := ParseDeepSeekSSELine(line)
+		if parsed && !done {
 			collector.ingestChunk(chunk)
+		}
+		if done {
+			return false
 		}
 		if stopped {
 			return true
@@ -52,7 +56,8 @@ func CollectStream(resp *http.Response, thinkingEnabled bool, closeBody bool) Co
 				contentFilter = true
 			}
 			// Keep scanning to collect late-arriving citation metadata lines
-			// that can appear after response/status=FINISHED.
+			// that can appear after response/status=FINISHED, but stop as soon
+			// as [DONE] arrives.
 			stopped = true
 			return true
 		}

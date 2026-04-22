@@ -118,12 +118,18 @@ type legacyFile struct {
 	Items   []Entry `json:"items"`
 }
 
+type legacyProbe struct {
+	Items []map[string]json.RawMessage `json:"items"`
+}
+
 type Store struct {
 	mu        sync.Mutex
 	path      string
 	detailDir string
 	state     File
 	details   map[string]Entry
+	dirty     map[string]struct{}
+	deleted   map[string]struct{}
 	err       error
 }
 
@@ -138,6 +144,8 @@ func New(path string) *Store {
 			Items:    []SummaryEntry{},
 		},
 		details: map[string]Entry{},
+		dirty:   map[string]struct{}{},
+		deleted: map[string]struct{}{},
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -237,9 +245,10 @@ func (s *Store) Start(params StartParams) (Entry, error) {
 		FinalPrompt: strings.TrimSpace(params.FinalPrompt),
 	}
 	s.details[entry.ID] = entry
+	s.markDetailDirtyLocked(entry.ID)
 	s.rebuildIndexLocked()
 	if err := s.saveLocked(); err != nil {
-		return Entry{}, err
+		return cloneEntry(entry), err
 	}
 	return cloneEntry(entry), nil
 }
@@ -280,6 +289,7 @@ func (s *Store) Update(id string, params UpdateParams) (Entry, error) {
 		item.CompletedAt = now
 	}
 	s.details[target] = item
+	s.markDetailDirtyLocked(target)
 	s.rebuildIndexLocked()
 	if err := s.saveLocked(); err != nil {
 		return Entry{}, err
@@ -303,6 +313,7 @@ func (s *Store) Delete(id string) error {
 	if _, ok := s.details[target]; !ok {
 		return errors.New("chat history entry not found")
 	}
+	s.markDetailDeletedLocked(target)
 	delete(s.details, target)
 	s.nextRevisionLocked()
 	s.rebuildIndexLocked()
@@ -320,6 +331,9 @@ func (s *Store) Clear() error {
 	defer s.mu.Unlock()
 	if s.err != nil {
 		return s.err
+	}
+	for id := range s.details {
+		s.markDetailDeletedLocked(id)
 	}
 	s.details = map[string]Entry{}
 	s.nextRevisionLocked()
@@ -374,7 +388,7 @@ func (s *Store) loadLocked() error {
 	if legacyErr != nil {
 		return legacyErr
 	}
-	if legacyOK && !hasDetailFiles(s.detailDir) {
+	if legacyOK {
 		s.loadLegacyLocked(legacy)
 		return s.saveLocked()
 	}
@@ -409,6 +423,8 @@ func (s *Store) loadLegacyLocked(legacy legacyFile) {
 		s.state.Limit = DefaultLimit
 	}
 	s.details = map[string]Entry{}
+	s.dirty = map[string]struct{}{}
+	s.deleted = map[string]struct{}{}
 	maxRevision := int64(0)
 	for _, item := range legacy.Items {
 		if strings.TrimSpace(item.ID) == "" {
@@ -426,6 +442,7 @@ func (s *Store) loadLegacyLocked(legacy legacyFile) {
 			maxRevision = item.Revision
 		}
 		s.details[item.ID] = item
+		s.markDetailDirtyLocked(item.ID)
 	}
 	s.state.Revision = maxRevision
 	s.rebuildIndexLocked()
@@ -439,41 +456,40 @@ func (s *Store) saveLocked() error {
 	s.rebuildIndexLocked()
 
 	if err := os.MkdirAll(s.detailDir, 0o755); err != nil {
-		s.err = err
-		return err
+		return fmt.Errorf("create chat history detail dir: %w", err)
 	}
-	activeFiles := make(map[string]struct{}, len(s.details))
-	for id, item := range s.details {
+	for _, id := range sortedDetailIDs(s.deleted) {
 		path := filepath.Join(s.detailDir, id+".json")
-		activeFiles[path] = struct{}{}
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove stale chat history detail: %w", err)
+		}
+	}
+	for _, id := range sortedDetailIDs(s.dirty) {
+		item, ok := s.details[id]
+		if !ok {
+			continue
+		}
+		path := filepath.Join(s.detailDir, id+".json")
 		payload, err := json.MarshalIndent(detailEnvelope{
 			Version: FileVersion,
 			Item:    item,
 		}, "", "  ")
 		if err != nil {
-			s.err = err
-			return err
+			return fmt.Errorf("encode chat history detail: %w", err)
 		}
 		if err := writeFileAtomic(path, append(payload, '\n')); err != nil {
-			s.err = err
 			return err
 		}
-	}
-	if err := cleanupDetailDir(s.detailDir, activeFiles); err != nil {
-		s.err = err
-		return err
 	}
 
 	payload, err := json.MarshalIndent(s.state, "", "  ")
 	if err != nil {
-		s.err = err
-		return err
+		return fmt.Errorf("encode chat history index: %w", err)
 	}
 	if err := writeFileAtomic(s.path, append(payload, '\n')); err != nil {
-		s.err = err
 		return err
 	}
-	s.err = nil
+	s.clearPendingDetailChangesLocked()
 	return nil
 }
 
@@ -502,6 +518,7 @@ func (s *Store) rebuildIndexLocked() {
 		}
 		for id := range s.details {
 			if _, ok := keep[id]; !ok {
+				s.markDetailDeletedLocked(id)
 				delete(s.details, id)
 			}
 		}
@@ -569,22 +586,6 @@ func readDetailFile(path string) (Entry, error) {
 	return cloneEntry(env.Item), nil
 }
 
-func hasDetailFiles(dir string) bool {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return false
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		if strings.HasSuffix(strings.ToLower(entry.Name()), ".json") {
-			return true
-		}
-	}
-	return false
-}
-
 func parseLegacy(raw []byte) (legacyFile, bool, error) {
 	var legacy legacyFile
 	if err := json.Unmarshal(raw, &legacy); err != nil {
@@ -593,32 +594,15 @@ func parseLegacy(raw []byte) (legacyFile, bool, error) {
 	if len(legacy.Items) == 0 {
 		return legacy, false, nil
 	}
-	for _, item := range legacy.Items {
-		if item.Content != "" || item.ReasoningContent != "" || item.FinalPrompt != "" || len(item.Messages) > 0 {
-			return legacy, true, nil
+	var probe legacyProbe
+	if err := json.Unmarshal(raw, &probe); err == nil {
+		for _, item := range probe.Items {
+			if _, ok := item["detail_revision"]; ok {
+				return legacy, false, nil
+			}
 		}
 	}
-	return legacy, false, nil
-}
-
-func cleanupDetailDir(dir string, active map[string]struct{}) error {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return fmt.Errorf("list chat history detail dir: %w", err)
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		path := filepath.Join(dir, entry.Name())
-		if _, ok := active[path]; ok {
-			continue
-		}
-		if err := os.Remove(path); err != nil {
-			return fmt.Errorf("remove stale chat history detail: %w", err)
-		}
-	}
-	return nil
+	return legacy, true, nil
 }
 
 func writeFileAtomic(path string, body []byte) error {
@@ -636,25 +620,38 @@ func writeFileAtomic(path string, body []byte) error {
 		return fmt.Errorf("create temp chat history: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	cleanup := func() {
-		_ = os.Remove(tmpPath)
+	cleanup := func() error {
+		if err := os.Remove(tmpPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove temp chat history: %w", err)
+		}
+		return nil
+	}
+	withCleanup := func(primary error, closeErr error) error {
+		errs := []error{primary}
+		if closeErr != nil {
+			errs = append(errs, fmt.Errorf("close temp chat history: %w", closeErr))
+		}
+		if cleanupErr := cleanup(); cleanupErr != nil {
+			errs = append(errs, cleanupErr)
+		}
+		return errors.Join(errs...)
 	}
 	if _, err := tmpFile.Write(body); err != nil {
-		_ = tmpFile.Close()
-		cleanup()
-		return fmt.Errorf("write temp chat history: %w", err)
+		return withCleanup(fmt.Errorf("write temp chat history: %w", err), tmpFile.Close())
 	}
 	if err := tmpFile.Sync(); err != nil {
-		_ = tmpFile.Close()
-		cleanup()
-		return fmt.Errorf("sync temp chat history: %w", err)
+		return withCleanup(fmt.Errorf("sync temp chat history: %w", err), tmpFile.Close())
 	}
 	if err := tmpFile.Close(); err != nil {
-		cleanup()
+		if cleanupErr := cleanup(); cleanupErr != nil {
+			return errors.Join(fmt.Errorf("close temp chat history: %w", err), cleanupErr)
+		}
 		return fmt.Errorf("close temp chat history: %w", err)
 	}
 	if err := os.Rename(tmpPath, path); err != nil {
-		cleanup()
+		if cleanupErr := cleanup(); cleanupErr != nil {
+			return errors.Join(fmt.Errorf("promote temp chat history: %w", err), cleanupErr)
+		}
 		return fmt.Errorf("promote temp chat history: %w", err)
 	}
 	return nil
@@ -671,6 +668,53 @@ func DetailETag(id string, revision int64) string {
 func isAllowedLimit(limit int) bool {
 	_, ok := allowedLimits[limit]
 	return ok
+}
+
+func (s *Store) markDetailDirtyLocked(id string) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return
+	}
+	if s.dirty == nil {
+		s.dirty = map[string]struct{}{}
+	}
+	if s.deleted == nil {
+		s.deleted = map[string]struct{}{}
+	}
+	s.dirty[id] = struct{}{}
+	delete(s.deleted, id)
+}
+
+func (s *Store) markDetailDeletedLocked(id string) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return
+	}
+	if s.dirty == nil {
+		s.dirty = map[string]struct{}{}
+	}
+	if s.deleted == nil {
+		s.deleted = map[string]struct{}{}
+	}
+	s.deleted[id] = struct{}{}
+	delete(s.dirty, id)
+}
+
+func (s *Store) clearPendingDetailChangesLocked() {
+	s.dirty = map[string]struct{}{}
+	s.deleted = map[string]struct{}{}
+}
+
+func sortedDetailIDs(ids map[string]struct{}) []string {
+	if len(ids) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(ids))
+	for id := range ids {
+		out = append(out, id)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func cloneFile(in File) File {
