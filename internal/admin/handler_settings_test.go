@@ -271,6 +271,38 @@ func TestUpdateConfigPreservesStructuredAPIKeysWhenBothFieldsPresent(t *testing.
 	}
 }
 
+func TestUpdateConfigLegacyKeysPreserveStructuredMetadata(t *testing.T) {
+	h := newAdminTestHandler(t, `{
+		"api_keys":[{"key":"legacy","name":"primary","remark":"prod"}],
+		"accounts":[]
+	}`)
+
+	payload := map[string]any{
+		"keys": []any{"legacy", "new-key"},
+	}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/admin/config", bytes.NewReader(b))
+	rec := httptest.NewRecorder()
+	h.updateConfig(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	snap := h.Store.Snapshot()
+	if len(snap.Keys) != 2 || snap.Keys[0] != "legacy" || snap.Keys[1] != "new-key" {
+		t.Fatalf("unexpected keys after legacy config update: %#v", snap.Keys)
+	}
+	if len(snap.APIKeys) != 2 {
+		t.Fatalf("unexpected api keys after legacy config update: %#v", snap.APIKeys)
+	}
+	if snap.APIKeys[0].Name != "primary" || snap.APIKeys[0].Remark != "prod" {
+		t.Fatalf("existing structured metadata was lost: %#v", snap.APIKeys[0])
+	}
+	if snap.APIKeys[1].Key != "new-key" || snap.APIKeys[1].Name != "" || snap.APIKeys[1].Remark != "" {
+		t.Fatalf("new legacy key should remain metadata-free: %#v", snap.APIKeys[1])
+	}
+}
+
 func TestUpdateSettingsPasswordInvalidatesOldJWT(t *testing.T) {
 	hash := authn.HashAdminPassword("old-password")
 	h := newAdminTestHandler(t, `{"admin":{"password_hash":"`+hash+`"}}`)
@@ -383,6 +415,79 @@ func TestConfigImportMergePreservesStructuredAPIKeys(t *testing.T) {
 	}
 	if snap.APIKeys[1].Name != "secondary" || snap.APIKeys[1].Remark != "staging" {
 		t.Fatalf("new structured metadata was lost: %#v", snap.APIKeys[1])
+	}
+}
+
+func TestConfigImportMergeUpgradesLegacyAPIKeys(t *testing.T) {
+	h := newAdminTestHandler(t, `{
+		"keys":["legacy"],
+		"accounts":[]
+	}`)
+
+	merge := map[string]any{
+		"mode": "merge",
+		"config": map[string]any{
+			"api_keys": []any{
+				map[string]any{"key": "legacy", "name": "primary", "remark": "prod"},
+				map[string]any{"key": "new-key", "name": "secondary", "remark": "staging"},
+			},
+		},
+	}
+	mergeBytes, _ := json.Marshal(merge)
+	mergeReq := httptest.NewRequest(http.MethodPost, "/admin/config/import?mode=merge", bytes.NewReader(mergeBytes))
+	mergeRec := httptest.NewRecorder()
+	h.configImport(mergeRec, mergeReq)
+	if mergeRec.Code != http.StatusOK {
+		t.Fatalf("merge status=%d body=%s", mergeRec.Code, mergeRec.Body.String())
+	}
+
+	snap := h.Store.Snapshot()
+	if len(snap.Keys) != 2 || snap.Keys[0] != "legacy" || snap.Keys[1] != "new-key" {
+		t.Fatalf("unexpected keys after legacy import merge: %#v", snap.Keys)
+	}
+	if len(snap.APIKeys) != 2 {
+		t.Fatalf("unexpected api keys after legacy import merge: %#v", snap.APIKeys)
+	}
+	if snap.APIKeys[0].Name != "primary" || snap.APIKeys[0].Remark != "prod" {
+		t.Fatalf("legacy key metadata was not upgraded: %#v", snap.APIKeys[0])
+	}
+	if snap.APIKeys[1].Name != "secondary" || snap.APIKeys[1].Remark != "staging" {
+		t.Fatalf("new structured metadata was not preserved: %#v", snap.APIKeys[1])
+	}
+}
+
+func TestBatchImportUpgradesLegacyAPIKeys(t *testing.T) {
+	h := newAdminTestHandler(t, `{
+		"keys":["legacy"],
+		"accounts":[]
+	}`)
+
+	payload := map[string]any{
+		"keys": []any{"legacy", "new-key"},
+		"api_keys": []any{
+			map[string]any{"key": "legacy", "name": "primary", "remark": "prod"},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/admin/import", bytes.NewReader(b))
+	rec := httptest.NewRecorder()
+	h.batchImport(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	snap := h.Store.Snapshot()
+	if len(snap.Keys) != 2 || snap.Keys[0] != "legacy" || snap.Keys[1] != "new-key" {
+		t.Fatalf("unexpected keys after batch import: %#v", snap.Keys)
+	}
+	if len(snap.APIKeys) != 2 {
+		t.Fatalf("unexpected api keys after batch import: %#v", snap.APIKeys)
+	}
+	if snap.APIKeys[0].Name != "primary" || snap.APIKeys[0].Remark != "prod" {
+		t.Fatalf("legacy key metadata was not upgraded: %#v", snap.APIKeys[0])
+	}
+	if snap.APIKeys[1].Name != "" || snap.APIKeys[1].Remark != "" {
+		t.Fatalf("new batch-imported key should stay metadata-free: %#v", snap.APIKeys[1])
 	}
 }
 

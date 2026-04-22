@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"ds2api/internal/config"
 )
 
 const (
@@ -379,7 +381,10 @@ func (s *Store) loadLocked() error {
 	raw, err := os.ReadFile(s.path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return s.saveLocked()
+			if saveErr := s.saveLocked(); saveErr != nil {
+				config.Logger.Warn("[chat_history] bootstrap write failed", "path", s.path, "error", saveErr)
+			}
+			return nil
 		}
 		return fmt.Errorf("read chat history index: %w", err)
 	}
@@ -390,7 +395,10 @@ func (s *Store) loadLocked() error {
 	}
 	if legacyOK {
 		s.loadLegacyLocked(legacy)
-		return s.saveLocked()
+		if err := s.saveLocked(); err != nil {
+			config.Logger.Warn("[chat_history] legacy migration writeback failed", "path", s.path, "error", err)
+		}
+		return nil
 	}
 
 	var state File
@@ -413,7 +421,10 @@ func (s *Store) loadLocked() error {
 		s.details[item.ID] = detail
 	}
 	s.rebuildIndexLocked()
-	return s.saveLocked()
+	if saveErr := s.saveLocked(); saveErr != nil {
+		config.Logger.Warn("[chat_history] index rewrite failed", "path", s.path, "error", saveErr)
+	}
+	return nil
 }
 
 func (s *Store) loadLegacyLocked(legacy legacyFile) {

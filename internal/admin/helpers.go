@@ -109,6 +109,78 @@ func toAPIKeys(v any) ([]config.APIKey, bool) {
 	return out, true
 }
 
+func normalizeAPIKeyForStorage(item config.APIKey) config.APIKey {
+	return config.APIKey{
+		Key:    strings.TrimSpace(item.Key),
+		Name:   strings.TrimSpace(item.Name),
+		Remark: strings.TrimSpace(item.Remark),
+	}
+}
+
+func apiKeyHasMetadata(item config.APIKey) bool {
+	return strings.TrimSpace(item.Name) != "" || strings.TrimSpace(item.Remark) != ""
+}
+
+func mergeAPIKeysPreferStructured(existing, incoming []config.APIKey) ([]config.APIKey, int) {
+	if len(existing) == 0 && len(incoming) == 0 {
+		return nil, 0
+	}
+
+	merged := make([]config.APIKey, 0, len(existing)+len(incoming))
+	index := make(map[string]int, len(existing)+len(incoming))
+	for _, item := range existing {
+		item = normalizeAPIKeyForStorage(item)
+		if item.Key == "" {
+			continue
+		}
+		if _, ok := index[item.Key]; ok {
+			continue
+		}
+		index[item.Key] = len(merged)
+		merged = append(merged, item)
+	}
+
+	imported := 0
+	for _, item := range incoming {
+		item = normalizeAPIKeyForStorage(item)
+		if item.Key == "" {
+			continue
+		}
+		if idx, ok := index[item.Key]; ok {
+			keep := merged[idx]
+			next := mergeAPIKeyRecord(keep, item)
+			if next != keep {
+				merged[idx] = next
+				imported++
+			}
+			continue
+		}
+		index[item.Key] = len(merged)
+		merged = append(merged, item)
+		imported++
+	}
+
+	if len(merged) == 0 {
+		return nil, imported
+	}
+	return merged, imported
+}
+
+func mergeAPIKeyRecord(existing, incoming config.APIKey) config.APIKey {
+	existing = normalizeAPIKeyForStorage(existing)
+	incoming = normalizeAPIKeyForStorage(incoming)
+	if existing.Key == "" {
+		return incoming
+	}
+	if apiKeyHasMetadata(existing) {
+		return existing
+	}
+	if apiKeyHasMetadata(incoming) {
+		return incoming
+	}
+	return existing
+}
+
 func fieldString(m map[string]any, key string) string {
 	v, ok := m[key]
 	if !ok || v == nil {

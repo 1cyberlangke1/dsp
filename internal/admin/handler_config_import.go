@@ -56,26 +56,9 @@ func (h *Handler) configImport(w http.ResponseWriter, r *http.Request) {
 			importedKeys = len(next.APIKeys)
 			importedAccounts = len(next.Accounts)
 		} else {
-			existingKeys := map[string]struct{}{}
-			for _, item := range next.APIKeys {
-				key := strings.TrimSpace(item.Key)
-				if key == "" {
-					continue
-				}
-				existingKeys[key] = struct{}{}
-			}
-			for _, item := range incoming.APIKeys {
-				key := strings.TrimSpace(item.Key)
-				if key == "" {
-					continue
-				}
-				if _, ok := existingKeys[key]; ok {
-					continue
-				}
-				existingKeys[key] = struct{}{}
-				next.APIKeys = append(next.APIKeys, item)
-				importedKeys++
-			}
+			var changed int
+			next.APIKeys, changed = mergeAPIKeysPreferStructured(next.APIKeys, incoming.APIKeys)
+			importedKeys += changed
 
 			existingAccounts := map[string]struct{}{}
 			for _, acc := range next.Accounts {

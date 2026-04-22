@@ -22,14 +22,7 @@ func (h *Handler) updateConfig(w http.ResponseWriter, r *http.Request) {
 		if apiKeys, ok := toAPIKeys(req["api_keys"]); ok {
 			c.APIKeys = apiKeys
 		} else if keys, ok := toStringSlice(req["keys"]); ok {
-			legacy := make([]config.APIKey, 0, len(keys))
-			for _, key := range keys {
-				if key == "" {
-					continue
-				}
-				legacy = append(legacy, config.APIKey{Key: key})
-			}
-			c.APIKeys = legacy
+			c.Keys = keys
 		}
 		if accountsRaw, ok := req["accounts"].([]any); ok {
 			existing := map[string]config.Account{}
@@ -182,33 +175,22 @@ func (h *Handler) batchImport(w http.ResponseWriter, r *http.Request) {
 	importedKeys, importedAccounts := 0, 0
 	err := h.Store.Update(func(c *config.Config) error {
 		if apiKeys, ok := toAPIKeys(req["api_keys"]); ok {
-			existing := map[string]bool{}
-			for _, item := range c.APIKeys {
-				existing[item.Key] = true
-			}
-			for _, item := range apiKeys {
-				if item.Key == "" || existing[item.Key] {
-					continue
-				}
-				c.APIKeys = append(c.APIKeys, item)
-				existing[item.Key] = true
-				importedKeys++
-			}
+			var changed int
+			c.APIKeys, changed = mergeAPIKeysPreferStructured(c.APIKeys, apiKeys)
+			importedKeys += changed
 		}
 		if keys, ok := req["keys"].([]any); ok {
-			existing := map[string]bool{}
-			for _, item := range c.APIKeys {
-				existing[item.Key] = true
-			}
+			legacy := make([]config.APIKey, 0, len(keys))
 			for _, k := range keys {
 				key := strings.TrimSpace(fmt.Sprintf("%v", k))
-				if key == "" || existing[key] {
+				if key == "" {
 					continue
 				}
-				c.APIKeys = append(c.APIKeys, config.APIKey{Key: key})
-				existing[key] = true
-				importedKeys++
+				legacy = append(legacy, config.APIKey{Key: key})
 			}
+			var changed int
+			c.APIKeys, changed = mergeAPIKeysPreferStructured(c.APIKeys, legacy)
+			importedKeys += changed
 		}
 		if accounts, ok := req["accounts"].([]any); ok {
 			existing := map[string]bool{}

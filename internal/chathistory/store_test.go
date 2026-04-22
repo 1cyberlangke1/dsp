@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -332,6 +333,56 @@ func TestStoreAutoMigratesMetadataOnlyLegacyMonolith(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(store.DetailDir(), "chat_metadata_only.json")); err != nil {
 		t.Fatalf("expected migrated detail file to exist: %v", err)
+	}
+}
+
+func TestStoreLegacyMigrationBestEffortWhenRewriteFails(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "chat_history.json")
+	longID := "chat_" + strings.Repeat("x", 320)
+	legacy := legacyFile{
+		Version: 1,
+		Limit:   20,
+		Items: []Entry{{
+			ID:        longID,
+			CreatedAt: 1,
+			UpdatedAt: 2,
+			Status:    "success",
+			UserInput: "hello",
+			Content:   "world",
+		}},
+	}
+	body, err := json.MarshalIndent(legacy, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal legacy file failed: %v", err)
+	}
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatalf("write legacy file failed: %v", err)
+	}
+
+	store := New(path)
+	if err := store.Err(); err != nil {
+		t.Fatalf("expected store to stay usable after migration writeback failure, got %v", err)
+	}
+	if !store.Enabled() {
+		t.Fatal("expected store to remain enabled after best-effort migration")
+	}
+
+	snapshot, err := store.Snapshot()
+	if err != nil {
+		t.Fatalf("snapshot failed: %v", err)
+	}
+	if len(snapshot.Items) != 1 || snapshot.Items[0].ID != longID {
+		t.Fatalf("unexpected snapshot after best-effort migration: %#v", snapshot.Items)
+	}
+	full, err := store.Get(longID)
+	if err != nil {
+		t.Fatalf("get migrated detail failed: %v", err)
+	}
+	if full.Content != "world" {
+		t.Fatalf("expected migrated content to stay in memory, got %#v", full)
+	}
+	if _, statErr := os.Stat(filepath.Join(store.DetailDir(), longID+".json")); statErr == nil {
+		t.Fatal("expected detail write to fail for overlong legacy id")
 	}
 }
 
