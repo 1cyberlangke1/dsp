@@ -321,7 +321,7 @@
         "templates": {
             "full": {
                 "name": "全量配置模板",
-                "desc": "包含密钥、账号及模型映射"
+                "desc": "直接复用 config.example.json，包含密钥、账号和默认配置"
             },
             "emailOnly": {
                 "name": "仅邮箱账号",

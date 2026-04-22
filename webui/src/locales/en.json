@@ -321,7 +321,7 @@
         "templates": {
             "full": {
                 "name": "Full configuration template",
-                "desc": "Includes keys, accounts, and model mapping"
+                "desc": "Loaded from config.example.json with keys, accounts, and defaults"
             },
             "emailOnly": {
                 "name": "Email-only accounts",
