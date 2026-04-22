@@ -96,6 +96,12 @@ func TestBuildOpenAIHistoryTranscriptPreservesOrderAndToolHistory(t *testing.T) 
 	if !strings.Contains(finalPrompt, "HISTORY.txt") {
 		t.Fatalf("expected history instruction in final prompt, got %s", finalPrompt)
 	}
+	if !strings.Contains(finalPrompt, "Follow the instructions in this prompt first") {
+		t.Fatalf("expected stronger prompt override in final prompt, got %s", finalPrompt)
+	}
+	if strings.Index(finalPrompt, "Follow the instructions in this prompt first") > strings.Index(finalPrompt, "Continue the conversation") {
+		t.Fatalf("expected history split instruction before continuity instructions, got %s", finalPrompt)
+	}
 }
 
 func TestSplitOpenAIHistoryMessagesUsesLatestUserTurn(t *testing.T) {
@@ -251,6 +257,12 @@ func TestChatCompletionsHistorySplitUploadsHistoryAndKeepsLatestPrompt(t *testin
 	if !strings.Contains(promptText, "HISTORY.txt") {
 		t.Fatalf("expected history instruction in completion prompt, got %s", promptText)
 	}
+	if !strings.Contains(promptText, "Follow the instructions in this prompt first") {
+		t.Fatalf("expected stronger prompt override in completion prompt, got %s", promptText)
+	}
+	if strings.Index(promptText, "Follow the instructions in this prompt first") > strings.Index(promptText, "Continue the conversation") {
+		t.Fatalf("expected history split instruction before continuity instructions, got %s", promptText)
+	}
 	refIDs, _ := ds.completionReq["ref_file_ids"].([]any)
 	if len(refIDs) == 0 || refIDs[0] != "file-inline-1" {
 		t.Fatalf("expected uploaded history file to be first ref_file_id, got %#v", ds.completionReq["ref_file_ids"])
@@ -300,6 +312,12 @@ func TestResponsesHistorySplitUploadsHistoryAndKeepsLatestPrompt(t *testing.T) {
 	}
 	if !strings.Contains(promptText, "[reasoning_content]") || !strings.Contains(promptText, "hidden reasoning") {
 		t.Fatalf("expected latest assistant reasoning to be attached to completion prompt, got %s", promptText)
+	}
+	if !strings.Contains(promptText, "Follow the instructions in this prompt first") {
+		t.Fatalf("expected stronger prompt override in completion prompt, got %s", promptText)
+	}
+	if strings.Index(promptText, "Follow the instructions in this prompt first") > strings.Index(promptText, "Continue the conversation") {
+		t.Fatalf("expected history split instruction before continuity instructions, got %s", promptText)
 	}
 }
 

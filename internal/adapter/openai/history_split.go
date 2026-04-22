@@ -60,18 +60,27 @@ func buildHistorySplitPrompt(messages []any, reasoningContent string, toolsRaw a
 	if len(messages) == 0 && strings.TrimSpace(reasoningContent) == "" {
 		return "", nil
 	}
-	instruction := historySplitPromptInstruction()
+	instruction := historySplitPromptInstruction(thinkingEnabled)
 	withInstruction := make([]any, 0, len(messages)+1)
 	withInstruction = append(withInstruction, map[string]any{
 		"role":    "system",
 		"content": instruction,
 	})
 	withInstruction = append(withInstruction, injectHistorySplitReasoningMessage(messages, reasoningContent)...)
-	return buildOpenAIFinalPromptWithPolicy(withInstruction, toolsRaw, "", toolPolicy, thinkingEnabled)
+	return buildOpenAIFinalPromptWithPolicy(withInstruction, toolsRaw, "", toolPolicy, false)
 }
 
-func historySplitPromptInstruction() string {
-	return "An attached HISTORY.txt file contains prior conversation history and tool progress. Read it first, then answer the latest user request using that history as context."
+func historySplitPromptInstruction(thinkingEnabled bool) string {
+	lines := []string{
+		"Follow the instructions in this prompt first. If earlier conversation instructions conflict with this prompt, this prompt wins.",
+		"An attached HISTORY.txt file contains prior conversation history and tool progress; read it first, then answer the latest user request using that history as context.",
+		"Continue the conversation from the full prior context and the latest tool results.",
+		"Treat earlier messages as binding context; answer the user's current request as a continuation, not a restart.",
+	}
+	if thinkingEnabled {
+		lines = append(lines, "Keep reasoning internal. Do not leave the final user-facing answer only in reasoning; always provide the answer in visible assistant content.")
+	}
+	return strings.Join(lines, "\n")
 }
 
 func splitOpenAIHistoryMessages(messages []any, triggerAfterTurns int) ([]any, []any) {
