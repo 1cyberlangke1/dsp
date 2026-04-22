@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	Keys             []string          `json:"keys,omitempty"`
+	APIKeys          []APIKey          `json:"api_keys,omitempty"`
 	Accounts         []Account         `json:"accounts,omitempty"`
 	Proxies          []Proxy           `json:"proxies,omitempty"`
 	ClaudeMapping    map[string]string `json:"claude_mapping,omitempty"`
@@ -26,11 +27,19 @@ type Config struct {
 }
 
 type Account struct {
+	Name     string `json:"name,omitempty"`
+	Remark   string `json:"remark,omitempty"`
 	Email    string `json:"email,omitempty"`
 	Mobile   string `json:"mobile,omitempty"`
 	Password string `json:"password,omitempty"`
 	Token    string `json:"token,omitempty"`
 	ProxyID  string `json:"proxy_id,omitempty"`
+}
+
+type APIKey struct {
+	Key    string `json:"key"`
+	Name   string `json:"name,omitempty"`
+	Remark string `json:"remark,omitempty"`
 }
 
 type Proxy struct {
@@ -70,6 +79,25 @@ func (c *Config) ClearAccountTokens() {
 	}
 	for i := range c.Accounts {
 		c.Accounts[i].Token = ""
+	}
+}
+
+func (c *Config) NormalizeCredentials() {
+	if c == nil {
+		return
+	}
+	normalizedAPIKeys := normalizeAPIKeys(c.APIKeys)
+	if len(normalizedAPIKeys) > 0 {
+		c.APIKeys = normalizedAPIKeys
+		c.Keys = apiKeysToStrings(c.APIKeys)
+	} else {
+		c.Keys = normalizeKeys(c.Keys)
+		c.APIKeys = apiKeysFromStrings(c.Keys, nil)
+	}
+
+	for i := range c.Accounts {
+		c.Accounts[i].Name = strings.TrimSpace(c.Accounts[i].Name)
+		c.Accounts[i].Remark = strings.TrimSpace(c.Accounts[i].Remark)
 	}
 }
 
