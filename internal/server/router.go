@@ -108,10 +108,7 @@ func timeout(d time.Duration) func(http.Handler) http.Handler {
 }
 
 func filteredLogger() func(http.Handler) http.Handler {
-	color := true
-	if isWindowsRuntime() {
-		color = false
-	}
+	color := !isWindowsRuntime()
 	base := &middleware.DefaultLogFormatter{
 		Logger:  log.New(os.Stdout, "", log.LstdFlags),
 		NoColor: !color,
