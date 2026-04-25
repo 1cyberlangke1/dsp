@@ -112,18 +112,12 @@ For the full module-by-module architecture and directory responsibilities, see [
 
 | Family | Model ID | thinking | search |
 | --- | --- | --- | --- |
-| default | `deepseek-chat` | ❌ | ❌ |
-| default | `deepseek-reasoner` | ✅ | ❌ |
-| default | `deepseek-chat-search` | ❌ | ✅ |
-| default | `deepseek-reasoner-search` | ✅ | ✅ |
-| expert | `deepseek-expert-chat` | ❌ | ❌ |
-| expert | `deepseek-expert-reasoner` | ✅ | ❌ |
-| expert | `deepseek-expert-chat-search` | ❌ | ✅ |
-| expert | `deepseek-expert-reasoner-search` | ✅ | ✅ |
-| vision | `deepseek-vision-chat` | ❌ | ❌ |
-| vision | `deepseek-vision-reasoner` | ✅ | ❌ |
-| vision | `deepseek-vision-chat-search` | ❌ | ✅ |
-| vision | `deepseek-vision-reasoner-search` | ✅ | ✅ |
+| default | `deepseek-v4-flash` | enabled by default, request-controlled | ❌ |
+| expert | `deepseek-v4-pro` | enabled by default, request-controlled | ❌ |
+| default | `deepseek-v4-flash-search` | enabled by default, request-controlled | ✅ |
+| expert | `deepseek-v4-pro-search` | enabled by default, request-controlled | ✅ |
+| vision | `deepseek-v4-vision` | enabled by default, request-controlled | ❌ |
+| vision | `deepseek-v4-vision-search` | enabled by default, request-controlled | ✅ |
 
 Besides native IDs, DS2API also accepts common aliases as input (for example `gpt-5`, `gpt-5-mini`, `gpt-5-codex`, `gpt-4.1`, `o3`, `claude-opus-4-6`, `claude-sonnet-4-5`, `gemini-2.5-pro`, `gemini-2.5-flash`), but `/v1/models` returns normalized DeepSeek native model IDs.
 
@@ -131,9 +125,9 @@ Besides native IDs, DS2API also accepts common aliases as input (for example `gp
 
 | Current common model | Default Mapping |
 | --- | --- |
-| `claude-sonnet-4-5` | `deepseek-chat` |
-| `claude-haiku-4-5` (compatible with `claude-3-5-haiku-latest`) | `deepseek-chat` |
-| `claude-opus-4-6` | `deepseek-reasoner` |
+| `claude-sonnet-4-5` | `deepseek-v4-flash` |
+| `claude-haiku-4-5` (compatible with `claude-3-5-haiku-latest`) | `deepseek-v4-flash` |
+| `claude-opus-4-6` | `deepseek-v4-pro` |
 
 Override mapping via `claude_mapping` or `claude_model_mapping` in config.
 Besides the current primary aliases above, `/anthropic/v1/models` also returns Claude 4.x snapshots plus historical 3.x / 2.x / 1.x IDs and common aliases for legacy client compatibility.
@@ -282,13 +276,13 @@ The server actually binds to `0.0.0.0:5001`, so devices on the same LAN can usua
     }
   ],
   "model_aliases": {
-    "gpt-4o": "deepseek-chat",
-    "gpt-5": "deepseek-chat",
-    "gpt-5-mini": "deepseek-chat",
-    "gpt-5-codex": "deepseek-reasoner",
-    "o3": "deepseek-reasoner",
-    "claude-opus-4-6": "deepseek-reasoner",
-    "gemini-2.5-flash": "deepseek-chat"
+    "gpt-4o": "deepseek-v4-flash",
+    "gpt-5": "deepseek-v4-flash",
+    "gpt-5-mini": "deepseek-v4-flash",
+    "gpt-5-codex": "deepseek-v4-pro",
+    "o3": "deepseek-v4-pro",
+    "claude-opus-4-6": "deepseek-v4-pro",
+    "gemini-2.5-flash": "deepseek-v4-flash"
   },
   "compat": {
     "wide_input_strict_output": true,
@@ -301,8 +295,8 @@ The server actually binds to `0.0.0.0:5001`, so devices on the same LAN can usua
     "provider": "deterministic"
   },
   "claude_mapping": {
-    "fast": "deepseek-chat",
-    "slow": "deepseek-reasoner"
+    "fast": "deepseek-v4-flash",
+    "slow": "deepseek-v4-pro"
   },
   "admin": {
     "jwt_expire_hours": 24

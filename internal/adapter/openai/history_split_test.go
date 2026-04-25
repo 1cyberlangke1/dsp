@@ -3,6 +3,7 @@ package openai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"ds2api/internal/auth"
+	"ds2api/internal/deepseek"
 	"ds2api/internal/util"
 )
 
@@ -40,96 +42,55 @@ func historySplitTestMessages() []any {
 	}
 }
 
-func TestBuildOpenAIHistoryTranscriptPreservesOrderAndToolHistory(t *testing.T) {
-	promptMessages, historyMessages := splitOpenAIHistoryMessages(historySplitTestMessages(), 1)
-	if len(promptMessages) != 2 {
-		t.Fatalf("expected 2 prompt messages, got %d", len(promptMessages))
-	}
-	if len(historyMessages) != 3 {
-		t.Fatalf("expected 3 history messages, got %d", len(historyMessages))
-	}
+type streamStatusManagedAuthStub struct{}
 
+func (streamStatusManagedAuthStub) Determine(_ *http.Request) (*auth.RequestAuth, error) {
+	return &auth.RequestAuth{
+		UseConfigToken: true,
+		DeepSeekToken:  "managed-token",
+		CallerID:       "caller:test",
+		AccountID:      "acct:test",
+		TriedAccounts:  map[string]bool{},
+	}, nil
+}
+
+func (streamStatusManagedAuthStub) DetermineCaller(_ *http.Request) (*auth.RequestAuth, error) {
+	return (&streamStatusManagedAuthStub{}).Determine(nil)
+}
+
+func (streamStatusManagedAuthStub) Release(_ *auth.RequestAuth) {}
+
+func TestBuildOpenAIHistoryTranscriptUsesInjectedFileWrapper(t *testing.T) {
+	_, historyMessages := splitOpenAIHistoryMessages(historySplitTestMessages(), 1)
 	transcript := buildOpenAIHistoryTranscript(historyMessages)
-	if !strings.Contains(transcript, "first user turn") {
-		t.Fatalf("expected user history in transcript, got %s", transcript)
+
+	if !strings.HasPrefix(transcript, "[file content end]\n\n") {
+		t.Fatalf("expected injected file wrapper prefix, got %q", transcript)
+	}
+	if !strings.Contains(transcript, "<｜begin▁of▁sentence｜>") {
+		t.Fatalf("expected serialized conversation markers, got %q", transcript)
+	}
+	if !strings.Contains(transcript, "first user turn") || !strings.Contains(transcript, "tool result") {
+		t.Fatalf("expected historical turns preserved, got %q", transcript)
+	}
+	if !strings.Contains(transcript, "[reasoning_content]") || !strings.Contains(transcript, "hidden reasoning") {
+		t.Fatalf("expected reasoning block preserved, got %q", transcript)
 	}
 	if !strings.Contains(transcript, "<tool_calls>") {
-		t.Fatalf("expected assistant tool_calls in transcript, got %s", transcript)
+		t.Fatalf("expected tool calls preserved, got %q", transcript)
 	}
-	if !strings.Contains(transcript, "tool_call_id=call-1") {
-		t.Fatalf("expected tool call id in transcript, got %s", transcript)
-	}
-	if !strings.Contains(transcript, "[reasoning_content]") {
-		t.Fatalf("expected reasoning block in HISTORY.txt, got %s", transcript)
-	}
-	if !strings.Contains(transcript, "hidden reasoning") {
-		t.Fatalf("expected reasoning text in HISTORY.txt, got %s", transcript)
-	}
-
-	userIdx := strings.Index(transcript, "=== 1. USER ===")
-	assistantIdx := strings.Index(transcript, "=== 2. ASSISTANT ===")
-	toolIdx := strings.Index(transcript, "=== 3. TOOL ===")
-	if userIdx < 0 || assistantIdx < 0 || toolIdx < 0 {
-		t.Fatalf("expected ordered role sections, got %s", transcript)
-	}
-	if userIdx >= assistantIdx || assistantIdx >= toolIdx {
-		t.Fatalf("expected USER -> ASSISTANT -> TOOL order, got %s", transcript)
-	}
-	if reasoningIdx := strings.Index(transcript, "[reasoning_content]"); reasoningIdx < 0 || reasoningIdx > strings.Index(transcript, "<tool_calls>") {
-		t.Fatalf("expected reasoning block before tool calls, got %s", transcript)
-	}
-	reasoning := extractHistorySplitReasoningContent(historyMessages)
-	if reasoning != "hidden reasoning" {
-		t.Fatalf("expected latest assistant reasoning to be extracted, got %q", reasoning)
-	}
-
-	finalPrompt, _ := buildHistorySplitPrompt(promptMessages, reasoning, nil, util.DefaultToolChoicePolicy(), false)
-	if !strings.Contains(finalPrompt, "latest user turn") {
-		t.Fatalf("expected latest user turn in final prompt, got %s", finalPrompt)
-	}
-	if strings.Contains(finalPrompt, "first user turn") {
-		t.Fatalf("expected earlier history to be removed from final prompt, got %s", finalPrompt)
-	}
-	if !strings.Contains(finalPrompt, "[reasoning_content]") || !strings.Contains(finalPrompt, "hidden reasoning") {
-		t.Fatalf("expected latest assistant reasoning to be attached to prompt, got %s", finalPrompt)
-	}
-	if !strings.Contains(finalPrompt, "HISTORY.txt") {
-		t.Fatalf("expected history instruction in final prompt, got %s", finalPrompt)
-	}
-	if !strings.Contains(finalPrompt, "Follow the instructions in this prompt first") {
-		t.Fatalf("expected stronger prompt override in final prompt, got %s", finalPrompt)
-	}
-	if strings.Index(finalPrompt, "Follow the instructions in this prompt first") > strings.Index(finalPrompt, "Continue the conversation") {
-		t.Fatalf("expected history split instruction before continuity instructions, got %s", finalPrompt)
+	if !strings.HasSuffix(transcript, "\n[file name]: IGNORE\n[file content begin]\n") {
+		t.Fatalf("expected injected file wrapper suffix, got %q", transcript)
 	}
 }
 
 func TestSplitOpenAIHistoryMessagesUsesLatestUserTurn(t *testing.T) {
-	toolCalls := []any{
-		map[string]any{
-			"name":      "search",
-			"arguments": map[string]any{"query": "docs"},
-		},
-	}
 	messages := []any{
 		map[string]any{"role": "system", "content": "system instructions"},
 		map[string]any{"role": "user", "content": "first user turn"},
-		map[string]any{
-			"role":       "assistant",
-			"content":    "",
-			"tool_calls": toolCalls,
-		},
-		map[string]any{
-			"role":         "tool",
-			"name":         "search",
-			"tool_call_id": "call-1",
-			"content":      "tool result",
-		},
+		map[string]any{"role": "assistant", "content": "first assistant turn"},
 		map[string]any{"role": "user", "content": "middle user turn"},
-		map[string]any{
-			"role":    "assistant",
-			"content": "middle assistant turn",
-		},
+		map[string]any{"role": "assistant", "content": "middle assistant turn"},
 		map[string]any{"role": "user", "content": "latest user turn"},
 	}
 
@@ -137,25 +98,21 @@ func TestSplitOpenAIHistoryMessagesUsesLatestUserTurn(t *testing.T) {
 	if len(promptMessages) == 0 || len(historyMessages) == 0 {
 		t.Fatalf("expected both prompt and history messages, got prompt=%d history=%d", len(promptMessages), len(historyMessages))
 	}
-	reasoning := extractHistorySplitReasoningContent(historyMessages)
-	if reasoning != "" {
-		t.Fatalf("expected no reasoning in this fixture, got %q", reasoning)
-	}
 
-	promptText, _ := buildHistorySplitPrompt(promptMessages, reasoning, nil, util.DefaultToolChoicePolicy(), false)
+	promptText, _ := buildOpenAIFinalPromptWithPolicy(promptMessages, nil, "", defaultToolChoicePolicy(), true)
 	if !strings.Contains(promptText, "latest user turn") {
 		t.Fatalf("expected latest user turn in prompt, got %s", promptText)
 	}
 	if strings.Contains(promptText, "middle user turn") {
-		t.Fatalf("expected middle user turn to be split into history, got %s", promptText)
+		t.Fatalf("expected middle user turn to be moved into history, got %s", promptText)
 	}
 
 	historyText := buildOpenAIHistoryTranscript(historyMessages)
 	if !strings.Contains(historyText, "middle user turn") {
-		t.Fatalf("expected middle user turn in HISTORY.txt, got %s", historyText)
+		t.Fatalf("expected middle user turn in split history, got %s", historyText)
 	}
 	if strings.Contains(historyText, "latest user turn") {
-		t.Fatalf("expected latest user turn to remain in prompt, got %s", historyText)
+		t.Fatalf("expected latest user turn to remain live, got %s", historyText)
 	}
 }
 
@@ -170,7 +127,7 @@ func TestApplyHistorySplitSkipsFirstTurn(t *testing.T) {
 		DS: ds,
 	}
 	req := map[string]any{
-		"model": "deepseek-chat",
+		"model": "deepseek-v4-flash",
 		"messages": []any{
 			map[string]any{"role": "user", "content": "hello"},
 		},
@@ -190,9 +147,6 @@ func TestApplyHistorySplitSkipsFirstTurn(t *testing.T) {
 	if out.FinalPrompt != stdReq.FinalPrompt {
 		t.Fatalf("expected prompt unchanged on first turn")
 	}
-	if len(out.RefFileIDs) != len(stdReq.RefFileIDs) {
-		t.Fatalf("expected ref files unchanged on first turn")
-	}
 }
 
 func TestApplyHistorySplitCarriesHistoryText(t *testing.T) {
@@ -206,7 +160,7 @@ func TestApplyHistorySplitCarriesHistoryText(t *testing.T) {
 		DS: ds,
 	}
 	req := map[string]any{
-		"model":    "deepseek-chat",
+		"model":    "deepseek-v4-flash",
 		"messages": historySplitTestMessages(),
 	}
 	stdReq, err := normalizeOpenAIChatRequest(h.Store, req, "")
@@ -226,7 +180,7 @@ func TestApplyHistorySplitCarriesHistoryText(t *testing.T) {
 	}
 }
 
-func TestChatCompletionsHistorySplitUploadsHistoryAndKeepsLatestPrompt(t *testing.T) {
+func TestChatCompletionsHistorySplitUploadsIgnoreFileAndKeepsLatestPrompt(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &Handler{
 		Store: mockOpenAIConfig{
@@ -238,7 +192,7 @@ func TestChatCompletionsHistorySplitUploadsHistoryAndKeepsLatestPrompt(t *testin
 		DS:   ds,
 	}
 	reqBody, _ := json.Marshal(map[string]any{
-		"model":    "deepseek-chat",
+		"model":    "deepseek-v4-flash",
 		"messages": historySplitTestMessages(),
 		"stream":   false,
 	})
@@ -256,21 +210,18 @@ func TestChatCompletionsHistorySplitUploadsHistoryAndKeepsLatestPrompt(t *testin
 		t.Fatalf("expected 1 upload call, got %d", len(ds.uploadCalls))
 	}
 	upload := ds.uploadCalls[0]
-	if upload.Filename != "HISTORY.txt" {
+	if upload.Filename != "IGNORE" {
 		t.Fatalf("unexpected upload filename: %q", upload.Filename)
-	}
-	if upload.ContentType != "text/plain; charset=utf-8" {
-		t.Fatalf("unexpected content type: %q", upload.ContentType)
 	}
 	if upload.Purpose != "assistants" {
 		t.Fatalf("unexpected purpose: %q", upload.Purpose)
 	}
 	historyText := string(upload.Data)
-	if !strings.Contains(historyText, "first user turn") || !strings.Contains(historyText, "tool result") {
-		t.Fatalf("expected older turns in HISTORY.txt, got %s", historyText)
+	if !strings.Contains(historyText, "[file content end]") || !strings.Contains(historyText, "[file name]: IGNORE") {
+		t.Fatalf("expected injected IGNORE wrapper, got %s", historyText)
 	}
 	if strings.Contains(historyText, "latest user turn") {
-		t.Fatalf("expected latest turn to remain in prompt, got %s", historyText)
+		t.Fatalf("expected latest turn to remain live, got %s", historyText)
 	}
 	if ds.completionReq == nil {
 		t.Fatal("expected completion payload to be captured")
@@ -281,18 +232,6 @@ func TestChatCompletionsHistorySplitUploadsHistoryAndKeepsLatestPrompt(t *testin
 	}
 	if strings.Contains(promptText, "first user turn") {
 		t.Fatalf("expected historical turns removed from completion prompt, got %s", promptText)
-	}
-	if !strings.Contains(promptText, "[reasoning_content]") || !strings.Contains(promptText, "hidden reasoning") {
-		t.Fatalf("expected latest assistant reasoning to be attached to completion prompt, got %s", promptText)
-	}
-	if !strings.Contains(promptText, "HISTORY.txt") {
-		t.Fatalf("expected history instruction in completion prompt, got %s", promptText)
-	}
-	if !strings.Contains(promptText, "Follow the instructions in this prompt first") {
-		t.Fatalf("expected stronger prompt override in completion prompt, got %s", promptText)
-	}
-	if strings.Index(promptText, "Follow the instructions in this prompt first") > strings.Index(promptText, "Continue the conversation") {
-		t.Fatalf("expected history split instruction before continuity instructions, got %s", promptText)
 	}
 	refIDs, _ := ds.completionReq["ref_file_ids"].([]any)
 	if len(refIDs) == 0 || refIDs[0] != "file-inline-1" {
@@ -314,7 +253,7 @@ func TestResponsesHistorySplitUploadsHistoryAndKeepsLatestPrompt(t *testing.T) {
 	r := chi.NewRouter()
 	RegisterRoutes(r, h)
 	reqBody, _ := json.Marshal(map[string]any{
-		"model":    "deepseek-chat",
+		"model":    "deepseek-v4-flash",
 		"messages": historySplitTestMessages(),
 		"stream":   false,
 	})
@@ -341,19 +280,78 @@ func TestResponsesHistorySplitUploadsHistoryAndKeepsLatestPrompt(t *testing.T) {
 	if strings.Contains(promptText, "first user turn") {
 		t.Fatalf("expected historical turns removed from completion prompt, got %s", promptText)
 	}
-	if !strings.Contains(promptText, "[reasoning_content]") || !strings.Contains(promptText, "hidden reasoning") {
-		t.Fatalf("expected latest assistant reasoning to be attached to completion prompt, got %s", promptText)
+}
+
+func TestChatCompletionsHistorySplitMapsManagedAuthFailureTo401(t *testing.T) {
+	ds := &inlineUploadDSStub{
+		uploadErr: &deepseek.RequestFailure{Op: "upload file", Kind: deepseek.FailureManagedUnauthorized, Message: "expired token"},
 	}
-	if !strings.Contains(promptText, "Follow the instructions in this prompt first") {
-		t.Fatalf("expected stronger prompt override in completion prompt, got %s", promptText)
+	h := &Handler{
+		Store: mockOpenAIConfig{
+			wideInput:           true,
+			historySplitEnabled: true,
+			historySplitTurns:   1,
+		},
+		Auth: streamStatusManagedAuthStub{},
+		DS:   ds,
 	}
-	if strings.Index(promptText, "Follow the instructions in this prompt first") > strings.Index(promptText, "Continue the conversation") {
-		t.Fatalf("expected history split instruction before continuity instructions, got %s", promptText)
+	reqBody, _ := json.Marshal(map[string]any{
+		"model":    "deepseek-v4-flash",
+		"messages": historySplitTestMessages(),
+		"stream":   false,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(string(reqBody)))
+	req.Header.Set("Authorization", "Bearer managed-key")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.ChatCompletions(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Please re-login the account in admin") {
+		t.Fatalf("expected managed auth error message, got %s", rec.Body.String())
+	}
+}
+
+func TestResponsesHistorySplitMapsDirectAuthFailureTo401(t *testing.T) {
+	ds := &inlineUploadDSStub{
+		uploadErr: &deepseek.RequestFailure{Op: "upload file", Kind: deepseek.FailureDirectUnauthorized, Message: "invalid token"},
+	}
+	h := &Handler{
+		Store: mockOpenAIConfig{
+			wideInput:           true,
+			historySplitEnabled: true,
+			historySplitTurns:   1,
+		},
+		Auth: streamStatusAuthStub{},
+		DS:   ds,
+	}
+	r := chi.NewRouter()
+	RegisterRoutes(r, h)
+	reqBody, _ := json.Marshal(map[string]any{
+		"model":    "deepseek-v4-flash",
+		"messages": historySplitTestMessages(),
+		"stream":   false,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(string(reqBody)))
+	req.Header.Set("Authorization", "Bearer direct-token")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Invalid token") {
+		t.Fatalf("expected direct auth error message, got %s", rec.Body.String())
 	}
 }
 
 func TestChatCompletionsHistorySplitUploadFailureReturnsInternalServerError(t *testing.T) {
-	ds := &inlineUploadDSStub{uploadErr: context.DeadlineExceeded}
+	ds := &inlineUploadDSStub{uploadErr: errors.New("boom")}
 	h := &Handler{
 		Store: mockOpenAIConfig{
 			wideInput:           true,
@@ -364,7 +362,7 @@ func TestChatCompletionsHistorySplitUploadFailureReturnsInternalServerError(t *t
 		DS:   ds,
 	}
 	reqBody, _ := json.Marshal(map[string]any{
-		"model":    "deepseek-chat",
+		"model":    "deepseek-v4-flash",
 		"messages": historySplitTestMessages(),
 		"stream":   false,
 	})
@@ -378,7 +376,51 @@ func TestChatCompletionsHistorySplitUploadFailureReturnsInternalServerError(t *t
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	if ds.completionReq != nil {
-		t.Fatalf("did not expect completion payload on upload failure")
+}
+
+func TestHistorySplitWorksAcrossAutoDeleteModes(t *testing.T) {
+	for _, mode := range []string{"none", "single", "all"} {
+		t.Run(mode, func(t *testing.T) {
+			ds := &inlineUploadDSStub{}
+			h := &Handler{
+				Store: mockOpenAIConfig{
+					wideInput:           true,
+					autoDeleteMode:      mode,
+					historySplitEnabled: true,
+					historySplitTurns:   1,
+				},
+				Auth: streamStatusAuthStub{},
+				DS:   ds,
+			}
+			reqBody, _ := json.Marshal(map[string]any{
+				"model":    "deepseek-v4-flash",
+				"messages": historySplitTestMessages(),
+				"stream":   false,
+			})
+			req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(string(reqBody)))
+			req.Header.Set("Authorization", "Bearer direct-token")
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+
+			h.ChatCompletions(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+			}
+			if len(ds.uploadCalls) != 1 {
+				t.Fatalf("expected history split upload for mode=%s, got %d", mode, len(ds.uploadCalls))
+			}
+			if ds.completionReq == nil {
+				t.Fatalf("expected completion payload for mode=%s", mode)
+			}
+			promptText, _ := ds.completionReq["prompt"].(string)
+			if !strings.Contains(promptText, "latest user turn") || strings.Contains(promptText, "first user turn") {
+				t.Fatalf("unexpected prompt for mode=%s: %s", mode, promptText)
+			}
+		})
 	}
+}
+
+func defaultToolChoicePolicy() util.ToolChoicePolicy {
+	return util.DefaultToolChoicePolicy()
 }

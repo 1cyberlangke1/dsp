@@ -105,11 +105,15 @@ func (c *Client) GetPowForTarget(ctx context.Context, a *auth.RequestAuth, targe
 	clients := c.requestClientsForAuth(ctx, a)
 	attempts := 0
 	refreshed := false
+	lastFailureKind := FailureUnknown
+	lastFailureMessage := ""
 	for attempts < maxAttempts {
 		headers := c.authHeaders(a.DeepSeekToken)
 		resp, status, err := c.postJSONWithStatus(ctx, clients.regular, clients.fallback, DeepSeekCreatePowURL, headers, map[string]any{"target_path": targetPath})
 		if err != nil {
 			config.Logger.Warn("[get_pow] request error", "error", err, "account", a.AccountID, "target_path", targetPath)
+			lastFailureKind = FailureUnknown
+			lastFailureMessage = err.Error()
 			attempts++
 			continue
 		}
@@ -126,6 +130,12 @@ func (c *Client) GetPowForTarget(ctx context.Context, a *auth.RequestAuth, targe
 			return BuildPowHeader(challenge, answer)
 		}
 		config.Logger.Warn("[get_pow] failed", "status", status, "code", code, "biz_code", bizCode, "msg", msg, "biz_msg", bizMsg, "use_config_token", a.UseConfigToken, "account", a.AccountID, "target_path", targetPath)
+		lastFailureMessage = failureMessage(msg, bizMsg, "get pow failed")
+		if isTokenInvalid(status, code, bizCode, msg, bizMsg) || isAuthIndicativeBizFailure(msg, bizMsg) {
+			lastFailureKind = authFailureKind(a.UseConfigToken)
+		} else {
+			lastFailureKind = FailureUnknown
+		}
 		if a.UseConfigToken {
 			if !refreshed && shouldAttemptRefresh(status, code, bizCode, msg, bizMsg) {
 				if c.Auth.RefreshToken(ctx, a) {
@@ -140,6 +150,9 @@ func (c *Client) GetPowForTarget(ctx context.Context, a *auth.RequestAuth, targe
 			}
 		}
 		attempts++
+	}
+	if lastFailureKind != FailureUnknown {
+		return "", &RequestFailure{Op: "get pow", Kind: lastFailureKind, Message: lastFailureMessage}
 	}
 	return "", errors.New("get pow failed")
 }
@@ -208,6 +221,23 @@ func isAuthIndicativeBizFailure(msg string, bizMsg string) bool {
 		}
 	}
 	return false
+}
+
+func authFailureKind(useConfigToken bool) FailureKind {
+	if useConfigToken {
+		return FailureManagedUnauthorized
+	}
+	return FailureDirectUnauthorized
+}
+
+func failureMessage(msg string, bizMsg string, fallback string) string {
+	if trimmed := strings.TrimSpace(bizMsg); trimmed != "" {
+		return trimmed
+	}
+	if trimmed := strings.TrimSpace(msg); trimmed != "" {
+		return trimmed
+	}
+	return strings.TrimSpace(fallback)
 }
 
 // DeepSeek has returned create-session ids in both biz_data.id and

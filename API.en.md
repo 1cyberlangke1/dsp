@@ -194,18 +194,12 @@ No auth required. Returns the currently supported DeepSeek native model list.
 {
   "object": "list",
   "data": [
-    {"id": "deepseek-chat", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-reasoner", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-chat-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-reasoner-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-expert-chat", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-expert-reasoner", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-expert-chat-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-expert-reasoner-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-vision-chat", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-vision-reasoner", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-vision-chat-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-vision-reasoner-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []}
+    {"id": "deepseek-v4-flash", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
+    {"id": "deepseek-v4-pro", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
+    {"id": "deepseek-v4-flash-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
+    {"id": "deepseek-v4-pro-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
+    {"id": "deepseek-v4-vision", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
+    {"id": "deepseek-v4-vision-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []}
   ]
 }
 ```
@@ -254,14 +248,14 @@ Content-Type: application/json
   "id": "<chat_session_id>",
   "object": "chat.completion",
   "created": 1738400000,
-  "model": "deepseek-reasoner",
+  "model": "deepseek-v4-pro",
   "choices": [
     {
       "index": 0,
       "message": {
         "role": "assistant",
         "content": "final response",
-        "reasoning_content": "reasoning trace (reasoner models)"
+        "reasoning_content": "reasoning trace (when thinking is enabled)"
       },
       "finish_reason": "stop"
     }
@@ -296,7 +290,7 @@ data: [DONE]
 **Field notes**:
 
 - First delta includes `role: assistant`
-- `deepseek-reasoner` / `deepseek-reasoner-search` models emit `delta.reasoning_content`
+- When thinking is enabled, the stream may emit `delta.reasoning_content`
 - Text emits `delta.content`
 - Last chunk includes `finish_reason` and `usage`
 - Token counting prefers pass-through from upstream DeepSeek SSE (`accumulated_token_usage` / `token_usage`), and only falls back to local estimation when upstream usage is absent
@@ -673,8 +667,8 @@ Returns sanitized config, including both `keys` and `api_keys`.
     }
   ],
   "claude_mapping": {
-    "fast": "deepseek-chat",
-    "slow": "deepseek-reasoner"
+    "fast": "deepseek-v4-flash",
+    "slow": "deepseek-v4-pro"
   }
 }
 ```
@@ -697,8 +691,8 @@ If both `api_keys` and `keys` are sent, the structured `api_keys` entries win so
     {"email": "user@example.com", "password": "pwd", "token": ""}
   ],
   "claude_mapping": {
-    "fast": "deepseek-chat",
-    "slow": "deepseek-reasoner"
+    "fast": "deepseek-v4-flash",
+    "slow": "deepseek-v4-pro"
   }
 }
 ```
@@ -903,7 +897,7 @@ Updates proxy binding for a specific account.
 | Field | Required | Notes |
 | --- | --- | --- |
 | `identifier` | ✅ | email / mobile / token-only synthetic id |
-| `model` | ❌ | default `deepseek-chat` |
+| `model` | ❌ | default `deepseek-v4-flash` |
 | `message` | ❌ | if empty, only session creation is tested |
 
 **Response**:
@@ -914,7 +908,7 @@ Updates proxy binding for a specific account.
   "success": true,
   "response_time": 1240,
   "message": "API test successful (session creation only)",
-  "model": "deepseek-chat",
+  "model": "deepseek-v4-flash",
   "session_count": 0,
   "config_writable": true
 }
@@ -985,7 +979,7 @@ Test API availability through the service itself.
 
 | Field | Required | Default |
 | --- | --- | --- |
-| `model` | ❌ | `deepseek-chat` |
+| `model` | ❌ | `deepseek-v4-flash` |
 | `message` | ❌ | `你好` |
 | `api_key` | ❌ | First key in config |
 
@@ -1009,7 +1003,7 @@ Common request fields:
 | --- | --- | --- | --- |
 | `message` | No | `你好` | Convenience single-turn user message |
 | `messages` | No | Auto-derived from `message` | OpenAI-style message array |
-| `model` | No | `deepseek-chat` | Target model |
+| `model` | No | `deepseek-v4-flash` | Target model |
 | `stream` | No | `true` | Recommended to keep streaming enabled so raw SSE is recorded |
 | `api_key` | No | First configured key | Business API key to use |
 | `sample_id` | No | Auto-generated | Sample directory name |
@@ -1219,7 +1213,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-chat",
+    "model": "deepseek-v4-flash",
     "messages": [{"role": "user", "content": "Hello"}],
     "stream": false
   }'
@@ -1232,7 +1226,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-reasoner",
+    "model": "deepseek-v4-pro",
     "messages": [{"role": "user", "content": "Explain quantum entanglement"}],
     "stream": true
   }'
@@ -1270,7 +1264,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-chat-search",
+    "model": "deepseek-v4-flash-search",
     "messages": [{"role": "user", "content": "Latest news today"}],
     "stream": true
   }'
@@ -1283,7 +1277,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-chat",
+    "model": "deepseek-v4-flash",
     "messages": [{"role": "user", "content": "What is the weather in Beijing?"}],
     "tools": [
       {
@@ -1381,7 +1375,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "X-Ds2-Target-Account: user@example.com" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-chat",
+    "model": "deepseek-v4-flash",
     "messages": [{"role": "user", "content": "Hello"}]
   }'
 ```

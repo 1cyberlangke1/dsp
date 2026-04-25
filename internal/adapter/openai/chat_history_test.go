@@ -63,7 +63,7 @@ func TestChatCompletionsNonStreamPersistsHistory(t *testing.T) {
 		ChatHistory: historyStore,
 	}
 
-	reqBody := `{"model":"deepseek-chat","messages":[{"role":"system","content":"be precise"},{"role":"user","content":"hi there"},{"role":"assistant","content":"previous answer"}],"stream":false}`
+	reqBody := `{"model":"deepseek-v4-flash","messages":[{"role":"system","content":"be precise"},{"role":"user","content":"hi there"},{"role":"assistant","content":"previous answer"}],"stream":false}`
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(reqBody))
 	req.Header.Set("Authorization", "Bearer direct-token")
 	req.Header.Set("Content-Type", "application/json")
@@ -115,7 +115,7 @@ func TestStartChatHistoryRecoversFromTransientWriteFailure(t *testing.T) {
 		AccountID: "acct:test",
 	}
 	stdReq := util.StandardRequest{
-		ResponseModel: "deepseek-chat",
+		ResponseModel: "deepseek-v4-flash",
 		Stream:        true,
 		Messages: []any{
 			map[string]any{"role": "user", "content": "hello"},
@@ -172,7 +172,7 @@ func TestHandleStreamContextCancelledMarksHistoryStopped(t *testing.T) {
 	historyStore := newTestChatHistoryStore(t)
 	entry, err := historyStore.Start(chathistory.StartParams{
 		CallerID:  "caller:test",
-		Model:     "deepseek-chat",
+		Model:     "deepseek-v4-flash",
 		Stream:    true,
 		UserInput: "hello",
 	})
@@ -194,7 +194,7 @@ func TestHandleStreamContextCancelledMarksHistoryStopped(t *testing.T) {
 	rec := httptest.NewRecorder()
 	resp := makeOpenAISSEHTTPResponse(`data: {"p":"response/content","v":"hello"}`, `data: [DONE]`)
 
-	h.handleStream(rec, req, resp, "cid-stop", "deepseek-chat", "prompt", false, false, nil, session)
+	h.handleStream(rec, req, resp, "cid-stop", "deepseek-v4-flash", "prompt", false, false, nil, session)
 
 	snapshot, err := historyStore.Snapshot()
 	if err != nil {
@@ -221,7 +221,7 @@ func TestChatCompletionsSkipsAdminWebUISource(t *testing.T) {
 		ChatHistory: historyStore,
 	}
 
-	reqBody := `{"model":"deepseek-chat","messages":[{"role":"user","content":"hi there"}],"stream":false}`
+	reqBody := `{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"hi there"}],"stream":false}`
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(reqBody))
 	req.Header.Set("Authorization", "Bearer direct-token")
 	req.Header.Set("Content-Type", "application/json")
@@ -253,7 +253,7 @@ func TestChatCompletionsSkipsHistoryWhenDisabled(t *testing.T) {
 		ChatHistory: historyStore,
 	}
 
-	reqBody := `{"model":"deepseek-chat","messages":[{"role":"user","content":"hi there"}],"stream":false}`
+	reqBody := `{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"hi there"}],"stream":false}`
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(reqBody))
 	req.Header.Set("Authorization", "Bearer direct-token")
 	req.Header.Set("Content-Type", "application/json")
@@ -286,7 +286,7 @@ func TestChatCompletionsHistorySplitPersistsHistoryText(t *testing.T) {
 		ChatHistory: historyStore,
 	}
 
-	reqBody := `{"model":"deepseek-chat","messages":[{"role":"system","content":"system instructions"},{"role":"user","content":"first user turn"},{"role":"assistant","content":"","reasoning_content":"hidden reasoning","tool_calls":[{"name":"search","arguments":{"query":"docs"}}]},{"role":"tool","name":"search","tool_call_id":"call-1","content":"tool result"},{"role":"user","content":"latest user turn"}],"stream":false}`
+	reqBody := `{"model":"deepseek-v4-flash","messages":[{"role":"system","content":"system instructions"},{"role":"user","content":"first user turn"},{"role":"assistant","content":"","reasoning_content":"hidden reasoning","tool_calls":[{"name":"search","arguments":{"query":"docs"}}]},{"role":"tool","name":"search","tool_call_id":"call-1","content":"tool result"},{"role":"user","content":"latest user turn"}],"stream":false}`
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(reqBody))
 	req.Header.Set("Authorization", "Bearer direct-token")
 	req.Header.Set("Content-Type", "application/json")

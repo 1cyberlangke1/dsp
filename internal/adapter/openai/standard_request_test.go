@@ -27,8 +27,11 @@ func TestNormalizeOpenAIChatRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("normalize failed: %v", err)
 	}
-	if n.ResolvedModel != "deepseek-reasoner" {
+	if n.ResolvedModel != "deepseek-v4-pro" {
 		t.Fatalf("unexpected resolved model: %s", n.ResolvedModel)
+	}
+	if !n.Thinking {
+		t.Fatalf("expected thinking enabled by default")
 	}
 	if !n.Stream {
 		t.Fatalf("expected stream=true")
@@ -82,11 +85,54 @@ func TestNormalizeOpenAIResponsesRequestInput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("normalize failed: %v", err)
 	}
-	if n.ResolvedModel != "deepseek-chat" {
+	if n.ResolvedModel != "deepseek-v4-flash" {
 		t.Fatalf("unexpected resolved model: %s", n.ResolvedModel)
+	}
+	if !n.Thinking {
+		t.Fatalf("expected thinking enabled by default for responses")
 	}
 	if len(n.Messages) != 2 {
 		t.Fatalf("expected 2 normalized messages, got %d", len(n.Messages))
+	}
+}
+
+func TestNormalizeOpenAIChatRequestThinkingOverrides(t *testing.T) {
+	store := newEmptyStoreForNormalizeTest(t)
+	req := map[string]any{
+		"model": "gpt-4o",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "hello"},
+		},
+		"thinking": map[string]any{"type": "disabled"},
+		"extra_body": map[string]any{
+			"thinking": map[string]any{"type": "enabled"},
+		},
+		"reasoning_effort": "high",
+	}
+	n, err := normalizeOpenAIChatRequest(store, req, "")
+	if err != nil {
+		t.Fatalf("normalize failed: %v", err)
+	}
+	if n.Thinking {
+		t.Fatalf("expected top-level thinking override to disable thinking")
+	}
+}
+
+func TestNormalizeOpenAIResponsesRequestThinkingExtraBodyFallback(t *testing.T) {
+	store := newEmptyStoreForNormalizeTest(t)
+	req := map[string]any{
+		"model": "gpt-4o",
+		"input": "ping",
+		"extra_body": map[string]any{
+			"thinking": map[string]any{"type": "disabled"},
+		},
+	}
+	n, err := normalizeOpenAIResponsesRequest(store, req, "")
+	if err != nil {
+		t.Fatalf("normalize failed: %v", err)
+	}
+	if n.Thinking {
+		t.Fatalf("expected extra_body thinking override to disable thinking")
 	}
 }
 

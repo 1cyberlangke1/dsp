@@ -114,18 +114,12 @@ flowchart LR
 
 | 模型类型 | 模型 ID | thinking | search |
 | --- | --- | --- | --- |
-| default | `deepseek-chat` | ❌ | ❌ |
-| default | `deepseek-reasoner` | ✅ | ❌ |
-| default | `deepseek-chat-search` | ❌ | ✅ |
-| default | `deepseek-reasoner-search` | ✅ | ✅ |
-| expert | `deepseek-expert-chat` | ❌ | ❌ |
-| expert | `deepseek-expert-reasoner` | ✅ | ❌ |
-| expert | `deepseek-expert-chat-search` | ❌ | ✅ |
-| expert | `deepseek-expert-reasoner-search` | ✅ | ✅ |
-| vision | `deepseek-vision-chat` | ❌ | ❌ |
-| vision | `deepseek-vision-reasoner` | ✅ | ❌ |
-| vision | `deepseek-vision-chat-search` | ❌ | ✅ |
-| vision | `deepseek-vision-reasoner-search` | ✅ | ✅ |
+| default | `deepseek-v4-flash` | 默认开启，可由请求参数控制 | ❌ |
+| expert | `deepseek-v4-pro` | 默认开启，可由请求参数控制 | ❌ |
+| default | `deepseek-v4-flash-search` | 默认开启，可由请求参数控制 | ✅ |
+| expert | `deepseek-v4-pro-search` | 默认开启，可由请求参数控制 | ✅ |
+| vision | `deepseek-v4-vision` | 默认开启，可由请求参数控制 | ❌ |
+| vision | `deepseek-v4-vision-search` | 默认开启，可由请求参数控制 | ✅ |
 
 除原生模型外，也支持常见 alias 输入（如 `gpt-5`、`gpt-5-mini`、`gpt-5-codex`、`gpt-4.1`、`o3`、`claude-opus-4-6`、`claude-sonnet-4-5`、`gemini-2.5-pro`、`gemini-2.5-flash` 等），但 `/v1/models` 返回的是规范化后的 DeepSeek 原生模型 ID。
 
@@ -133,9 +127,9 @@ flowchart LR
 
 | 当前常用模型 | 默认映射 |
 | --- | --- |
-| `claude-sonnet-4-5` | `deepseek-chat` |
-| `claude-haiku-4-5`（兼容 `claude-3-5-haiku-latest`） | `deepseek-chat` |
-| `claude-opus-4-6` | `deepseek-reasoner` |
+| `claude-sonnet-4-5` | `deepseek-v4-flash` |
+| `claude-haiku-4-5`（兼容 `claude-3-5-haiku-latest`） | `deepseek-v4-flash` |
+| `claude-opus-4-6` | `deepseek-v4-pro` |
 
 可通过配置中的 `claude_mapping` 或 `claude_model_mapping` 覆盖映射关系。
 `/anthropic/v1/models` 除上述当前主别名外，还会返回 Claude 4.x snapshots，以及 3.x / 2.x / 1.x 历史模型 ID 与常见 alias，便于旧客户端直接兼容。
@@ -293,13 +287,13 @@ go run ./cmd/ds2api
     }
   ],
   "model_aliases": {
-    "gpt-4o": "deepseek-chat",
-    "gpt-5": "deepseek-chat",
-    "gpt-5-mini": "deepseek-chat",
-    "gpt-5-codex": "deepseek-reasoner",
-    "o3": "deepseek-reasoner",
-    "claude-opus-4-6": "deepseek-reasoner",
-    "gemini-2.5-flash": "deepseek-chat"
+    "gpt-4o": "deepseek-v4-flash",
+    "gpt-5": "deepseek-v4-flash",
+    "gpt-5-mini": "deepseek-v4-flash",
+    "gpt-5-codex": "deepseek-v4-pro",
+    "o3": "deepseek-v4-pro",
+    "claude-opus-4-6": "deepseek-v4-pro",
+    "gemini-2.5-flash": "deepseek-v4-flash"
   },
   "compat": {
     "wide_input_strict_output": true,
@@ -312,8 +306,8 @@ go run ./cmd/ds2api
     "provider": "deterministic"
   },
   "claude_mapping": {
-    "fast": "deepseek-chat",
-    "slow": "deepseek-reasoner"
+    "fast": "deepseek-v4-flash",
+    "slow": "deepseek-v4-pro"
   },
   "admin": {
     "jwt_expire_hours": 24

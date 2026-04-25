@@ -20,25 +20,7 @@ func normalizeResponsesInputItemWithState(m map[string]any, callNameByID map[str
 	role := strings.ToLower(strings.TrimSpace(asString(m["role"])))
 	if role != "" {
 		if role == "assistant" {
-			out := map[string]any{
-				"role": "assistant",
-			}
-			if toolCalls, ok := m["tool_calls"].([]any); ok && len(toolCalls) > 0 {
-				out["tool_calls"] = toolCalls
-			}
-			content := m["content"]
-			if content == nil {
-				if txt, _ := m["text"].(string); strings.TrimSpace(txt) != "" {
-					content = txt
-				}
-			}
-			if content != nil {
-				out["content"] = content
-			}
-			if _, hasToolCalls := out["tool_calls"]; hasToolCalls || out["content"] != nil {
-				return out
-			}
-			return nil
+			return normalizeResponsesAssistantMessage(m)
 		}
 		content := m["content"]
 		if content == nil {
@@ -70,6 +52,10 @@ func normalizeResponsesInputItemWithState(m map[string]any, callNameByID map[str
 	itemType := strings.ToLower(strings.TrimSpace(asString(m["type"])))
 	switch itemType {
 	case "message", "input_message":
+		role := strings.ToLower(strings.TrimSpace(asString(m["role"])))
+		if role == "assistant" {
+			return normalizeResponsesAssistantMessage(m)
+		}
 		content := m["content"]
 		if content == nil {
 			if txt, _ := m["text"].(string); strings.TrimSpace(txt) != "" {
@@ -79,7 +65,6 @@ func normalizeResponsesInputItemWithState(m map[string]any, callNameByID map[str
 		if content == nil {
 			return nil
 		}
-		role := strings.ToLower(strings.TrimSpace(asString(m["role"])))
 		if role == "" {
 			role = "user"
 		}
@@ -188,6 +173,31 @@ func normalizeResponsesInputItemWithState(m map[string]any, callNameByID map[str
 				"content": content,
 			}
 		}
+	}
+	return nil
+}
+
+func normalizeResponsesAssistantMessage(m map[string]any) map[string]any {
+	out := map[string]any{
+		"role": "assistant",
+	}
+	if toolCalls, ok := m["tool_calls"].([]any); ok && len(toolCalls) > 0 {
+		out["tool_calls"] = toolCalls
+	}
+	content := m["content"]
+	if content == nil {
+		if txt, _ := m["text"].(string); strings.TrimSpace(txt) != "" {
+			content = txt
+		}
+	}
+	if content != nil {
+		out["content"] = content
+	}
+	if reasoning := strings.TrimSpace(normalizeOpenAIReasoningContentForPrompt(m["reasoning_content"])); reasoning != "" {
+		out["reasoning_content"] = m["reasoning_content"]
+	}
+	if _, hasToolCalls := out["tool_calls"]; hasToolCalls || out["content"] != nil || out["reasoning_content"] != nil {
+		return out
 	}
 	return nil
 }

@@ -15,18 +15,12 @@ type ModelAliasReader interface {
 }
 
 var DeepSeekModels = []ModelInfo{
-	{ID: "deepseek-chat", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-reasoner", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-chat-search", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-reasoner-search", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-expert-chat", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-expert-reasoner", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-expert-chat-search", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-expert-reasoner-search", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-vision-chat", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-vision-reasoner", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-vision-chat-search", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-vision-reasoner-search", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
+	{ID: "deepseek-v4-flash", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
+	{ID: "deepseek-v4-pro", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
+	{ID: "deepseek-v4-flash-search", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
+	{ID: "deepseek-v4-pro-search", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
+	{ID: "deepseek-v4-vision", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
+	{ID: "deepseek-v4-vision-search", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
 }
 
 var ClaudeModels = []ModelInfo{
@@ -72,29 +66,9 @@ var ClaudeModels = []ModelInfo{
 
 func GetModelConfig(model string) (thinking bool, search bool, ok bool) {
 	switch lower(model) {
-	case "deepseek-chat":
-		return false, false, true
-	case "deepseek-reasoner":
+	case "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-vision":
 		return true, false, true
-	case "deepseek-chat-search":
-		return false, true, true
-	case "deepseek-reasoner-search":
-		return true, true, true
-	case "deepseek-expert-chat":
-		return false, false, true
-	case "deepseek-expert-reasoner":
-		return true, false, true
-	case "deepseek-expert-chat-search":
-		return false, true, true
-	case "deepseek-expert-reasoner-search":
-		return true, true, true
-	case "deepseek-vision-chat":
-		return false, false, true
-	case "deepseek-vision-reasoner":
-		return true, false, true
-	case "deepseek-vision-chat-search":
-		return false, true, true
-	case "deepseek-vision-reasoner-search":
+	case "deepseek-v4-flash-search", "deepseek-v4-pro-search", "deepseek-v4-vision-search":
 		return true, true, true
 	default:
 		return false, false, false
@@ -103,11 +77,11 @@ func GetModelConfig(model string) (thinking bool, search bool, ok bool) {
 
 func GetModelType(model string) (modelType string, ok bool) {
 	switch lower(model) {
-	case "deepseek-chat", "deepseek-reasoner", "deepseek-chat-search", "deepseek-reasoner-search":
+	case "deepseek-v4-flash", "deepseek-v4-flash-search":
 		return "default", true
-	case "deepseek-expert-chat", "deepseek-expert-reasoner", "deepseek-expert-chat-search", "deepseek-expert-reasoner-search":
+	case "deepseek-v4-pro", "deepseek-v4-pro-search":
 		return "expert", true
-	case "deepseek-vision-chat", "deepseek-vision-reasoner", "deepseek-vision-chat-search", "deepseek-vision-reasoner-search":
+	case "deepseek-v4-vision", "deepseek-v4-vision-search":
 		return "vision", true
 	default:
 		return "", false
@@ -121,27 +95,27 @@ func IsSupportedDeepSeekModel(model string) bool {
 
 func DefaultModelAliases() map[string]string {
 	return map[string]string{
-		"gpt-4o":                 "deepseek-chat",
-		"gpt-4.1":                "deepseek-chat",
-		"gpt-4.1-mini":           "deepseek-chat",
-		"gpt-4.1-nano":           "deepseek-chat",
-		"gpt-5":                  "deepseek-chat",
-		"gpt-5-mini":             "deepseek-chat",
-		"gpt-5-codex":            "deepseek-reasoner",
-		"o1":                     "deepseek-reasoner",
-		"o1-mini":                "deepseek-reasoner",
-		"o3":                     "deepseek-reasoner",
-		"o3-mini":                "deepseek-reasoner",
-		"claude-sonnet-4-5":      "deepseek-chat",
-		"claude-haiku-4-5":       "deepseek-chat",
-		"claude-opus-4-6":        "deepseek-reasoner",
-		"claude-3-5-sonnet":      "deepseek-chat",
-		"claude-3-5-haiku":       "deepseek-chat",
-		"claude-3-opus":          "deepseek-reasoner",
-		"gemini-2.5-pro":         "deepseek-chat",
-		"gemini-2.5-flash":       "deepseek-chat",
-		"llama-3.1-70b-instruct": "deepseek-chat",
-		"qwen-max":               "deepseek-chat",
+		"gpt-4o":                 "deepseek-v4-flash",
+		"gpt-4.1":                "deepseek-v4-flash",
+		"gpt-4.1-mini":           "deepseek-v4-flash",
+		"gpt-4.1-nano":           "deepseek-v4-flash",
+		"gpt-5":                  "deepseek-v4-flash",
+		"gpt-5-mini":             "deepseek-v4-flash",
+		"gpt-5-codex":            "deepseek-v4-pro",
+		"o1":                     "deepseek-v4-pro",
+		"o1-mini":                "deepseek-v4-pro",
+		"o3":                     "deepseek-v4-pro",
+		"o3-mini":                "deepseek-v4-pro",
+		"claude-sonnet-4-5":      "deepseek-v4-flash",
+		"claude-haiku-4-5":       "deepseek-v4-flash",
+		"claude-opus-4-6":        "deepseek-v4-pro",
+		"claude-3-5-sonnet":      "deepseek-v4-flash",
+		"claude-3-5-haiku":       "deepseek-v4-flash",
+		"claude-3-opus":          "deepseek-v4-pro",
+		"gemini-2.5-pro":         "deepseek-v4-pro",
+		"gemini-2.5-flash":       "deepseek-v4-flash",
+		"llama-3.1-70b-instruct": "deepseek-v4-flash",
+		"qwen-max":               "deepseek-v4-flash",
 	}
 }
 
@@ -179,23 +153,29 @@ func ResolveModel(store ModelAliasReader, requested string) (string, bool) {
 		return "", false
 	}
 
+	useVision := strings.Contains(model, "vision")
 	useReasoner := strings.Contains(model, "reason") ||
 		strings.Contains(model, "reasoner") ||
 		strings.HasPrefix(model, "o1") ||
 		strings.HasPrefix(model, "o3") ||
 		strings.Contains(model, "opus") ||
+		strings.Contains(model, "slow") ||
 		strings.Contains(model, "r1")
 	useSearch := strings.Contains(model, "search")
 
 	switch {
+	case useVision && useSearch:
+		return "deepseek-v4-vision-search", true
+	case useVision:
+		return "deepseek-v4-vision", true
 	case useReasoner && useSearch:
-		return "deepseek-reasoner-search", true
+		return "deepseek-v4-pro-search", true
 	case useReasoner:
-		return "deepseek-reasoner", true
+		return "deepseek-v4-pro", true
 	case useSearch:
-		return "deepseek-chat-search", true
+		return "deepseek-v4-flash-search", true
 	default:
-		return "deepseek-chat", true
+		return "deepseek-v4-flash", true
 	}
 }
 

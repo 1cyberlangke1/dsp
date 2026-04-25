@@ -219,18 +219,12 @@
     "apiTester": {
         "defaultMessage": "你好，请用一句话介绍你自己。",
         "models": {
-            "chat": "非思考模型",
-            "reasoner": "思考模型",
-            "chatSearch": "非思考模型 (带搜索)",
-            "reasonerSearch": "思考模型 (带搜索)",
-            "expertChat": "非思考专家模式",
-            "expertReasoner": "思考专家模式",
-            "expertChatSearch": "非思考专家模式 (带搜索)",
-            "expertReasonerSearch": "思考专家模式 (带搜索)",
-            "visionChat": "非思考视觉模式",
-            "visionReasoner": "思考视觉模式",
-            "visionChatSearch": "非思考视觉模式 (带搜索)",
-            "visionReasonerSearch": "思考视觉模式 (带搜索)"
+            "flash": "v4 Flash（默认开启思考）",
+            "pro": "v4 Pro（默认开启思考）",
+            "flashSearch": "v4 Flash（带搜索）",
+            "proSearch": "v4 Pro（带搜索）",
+            "vision": "v4 Vision（默认开启思考）",
+            "visionSearch": "v4 Vision（带搜索）"
         },
         "missingApiKey": "请提供 API 密钥",
         "requestFailed": "请求失败",

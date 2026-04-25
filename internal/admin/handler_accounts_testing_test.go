@@ -72,7 +72,7 @@ func TestTestAccount_BatchModeOnlyCreatesSession(t *testing.T) {
 		t.Fatal("expected test account")
 	}
 
-	result := h.testAccount(context.Background(), acc, "deepseek-chat", "")
+	result := h.testAccount(context.Background(), acc, "deepseek-v4-flash", "")
 
 	if ok, _ := result["success"].(bool); !ok {
 		t.Fatalf("expected success=true, got %#v", result)
@@ -177,7 +177,7 @@ func TestTestAccount_MessageModeUsesExpertModelTypeForExpertModel(t *testing.T) 
 		t.Fatal("expected test account")
 	}
 
-	result := h.testAccount(context.Background(), acc, "deepseek-expert-chat", "hello")
+	result := h.testAccount(context.Background(), acc, "deepseek-v4-pro", "hello")
 
 	if ok, _ := result["success"].(bool); !ok {
 		t.Fatalf("expected success=true, got %#v", result)
@@ -200,7 +200,7 @@ func TestTestAccount_MessageModeUsesVisionModelTypeForVisionModel(t *testing.T) 
 		t.Fatal("expected test account")
 	}
 
-	result := h.testAccount(context.Background(), acc, "deepseek-vision-chat", "hello")
+	result := h.testAccount(context.Background(), acc, "deepseek-v4-vision", "hello")
 
 	if ok, _ := result["success"].(bool); !ok {
 		t.Fatalf("expected success=true, got %#v", result)

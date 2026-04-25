@@ -1,11 +1,8 @@
 package openai
 
 import (
-	"crypto/rand"
 	"crypto/subtle"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -15,6 +12,8 @@ import (
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
 	"ds2api/internal/util"
+
+	"github.com/google/uuid"
 )
 
 func (h *Handler) handleVercelStreamPrepare(w http.ResponseWriter, r *http.Request) {
@@ -67,6 +66,12 @@ func (h *Handler) handleVercelStreamPrepare(w http.ResponseWriter, r *http.Reque
 	}
 	if !stdReq.Stream {
 		writeOpenAIError(w, http.StatusBadRequest, "stream must be true")
+		return
+	}
+	stdReq, err = h.applyHistorySplit(r.Context(), a, stdReq)
+	if err != nil {
+		status, message := mapHistorySplitError(err)
+		writeOpenAIError(w, status, message)
 		return
 	}
 
@@ -260,9 +265,5 @@ func streamLeaseTTL() time.Duration {
 }
 
 func newLeaseID() string {
-	buf := make([]byte, 16)
-	if _, err := rand.Read(buf); err == nil {
-		return hex.EncodeToString(buf)
-	}
-	return fmt.Sprintf("lease-%d", time.Now().UnixNano())
+	return strings.ReplaceAll(uuid.NewString(), "-", "")
 }

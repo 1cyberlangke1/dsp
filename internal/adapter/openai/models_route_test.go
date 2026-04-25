@@ -14,7 +14,7 @@ func TestGetModelRouteDirectAndAlias(t *testing.T) {
 	RegisterRoutes(r, h)
 
 	t.Run("direct", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/v1/models/deepseek-chat", nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1/models/deepseek-v4-flash", nil)
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -23,7 +23,7 @@ func TestGetModelRouteDirectAndAlias(t *testing.T) {
 	})
 
 	t.Run("direct_expert", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/v1/models/deepseek-expert-chat", nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1/models/deepseek-v4-pro", nil)
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -32,7 +32,7 @@ func TestGetModelRouteDirectAndAlias(t *testing.T) {
 	})
 
 	t.Run("direct_vision", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/v1/models/deepseek-vision-chat", nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1/models/deepseek-v4-vision", nil)
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {

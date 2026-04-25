@@ -219,18 +219,12 @@
     "apiTester": {
         "defaultMessage": "Hello, please introduce yourself in one sentence.",
         "models": {
-            "chat": "Non-reasoning model",
-            "reasoner": "Reasoning model",
-            "chatSearch": "Non-reasoning model (with search)",
-            "reasonerSearch": "Reasoning model (with search)",
-            "expertChat": "Non-reasoning expert mode",
-            "expertReasoner": "Reasoning expert mode",
-            "expertChatSearch": "Non-reasoning expert mode (with search)",
-            "expertReasonerSearch": "Reasoning expert mode (with search)",
-            "visionChat": "Non-reasoning vision mode",
-            "visionReasoner": "Reasoning vision mode",
-            "visionChatSearch": "Non-reasoning vision mode (with search)",
-            "visionReasonerSearch": "Reasoning vision mode (with search)"
+            "flash": "v4 Flash (thinking on by default)",
+            "pro": "v4 Pro (thinking on by default)",
+            "flashSearch": "v4 Flash (with search)",
+            "proSearch": "v4 Pro (with search)",
+            "vision": "v4 Vision (thinking on by default)",
+            "visionSearch": "v4 Vision (with search)"
         },
         "missingApiKey": "Please provide an API key.",
         "requestFailed": "Request failed.",

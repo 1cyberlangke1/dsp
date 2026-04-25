@@ -38,9 +38,9 @@
     }
   ],
   "model_aliases": {
-    "gpt-4o": "deepseek-chat",
-    "gpt-5-codex": "deepseek-reasoner",
-    "o3": "deepseek-reasoner"
+    "gpt-4o": "deepseek-v4-flash",
+    "gpt-5-codex": "deepseek-v4-pro",
+    "o3": "deepseek-v4-pro"
   },
   "compat": {
     "wide_input_strict_output": true,
@@ -57,8 +57,8 @@
     "provider": "deterministic"
   },
   "claude_mapping": {
-    "fast": "deepseek-chat",
-    "slow": "deepseek-reasoner"
+    "fast": "deepseek-v4-flash",
+    "slow": "deepseek-v4-pro"
   },
   "admin": {
     "jwt_expire_hours": 24

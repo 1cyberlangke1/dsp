@@ -194,18 +194,12 @@ Gemini 兼容客户端还可以使用 `x-goog-api-key`、`?key=` 或 `?api_key=`
 {
   "object": "list",
   "data": [
-    {"id": "deepseek-chat", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-reasoner", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-chat-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-reasoner-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-expert-chat", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-expert-reasoner", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-expert-chat-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-expert-reasoner-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-vision-chat", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-vision-reasoner", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-vision-chat-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-vision-reasoner-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []}
+    {"id": "deepseek-v4-flash", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
+    {"id": "deepseek-v4-pro", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
+    {"id": "deepseek-v4-flash-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
+    {"id": "deepseek-v4-pro-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
+    {"id": "deepseek-v4-vision", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
+    {"id": "deepseek-v4-vision-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []}
   ]
 }
 ```
@@ -254,14 +248,14 @@ Content-Type: application/json
   "id": "<chat_session_id>",
   "object": "chat.completion",
   "created": 1738400000,
-  "model": "deepseek-reasoner",
+  "model": "deepseek-v4-pro",
   "choices": [
     {
       "index": 0,
       "message": {
         "role": "assistant",
         "content": "最终回复",
-        "reasoning_content": "思考内容（reasoner 模型）"
+        "reasoning_content": "思考内容（开启 thinking 时）"
       },
       "finish_reason": "stop"
     }
@@ -296,7 +290,7 @@ data: [DONE]
 **字段说明**：
 
 - 首个 delta 包含 `role: assistant`
-- `deepseek-reasoner` / `deepseek-reasoner-search` 模型输出 `delta.reasoning_content`
+- 开启 thinking 时会输出 `delta.reasoning_content`
 - 普通文本输出 `delta.content`
 - 最后一段包含 `finish_reason` 和 `usage`
 - token 计数优先透传上游 DeepSeek SSE（如 `accumulated_token_usage` / `token_usage`）；仅在上游缺失时回退本地估算
@@ -674,8 +668,8 @@ data: {"type":"message_stop"}
     }
   ],
   "claude_mapping": {
-    "fast": "deepseek-chat",
-    "slow": "deepseek-reasoner"
+    "fast": "deepseek-v4-flash",
+    "slow": "deepseek-v4-pro"
   }
 }
 ```
@@ -698,8 +692,8 @@ data: {"type":"message_stop"}
     {"email": "user@example.com", "password": "pwd", "token": ""}
   ],
   "claude_mapping": {
-    "fast": "deepseek-chat",
-    "slow": "deepseek-reasoner"
+    "fast": "deepseek-v4-flash",
+    "slow": "deepseek-v4-pro"
   }
 }
 ```
@@ -907,7 +901,7 @@ data: {"type":"message_stop"}
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
 | `identifier` | ✅ | email / mobile / token-only 合成标识 |
-| `model` | ❌ | 默认 `deepseek-chat` |
+| `model` | ❌ | 默认 `deepseek-v4-flash` |
 | `message` | ❌ | 空字符串时仅测试会话创建 |
 
 **响应**：
@@ -918,7 +912,7 @@ data: {"type":"message_stop"}
   "success": true,
   "response_time": 1240,
   "message": "API 测试成功（仅会话创建）",
-  "model": "deepseek-chat",
+  "model": "deepseek-v4-flash",
   "session_count": 0,
   "config_writable": true
 }
@@ -988,7 +982,7 @@ data: {"type":"message_stop"}
 
 | 字段 | 必填 | 默认值 |
 | --- | --- | --- |
-| `model` | ❌ | `deepseek-chat` |
+| `model` | ❌ | `deepseek-v4-flash` |
 | `message` | ❌ | `你好` |
 | `api_key` | ❌ | 配置中第一个 key |
 
@@ -1012,7 +1006,7 @@ data: {"type":"message_stop"}
 | --- | --- | --- | --- |
 | `message` | 否 | `你好` | 便捷单轮用户消息 |
 | `messages` | 否 | 自动由 `message` 生成 | OpenAI 风格消息数组 |
-| `model` | 否 | `deepseek-chat` | 目标模型 |
+| `model` | 否 | `deepseek-v4-flash` | 目标模型 |
 | `stream` | 否 | `true` | 建议保留流式，以记录原始 SSE |
 | `api_key` | 否 | 配置中第一个 key | 调用业务接口使用的 key |
 | `sample_id` | 否 | 自动生成 | 样本目录名 |
@@ -1222,7 +1216,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-chat",
+    "model": "deepseek-v4-flash",
     "messages": [{"role": "user", "content": "你好"}],
     "stream": false
   }'
@@ -1235,7 +1229,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-reasoner",
+    "model": "deepseek-v4-pro",
     "messages": [{"role": "user", "content": "解释一下量子纠缠"}],
     "stream": true
   }'
@@ -1273,7 +1267,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-chat-search",
+    "model": "deepseek-v4-flash-search",
     "messages": [{"role": "user", "content": "今天的新闻"}],
     "stream": true
   }'
@@ -1286,7 +1280,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-chat",
+    "model": "deepseek-v4-flash",
     "messages": [{"role": "user", "content": "北京今天天气怎么样？"}],
     "tools": [
       {
@@ -1384,7 +1378,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "X-Ds2-Target-Account: user@example.com" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-chat",
+    "model": "deepseek-v4-flash",
     "messages": [{"role": "user", "content": "你好"}]
   }'
 ```

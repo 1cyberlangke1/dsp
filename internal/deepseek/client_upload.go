@@ -67,6 +67,8 @@ func (c *Client) UploadFile(ctx context.Context, a *auth.RequestAuth, req Upload
 	attempts := 0
 	refreshed := false
 	powHeader := ""
+	lastFailureKind := FailureUnknown
+	lastFailureMessage := ""
 	for attempts < maxAttempts {
 		clients := c.requestClientsForAuth(ctx, a)
 		if strings.TrimSpace(powHeader) == "" {
@@ -85,6 +87,8 @@ func (c *Client) UploadFile(ctx context.Context, a *auth.RequestAuth, req Upload
 		if err != nil {
 			config.Logger.Warn("[upload_file] request error", "error", err, "account", a.AccountID, "filename", filename)
 			powHeader = ""
+			lastFailureKind = FailureUnknown
+			lastFailureMessage = err.Error()
 			attempts++
 			continue
 		}
@@ -131,6 +135,12 @@ func (c *Client) UploadFile(ctx context.Context, a *auth.RequestAuth, req Upload
 		}
 		config.Logger.Warn("[upload_file] failed", "status", resp.StatusCode, "code", code, "biz_code", bizCode, "msg", msg, "biz_msg", bizMsg, "account", a.AccountID, "filename", filename)
 		powHeader = ""
+		lastFailureMessage = failureMessage(msg, bizMsg, "upload file failed")
+		if isTokenInvalid(resp.StatusCode, code, bizCode, msg, bizMsg) || isAuthIndicativeBizFailure(msg, bizMsg) {
+			lastFailureKind = authFailureKind(a.UseConfigToken)
+		} else {
+			lastFailureKind = FailureUnknown
+		}
 		if a.UseConfigToken {
 			if !refreshed && shouldAttemptRefresh(resp.StatusCode, code, bizCode, msg, bizMsg) {
 				if c.Auth.RefreshToken(ctx, a) {
@@ -146,6 +156,9 @@ func (c *Client) UploadFile(ctx context.Context, a *auth.RequestAuth, req Upload
 			}
 		}
 		attempts++
+	}
+	if lastFailureKind != FailureUnknown {
+		return nil, &RequestFailure{Op: "upload file", Kind: lastFailureKind, Message: lastFailureMessage}
 	}
 	return nil, errors.New("upload file failed")
 }

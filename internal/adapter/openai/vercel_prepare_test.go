@@ -1,10 +1,15 @@
 package openai
 
 import (
-	"ds2api/internal/auth"
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+
+	"ds2api/internal/auth"
+	"ds2api/internal/deepseek"
 )
 
 func TestIsVercelStreamPrepareRequest(t *testing.T) {
@@ -79,5 +84,99 @@ func TestStreamLeaseTTL(t *testing.T) {
 	t.Setenv("DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS", "invalid")
 	if got := streamLeaseTTL(); got != 15*time.Minute {
 		t.Fatalf("expected default ttl on invalid value, got %v", got)
+	}
+}
+
+func TestHandleVercelStreamPrepareAppliesHistorySplit(t *testing.T) {
+	t.Setenv("VERCEL", "1")
+	t.Setenv("DS2API_VERCEL_INTERNAL_SECRET", "stream-secret")
+
+	ds := &inlineUploadDSStub{}
+	h := &Handler{
+		Store: mockOpenAIConfig{
+			wideInput:           true,
+			historySplitEnabled: true,
+			historySplitTurns:   1,
+		},
+		Auth: streamStatusAuthStub{},
+		DS:   ds,
+	}
+
+	reqBody, _ := json.Marshal(map[string]any{
+		"model":    "deepseek-v4-flash",
+		"messages": historySplitTestMessages(),
+		"stream":   true,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions?__stream_prepare=1", strings.NewReader(string(reqBody)))
+	req.Header.Set("Authorization", "Bearer direct-token")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Ds2-Internal-Token", "stream-secret")
+	rec := httptest.NewRecorder()
+
+	h.handleVercelStreamPrepare(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(ds.uploadCalls) != 1 {
+		t.Fatalf("expected 1 history upload, got %d", len(ds.uploadCalls))
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	payload, _ := body["payload"].(map[string]any)
+	if payload == nil {
+		t.Fatalf("expected payload object, got %#v", body["payload"])
+	}
+	promptText, _ := payload["prompt"].(string)
+	if !strings.Contains(promptText, "latest user turn") {
+		t.Fatalf("expected latest user turn in prompt, got %s", promptText)
+	}
+	if strings.Contains(promptText, "first user turn") {
+		t.Fatalf("expected historical turns removed from prompt, got %s", promptText)
+	}
+	refIDs, _ := payload["ref_file_ids"].([]any)
+	if len(refIDs) == 0 || refIDs[0] != "file-inline-1" {
+		t.Fatalf("expected uploaded history file first in ref_file_ids, got %#v", payload["ref_file_ids"])
+	}
+}
+
+func TestHandleVercelStreamPrepareMapsHistorySplitManagedAuthFailureTo401(t *testing.T) {
+	t.Setenv("VERCEL", "1")
+	t.Setenv("DS2API_VERCEL_INTERNAL_SECRET", "stream-secret")
+
+	ds := &inlineUploadDSStub{
+		uploadErr: &deepseek.RequestFailure{Op: "upload file", Kind: deepseek.FailureManagedUnauthorized, Message: "expired token"},
+	}
+	h := &Handler{
+		Store: mockOpenAIConfig{
+			wideInput:           true,
+			historySplitEnabled: true,
+			historySplitTurns:   1,
+		},
+		Auth: streamStatusManagedAuthStub{},
+		DS:   ds,
+	}
+
+	reqBody, _ := json.Marshal(map[string]any{
+		"model":    "deepseek-v4-flash",
+		"messages": historySplitTestMessages(),
+		"stream":   true,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions?__stream_prepare=1", strings.NewReader(string(reqBody)))
+	req.Header.Set("Authorization", "Bearer managed-key")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Ds2-Internal-Token", "stream-secret")
+	rec := httptest.NewRecorder()
+
+	h.handleVercelStreamPrepare(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Please re-login the account in admin") {
+		t.Fatalf("expected managed auth error message, got %s", rec.Body.String())
 	}
 }
