@@ -120,7 +120,7 @@ For the full module-by-module architecture and directory responsibilities, see [
 | vision | `deepseek-v4-vision` | enabled by default, request-controlled | ❌ |
 | vision | `deepseek-v4-vision-search` | enabled by default, request-controlled | ✅ |
 
-Besides native IDs, DS2API also accepts common aliases as input (for example `gpt-5.5`, `gpt-5.4-mini`, `gpt-5.3-codex`, `gpt-4.1`, `o3`, `claude-opus-4-6`, `claude-sonnet-4-6`, `gemini-2.5-pro`, `gemini-2.5-flash`), but `/v1/models` returns normalized DeepSeek native model IDs.
+Besides native IDs, DS2API also accepts common aliases as input (for example `gpt-4.1`, `gpt-5`, `gpt-5-codex`, `o3`, `claude-*`, `gemini-*`), but `/v1/models` returns normalized DeepSeek native model IDs. The complete alias behavior is documented in [API.en.md](API.en.md#model-alias-resolution) and `config.example.json`.
 
 ### Claude Endpoint (`GET /anthropic/v1/models`)
 
@@ -131,7 +131,7 @@ Besides native IDs, DS2API also accepts common aliases as input (for example `gp
 | `claude-opus-4-6` | `deepseek-v4-pro` |
 
 Override mapping via the global `model_aliases` config.
-Besides the current primary aliases above, `/anthropic/v1/models` also returns Claude 4.x snapshots plus historical 3.x IDs and common aliases for legacy client compatibility.
+Besides the primary aliases above, `/anthropic/v1/models` also returns Claude 4.x snapshots plus historical 3.x IDs and common aliases for legacy client compatibility.
 
 #### Claude Code integration pitfalls (validated)
 
@@ -261,97 +261,18 @@ The server actually binds to `0.0.0.0:5001`, so devices on the same LAN can usua
 
 ## Configuration
 
-### `config.json` Example
+`README` keeps only the onboarding path. Use [config.example.json](config.example.json) as the field template, and see the [deployment guide](docs/DEPLOY.en.md#0-prerequisites) plus [API configuration notes](API.en.md#configuration-best-practice) for full details.
 
-```json
-{
-  "keys": ["your-api-key-1", "your-api-key-2"],
-  "accounts": [
-    {
-      "email": "user@example.com",
-      "password": "your-password"
-    },
-    {
-      "mobile": "12345678901",
-      "password": "your-password"
-    }
-  ],
-  "model_aliases": {
-    "gpt-4o": "deepseek-v4-flash",
-    "gpt-5": "deepseek-v4-flash",
-    "gpt-5-mini": "deepseek-v4-flash",
-    "gpt-5-codex": "deepseek-v4-pro",
-    "o3": "deepseek-v4-pro",
-    "claude-opus-4-6": "deepseek-v4-pro",
-    "gemini-2.5-flash": "deepseek-v4-flash"
-  },
-  "compat": {
-    "wide_input_strict_output": true,
-    "strip_reference_markers": true
-  },
-  "responses": {
-    "store_ttl_seconds": 900
-  },
-  "embeddings": {
-    "provider": "deterministic"
-  },
-  "admin": {
-    "jwt_expire_hours": 24
-  },
-  "runtime": {
-    "account_max_inflight": 2,
-    "account_max_queue": 0,
-    "global_max_inflight": 0,
-    "token_refresh_interval_hours": 6
-  },
-  "auto_delete": {
-    "mode": "none"
-  }
-}
-```
+Common fields:
 
-- `keys`: API access keys; clients authenticate via `Authorization: Bearer <key>`
-- `accounts`: DeepSeek account list, supports `email` or `mobile` login
-- `token`: Even if set in `config.json`, it is cleared during load (DS2API does not read persisted tokens from config); runtime tokens are maintained/refreshed in memory only
-- `model_aliases`: Single global alias map shared by OpenAI / Claude / Gemini model names
-- `compat.wide_input_strict_output`: Keep `true` (current default policy)
-- `compat.strip_reference_markers`: Keep `true`; it strips reference markers from visible output
-- `toolcall`: Legacy field; the current behavior is fixed to feature matching + high-confidence early emit, and any config value is ignored
-- `responses.store_ttl_seconds`: In-memory TTL for `/v1/responses/{id}`
-- `embeddings.provider`: Embeddings provider (`deterministic/mock/builtin` built-in)
-- `admin`: Admin panel settings (JWT expiry, password hash, etc.), hot-reloadable via Admin Settings API
-- `runtime`: Runtime parameters (concurrency limits, queue sizes, managed token refresh interval), hot-reloadable via Admin Settings API; `account_max_queue=0`/`global_max_inflight=0` means auto-calculate from recommended values, `token_refresh_interval_hours=6` is the default forced re-login interval
-- `auto_delete.mode`: How to clean up DeepSeek remote chat records after each request completes. Supported values: `none` (default, no deletion), `single` (delete only the current session), `all` (delete all sessions); legacy `auto_delete.sessions=true` is still treated as `all`
+- `keys` / `api_keys`: client API keys; `api_keys` adds `name` and `remark` metadata while `keys` remains compatible.
+- `accounts`: managed DeepSeek accounts, supporting `email` or `mobile` login plus proxy/name/remark metadata.
+- `model_aliases`: one shared alias map for OpenAI / Claude / Gemini model names.
+- `runtime`: account concurrency, queueing, and token refresh behavior, hot-reloadable via Admin Settings.
+- `auto_delete.mode`: remote session cleanup after each request, supporting `none` / `single` / `all`.
+- `history_split`: multi-turn history split policy, enabled by default to avoid inlining all long history into the prompt.
 
-### Environment Variables
-
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `PORT` | Service port | `5001` |
-| `LOG_LEVEL` | Log level | `INFO` (`DEBUG`/`WARN`/`ERROR`) |
-| `DS2API_ADMIN_KEY` | Admin login key | `admin` |
-| `DS2API_JWT_SECRET` | Admin JWT signing secret | Same as `DS2API_ADMIN_KEY` |
-| `DS2API_JWT_EXPIRE_HOURS` | Admin JWT TTL in hours | `24` |
-| `DS2API_CONFIG_PATH` | Config file path | `config.json` |
-| `DS2API_CONFIG_JSON` | Inline config (JSON or Base64) | — |
-| `DS2API_CHAT_HISTORY_PATH` | Server-side conversation history file path | `data/chat_history.json` |
-| `DS2API_ENV_WRITEBACK` | Auto-write env-backed config to file and transition to file mode (`1/true/yes/on`) | Disabled |
-| `DS2API_STATIC_ADMIN_DIR` | Admin static assets dir | `static/admin` |
-| `DS2API_AUTO_BUILD_WEBUI` | Auto-build WebUI on startup | Enabled locally, disabled on Vercel |
-| `DS2API_ACCOUNT_MAX_INFLIGHT` | Max in-flight requests per account | `2` |
-| `DS2API_ACCOUNT_MAX_QUEUE` | Waiting queue limit | `recommended_concurrency` |
-| `DS2API_GLOBAL_MAX_INFLIGHT` | Global max in-flight requests | `recommended_concurrency` |
-| `DS2API_VERCEL_INTERNAL_SECRET` | Vercel hybrid streaming internal auth | Falls back to `DS2API_ADMIN_KEY` |
-| `DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS` | Stream lease TTL seconds | `900` |
-| `DS2API_DEV_PACKET_CAPTURE` | Local dev packet capture switch (record recent request/response bodies) | Enabled by default on non-Vercel local runtime |
-| `DS2API_DEV_PACKET_CAPTURE_LIMIT` | Number of captured sessions to retain (auto-evict overflow) | `20` |
-| `DS2API_DEV_PACKET_CAPTURE_MAX_BODY_BYTES` | Max recorded bytes per captured response body | `5242880` |
-| `VERCEL_TOKEN` | Vercel sync token | — |
-| `VERCEL_PROJECT_ID` | Vercel project ID | — |
-| `VERCEL_TEAM_ID` | Vercel team ID | — |
-| `DS2API_VERCEL_PROTECTION_BYPASS` | Vercel deployment protection bypass for internal Node→Go calls | — |
-
-> Note: when `DS2API_CONFIG_JSON` is detected, the Admin UI shows mode risk and auto-persistence status (including `DS2API_CONFIG_PATH` and mode-transition hints).
+For the full environment variable list, see [docs/DEPLOY.en.md](docs/DEPLOY.en.md). For auth behavior, see [API.en.md](API.en.md#authentication).
 
 ## Authentication Modes
 
@@ -432,28 +353,19 @@ The save endpoint can target a chain by `query`, `chain_key`, or `capture_id`. E
 
 ## Testing
 
-```bash
-# Unit tests (Go + Node)
-./tests/scripts/run-unit-all.sh
+For the full testing guide, see [docs/TESTING.md](docs/TESTING.md).
 
-# One-command live end-to-end tests (real accounts, full request/response logs)
-./tests/scripts/run-live.sh
-
-# Or with custom flags
-go run ./cmd/ds2api-tests \
-  --config config.json \
-  --admin-key admin \
-  --out artifacts/testsuite \
-  --timeout 120 \
-  --retries 2
-```
+Quick commands:
 
 ```bash
-# Release-blocking gates
-./tests/scripts/check-stage6-manual-smoke.sh
+# Local PR gates
+./scripts/lint.sh
 ./tests/scripts/check-refactor-line-gate.sh
 ./tests/scripts/run-unit-all.sh
-npm ci --prefix webui && npm run build --prefix webui
+npm run build --prefix webui
+
+# Live end-to-end tests (real accounts, full request/response logs)
+./tests/scripts/run-live.sh
 ```
 
 ## Release Artifact Automation (GitHub Actions)

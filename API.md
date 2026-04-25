@@ -160,6 +160,7 @@ Gemini 兼容客户端还可以使用 `x-goog-api-key`、`?key=` 或 `?api_key=`
 | DELETE | `/admin/dev/captures` | Admin | 清空本地抓包记录 |
 | GET | `/admin/chat-history` | Admin | 查看服务器端对话记录 |
 | DELETE | `/admin/chat-history` | Admin | 清空服务器端对话记录 |
+| GET | `/admin/chat-history/{id}` | Admin | 查看单条服务器端对话记录 |
 | DELETE | `/admin/chat-history/{id}` | Admin | 删除单条服务器端对话记录 |
 | PUT | `/admin/chat-history/settings` | Admin | 更新对话记录保留条数 |
 | GET | `/admin/version` | Admin | 查询当前版本与最新 Release |
@@ -215,14 +216,15 @@ Gemini 兼容客户端还可以使用 `x-goog-api-key`、`?key=` 或 `?api_key=`
 3. 未命中时按模型家族规则回退（如 `o*`、`gpt-*`、`claude-*`）。
 4. 仍未命中则返回 `invalid_request_error`。
 
-当前内置默认 alias（节选）：
+当前内置默认 alias 来自 `internal/config/models.go`，`config.model_aliases` 会在运行时覆盖或补充同名映射。节选：
 
-- OpenAI：`gpt-4o`、`gpt-4.1`、`gpt-4.1-mini`、`gpt-4.1-nano`、`gpt-5`、`gpt-5.4`、`gpt-5.5`、`gpt-5-mini`、`gpt-5.4-mini`、`gpt-5.4-nano`、`gpt-5.5-pro`、`gpt-5-codex`、`gpt-5.3-codex`
-- OpenAI Reasoning：`o1`、`o1-mini`、`o3`、`o3-mini`
-- Claude：`claude-sonnet-4-6`、`claude-haiku-4-5`、`claude-opus-4-6`（及 `claude-sonnet-4-5` / `claude-3-5-sonnet` / `claude-3-5-haiku` / `claude-3-opus` 兼容别名）
-- Gemini：`gemini-2.5-pro`、`gemini-2.5-flash`
+- OpenAI / Codex：`gpt-4o`、`gpt-4.1`、`gpt-5`、`gpt-5.5`、`gpt-5-codex`、`gpt-5.3-codex`、`codex-mini-latest`
+- OpenAI reasoning：`o1`、`o3`、`o3-deep-research`、`o4-mini`
+- Claude：`claude-opus-4-6`、`claude-sonnet-4-6`、`claude-haiku-4-5`、`claude-3-5-sonnet-latest`
+- Gemini：`gemini-2.5-pro`、`gemini-2.5-flash`、`gemini-pro-vision`
+- 其他兼容族：`llama-*`、`qwen-*`、`mistral-*`、`command-*` 会按家族启发式回退
 
-> 截至 2026-04-26：OpenAI 开发者模型页当前推荐 `gpt-5.5` 作为旗舰 API 模型；ChatGPT Help Center 当前主打 `GPT-5.3 Instant / GPT-5.5 Thinking / GPT-5.5 Pro`；Anthropic 官方模型页当前主推 `claude-opus-4-6`、`claude-sonnet-4-6`、`claude-haiku-4-5`。
+退役历史模型（如 `claude-1.*`、`claude-2.*`、`claude-instant-*`、`gpt-3.5*`）会被显式拒绝。
 
 ### `POST /v1/chat/completions`
 
@@ -710,6 +712,7 @@ data: {"type":"message_stop"}
 - `compat`（`wide_input_strict_output`、`strip_reference_markers`）
 - `responses` / `embeddings`
 - `auto_delete`（`mode`：`none` / `single` / `all`；旧配置 `sessions=true` 仍按 `all` 处理）
+- `history_split`（`enabled`、`trigger_after_turns`）
 - `model_aliases`
 - `env_backed`、`needs_vercel_sync`
 - `toolcall` 策略已固定为 `feature_match + high`，不再通过 settings 返回或修改
@@ -724,6 +727,7 @@ data: {"type":"message_stop"}
 - `responses.store_ttl_seconds`
 - `embeddings.provider`
 - `auto_delete.mode`
+- `history_split.enabled` / `history_split.trigger_after_turns`
 - `model_aliases`
 - `toolcall` 策略已固定，不再作为可写入字段
 
@@ -748,9 +752,9 @@ data: {"type":"message_stop"}
 
 请求可直接传配置对象，或使用 `{"config": {...}, "mode":"merge"}` 包裹格式。
 也支持在查询参数里传 `?mode=merge` / `?mode=replace`。
-导入时会接受 `keys`、`api_keys`、`accounts`、`model_aliases`、`admin`、`runtime`、`responses`、`embeddings`、`auto_delete` 等字段；`toolcall` 相关字段会被忽略。
+`replace` 模式会按完整配置结构替换（保留 Vercel 同步元信息）；`merge` 模式会合并 `keys`、`api_keys`、`accounts`、`model_aliases`，并覆盖 `admin`、`runtime`、`responses`、`embeddings` 中的非空字段。`compat`、`auto_delete`、`history_split` 建议通过 `/admin/settings` 或配置文件管理；`toolcall` 相关字段会被忽略。
 
-> `compat` 相关字段请通过 `/admin/settings` 或配置文件管理；该导入接口不会更新 `compat`。
+> 注意：`merge` 模式不会更新 `compat`、`auto_delete`、`history_split`。
 
 ### `GET /admin/config/export`
 

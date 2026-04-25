@@ -160,6 +160,7 @@ Gemini-compatible clients can also send `x-goog-api-key`, `?key=`, or `?api_key=
 | DELETE | `/admin/dev/captures` | Admin | Clear local packet-capture entries |
 | GET | `/admin/chat-history` | Admin | Read server-side conversation history |
 | DELETE | `/admin/chat-history` | Admin | Clear server-side conversation history |
+| GET | `/admin/chat-history/{id}` | Admin | Read one server-side conversation entry |
 | DELETE | `/admin/chat-history/{id}` | Admin | Delete one server-side conversation entry |
 | PUT | `/admin/chat-history/settings` | Admin | Update conversation history retention limit |
 | GET | `/admin/version` | Admin | Check current version and latest Release |
@@ -215,12 +216,15 @@ For `chat` / `responses` / `embeddings`, DS2API follows a wide-input/strict-outp
 3. If still unmatched, fall back by known family heuristics (`o*`, `gpt-*`, `claude-*`, etc.).
 4. If still unmatched, return `invalid_request_error`.
 
-Current built-in default aliases (excerpt):
+Built-in aliases come from `internal/config/models.go`; `config.model_aliases` can override or add mappings at runtime. Excerpt:
 
-- OpenAI: `gpt-4o`, `gpt-4.1`, `gpt-5.5`, `gpt-5.4-mini`, `gpt-5.3-codex`
-- OpenAI reasoning: `o1`, `o1-mini`, `o3`, `o4-mini`
-- Claude: `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-6` (plus compatibility aliases `claude-3-5-sonnet` / `claude-3-5-haiku` / `claude-3-opus`)
-- Gemini: `gemini-2.5-pro`, `gemini-2.5-flash`
+- OpenAI / Codex: `gpt-4o`, `gpt-4.1`, `gpt-5`, `gpt-5.5`, `gpt-5-codex`, `gpt-5.3-codex`, `codex-mini-latest`
+- OpenAI reasoning: `o1`, `o3`, `o3-deep-research`, `o4-mini`
+- Claude: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-3-5-sonnet-latest`
+- Gemini: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-pro-vision`
+- Other compatibility families: `llama-*`, `qwen-*`, `mistral-*`, and `command-*` fall back through family heuristics
+
+Retired historical families such as `claude-1.*`, `claude-2.*`, `claude-instant-*`, and `gpt-3.5*` are explicitly rejected.
 
 ### `POST /v1/chat/completions`
 
@@ -707,6 +711,7 @@ Reads runtime settings and status, including:
 - `compat` (`wide_input_strict_output`, `strip_reference_markers`)
 - `responses` / `embeddings`
 - `auto_delete` (`mode`: `none` / `single` / `all`; legacy `sessions=true` is still treated as `all`)
+- `history_split` (`enabled`, `trigger_after_turns`)
 - `model_aliases`
 - `env_backed`, `needs_vercel_sync`
 - `toolcall` policy is fixed to `feature_match + high` and is no longer returned or editable via settings
@@ -721,6 +726,7 @@ Hot-updates runtime settings. Supported fields:
 - `responses.store_ttl_seconds`
 - `embeddings.provider`
 - `auto_delete.mode`
+- `history_split.enabled` / `history_split.trigger_after_turns`
 - `model_aliases`
 - `toolcall` policy is fixed and is no longer writable through settings
 
@@ -745,9 +751,9 @@ Imports full config with:
 
 The request can send config directly, or wrapped as `{"config": {...}, "mode":"merge"}`.
 Query params `?mode=merge` / `?mode=replace` are also supported.
-Import accepts `keys`, `api_keys`, `accounts`, `model_aliases`, `admin`, `runtime`, `responses`, `embeddings`, and `auto_delete`; legacy `toolcall` fields are ignored.
+`replace` mode replaces the full config shape while preserving Vercel sync metadata. `merge` mode merges `keys`, `api_keys`, `accounts`, and `model_aliases`, and overwrites non-empty fields under `admin`, `runtime`, `responses`, and `embeddings`. Manage `compat`, `auto_delete`, and `history_split` via `/admin/settings` or the config file; legacy `toolcall` fields are ignored.
 
-> `compat` fields are managed via `/admin/settings` or the config file; this import endpoint does not update `compat`.
+> Note: `merge` mode does not update `compat`, `auto_delete`, or `history_split`.
 
 ### `GET /admin/config/export`
 

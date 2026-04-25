@@ -4,9 +4,9 @@ Language: [中文](ARCHITECTURE.md) | [English](ARCHITECTURE.en.md)
 
 > This file is the single architecture source for directory layout, module boundaries, and execution flow.
 
-## 1. Top-level Layout (expanded)
+## 1. Top-level Layout (core directories)
 
-> Notes: this is the **fully expanded** project directory list (excluding metadata/dependency dirs such as `.git/` and `webui/node_modules/`), with each folder annotated by purpose.
+> Notes: this lists the main business directories (excluding metadata/dependency dirs such as `.git/` and `webui/node_modules/`), with each folder annotated by purpose. Newly added directories should be verified from the code tree rather than treated as a per-file inventory here.
 
 ```text
 ds2api/
@@ -27,6 +27,7 @@ ds2api/
 │   │   └── openai/                       # OpenAI adapter and shared execution core
 │   ├── admin/                            # Admin API (config/accounts/ops)
 │   ├── auth/                             # Auth/JWT/credential resolution
+│   ├── chathistory/                      # Server-side conversation history storage/query
 │   ├── claudeconv/                       # Claude message conversion helpers
 │   ├── compat/                           # Compatibility and regression helpers
 │   ├── config/                           # Config loading/validation/hot reload
@@ -44,6 +45,7 @@ ds2api/
 │   ├── prompt/                           # Prompt composition
 │   ├── rawsample/                        # Raw sample read/write and management
 │   ├── server/                           # Router and middleware assembly
+│   │   └── data/                         # Router/runtime helper data
 │   ├── sse/                              # SSE parsing utilities
 │   ├── stream/                           # Unified stream consumption engine
 │   ├── testsuite/                        # Testsuite execution framework
@@ -118,6 +120,7 @@ flowchart LR
 - `internal/stream` + `internal/sse`: stream parsing and incremental assembly.
 - `internal/toolcall`: canonical XML tool-call parsing + anti-leak sieve (the only executable format is `<tool_calls>` / `<invoke name="...">` / `<parameter name="...">`).
 - `internal/admin`: config/accounts/vercel sync/version/dev-capture endpoints.
+- `internal/chathistory`: server-side conversation history persistence, pagination, detail lookup, and retention policy.
 - `internal/config`: config loading/validation + runtime settings hot-reload.
 - `internal/account`: managed account pool, inflight slots, waiting queue.
 

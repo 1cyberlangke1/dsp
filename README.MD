@@ -122,7 +122,7 @@ flowchart LR
 | vision | `deepseek-v4-vision` | 默认开启，可由请求参数控制 | ❌ |
 | vision | `deepseek-v4-vision-search` | 默认开启，可由请求参数控制 | ✅ |
 
-除原生模型外，也支持常见 alias 输入（如 `gpt-5.5`、`gpt-5.4`、`gpt-5.4-mini`、`gpt-5.3-codex`、`gpt-4.1`、`o3`、`claude-opus-4-6`、`claude-sonnet-4-6`、`gemini-2.5-pro`、`gemini-2.5-flash` 等），但 `/v1/models` 返回的是规范化后的 DeepSeek 原生模型 ID。
+除原生模型外，也支持常见 alias 输入（如 `gpt-4.1`、`gpt-5`、`gpt-5-codex`、`o3`、`claude-*`、`gemini-*` 等），但 `/v1/models` 返回的是规范化后的 DeepSeek 原生模型 ID。完整 alias 行为以 [API.md](API.md#模型-alias-解析策略) 和 `config.example.json` 为准。
 
 ### Claude 接口（`GET /anthropic/v1/models`）
 
@@ -133,9 +133,7 @@ flowchart LR
 | `claude-opus-4-6` | `deepseek-v4-pro` |
 
 可通过配置中的 `model_aliases` 覆盖映射关系。
-`/anthropic/v1/models` 除上述当前主别名外，还会返回 Claude 4.x snapshots，以及 3.x 历史模型 ID 与常见 alias，便于旧客户端直接兼容。
-
-> 截至 2026-04-26：Anthropic 官方模型页当前主推 `claude-opus-4-6`、`claude-sonnet-4-6`、`claude-haiku-4-5`；OpenAI 官方开发者模型页当前推荐从 `gpt-5.5` 开始，ChatGPT Help Center 当前主打 `GPT-5.3 Instant / GPT-5.5 Thinking / GPT-5.5 Pro`。本文档中的 alias 示例按“兼容客户端会传来的最新官方模型 ID”维护。
+`/anthropic/v1/models` 除上述主别名外，还会返回 Claude 4.x snapshots、3.x 历史模型 ID 与常见 alias，便于旧客户端直接兼容。
 
 #### Claude Code 接入避坑（实测）
 
@@ -265,119 +263,18 @@ go run ./cmd/ds2api
 
 ## 配置说明
 
-### `config.json` 示例
+`README` 只保留快速入口，完整字段请以 [config.example.json](config.example.json) 为模板，并参考 [部署指南](docs/DEPLOY.md#0-前置要求) 与 [API 配置最佳实践](API.md#配置最佳实践)。
 
-```json
-{
-  "keys": ["your-api-key-1", "your-api-key-2"],
-  "api_keys": [
-    {
-      "key": "your-api-key-1",
-      "name": "主 Key",
-      "remark": "生产流量"
-    }
-  ],
-  "accounts": [
-    {
-      "name": "账号 A",
-      "remark": "主账号",
-      "email": "user@example.com",
-      "password": "your-password"
-    },
-    {
-      "mobile": "12345678901",
-      "password": "your-password"
-    }
-  ],
-  "model_aliases": {
-    "gpt-4o": "deepseek-v4-flash",
-    "gpt-5.5": "deepseek-v4-flash",
-    "gpt-5.4-mini": "deepseek-v4-flash",
-    "gpt-5.3-codex": "deepseek-v4-pro",
-    "o3": "deepseek-v4-pro",
-    "claude-opus-4-6": "deepseek-v4-pro",
-    "gemini-2.5-flash": "deepseek-v4-flash"
-  },
-  "compat": {
-    "wide_input_strict_output": true,
-    "strip_reference_markers": true
-  },
-  "responses": {
-    "store_ttl_seconds": 900
-  },
-  "embeddings": {
-    "provider": "deterministic"
-  },
-  "admin": {
-    "jwt_expire_hours": 24
-  },
-  "runtime": {
-    "account_max_inflight": 2,
-    "account_max_queue": 0,
-    "global_max_inflight": 0,
-    "token_refresh_interval_hours": 6
-  },
-  "auto_delete": {
-    "mode": "none"
-  }
-}
-```
+常用字段：
 
-- `keys`：API 访问密钥列表，客户端通过 `Authorization: Bearer <key>` 鉴权
-- `api_keys`：推荐使用的新结构化密钥列表，支持 `key` + `name` + `remark`（`keys` 仍兼容）
-- `accounts`：DeepSeek 账号列表，支持 `email` 或 `mobile` 登录；可额外填写 `name` / `remark` 便于管理
-- `token`：配置文件中即使填写也会在加载时被清空（不会从 `config.json` 读取 token）；实际 token 仅在运行时内存中维护并自动刷新
-- `model_aliases`：常见模型名（如 GPT/Codex/Claude）到 DeepSeek 模型的映射
-- `compat.wide_input_strict_output`：建议保持 `true`（当前实现默认宽进严出）
-- `compat.strip_reference_markers`：建议保持 `true`，用于清理可见输出中的引用/标记
-- `toolcall`：旧字段，当前实现已固定为特征匹配 + 高置信早发；即使保留在配置里也会被忽略
-- `responses.store_ttl_seconds`：`/v1/responses/{id}` 的内存缓存 TTL
-- `embeddings.provider`：embedding 提供方（当前内置 `deterministic/mock/builtin`）
-- `model_aliases`：全局统一模型映射表，OpenAI / Claude / Gemini 共用；项目内只维护这一套映射入口
-- `admin`：管理后台设置（JWT 过期时间、密码哈希等），可通过 Admin Settings API 热更新
-- `runtime`：运行时参数（并发限制、队列大小、托管账号 token 刷新间隔），可通过 Admin Settings API 热更新；`account_max_queue=0`/`global_max_inflight=0` 表示按推荐值自动计算，`token_refresh_interval_hours=6` 为默认强制重登间隔
-- `auto_delete.mode`：请求结束后如何清理 DeepSeek 远端聊天记录，支持 `none`（默认，不删除）、`single`（仅删除当前会话）、`all`（清空全部会话）；旧配置里的 `auto_delete.sessions=true` 仍会被视为 `all`
+- `keys` / `api_keys`：客户端访问密钥，`api_keys` 支持 `name` 与 `remark` 元信息，`keys` 继续兼容。
+- `accounts`：DeepSeek 托管账号，支持 `email` 或 `mobile` 登录，可配置代理、名称和备注。
+- `model_aliases`：OpenAI / Claude / Gemini 共用的模型 alias 映射。
+- `runtime`：账号并发、队列与 token 刷新策略，可通过 Admin Settings 热更新。
+- `auto_delete.mode`：请求结束后的远端会话清理策略，支持 `none` / `single` / `all`。
+- `history_split`：多轮历史拆分策略，默认开启，避免长历史全部内联进 prompt。
 
-### 环境变量
-
-> 建议：长期维护请优先以 `config.json`（或其 Base64）为单一配置源。环境变量仅保留部署必需项；`DS2API_CONFIG_JSON` 主要用于 Vercel/无持久盘场景，后续可能进一步收敛。
-
-| 变量 | 用途 | 默认值 |
-| --- | --- | --- |
-| `PORT` | 服务端口 | `5001` |
-| `LOG_LEVEL` | 日志级别 | `INFO`（可选：`DEBUG`/`WARN`/`ERROR`） |
-| `DS2API_ADMIN_KEY` | Admin 登录密钥 | `admin` |
-| `DS2API_JWT_SECRET` | Admin JWT 签名密钥 | 等同 `DS2API_ADMIN_KEY` |
-| `DS2API_JWT_EXPIRE_HOURS` | Admin JWT 过期小时数 | `24` |
-| `DS2API_CONFIG_PATH` | 配置文件路径 | `config.json` |
-| `DS2API_CONFIG_JSON` | 直接注入配置（JSON 或 Base64） | — |
-| `DS2API_CHAT_HISTORY_PATH` | 服务器端对话记录文件路径 | `data/chat_history.json` |
-| `DS2API_ENV_WRITEBACK` | 环境变量模式下自动写回配置文件并切换文件模式（`1/true/yes/on`） | 关闭 |
-| `DS2API_STATIC_ADMIN_DIR` | 管理台静态文件目录 | `static/admin` |
-| `DS2API_AUTO_BUILD_WEBUI` | 启动时自动构建 WebUI | 本地开启，Vercel 关闭 |
-| `DS2API_DEV_PACKET_CAPTURE` | 本地开发抓包开关（记录最近会话请求/响应体） | 本地非 Vercel 默认开启 |
-| `DS2API_DEV_PACKET_CAPTURE_LIMIT` | 本地抓包保留条数（超出自动淘汰） | `20` |
-| `DS2API_DEV_PACKET_CAPTURE_MAX_BODY_BYTES` | 单条响应体最大记录字节数 | `5242880` |
-| `DS2API_ACCOUNT_MAX_INFLIGHT` | 每账号最大并发 in-flight 请求数 | `2` |
-| `DS2API_ACCOUNT_MAX_QUEUE` | 等待队列上限 | `recommended_concurrency` |
-| `DS2API_GLOBAL_MAX_INFLIGHT` | 全局最大 in-flight 请求数 | `recommended_concurrency` |
-| `DS2API_VERCEL_INTERNAL_SECRET` | Vercel 混合流式内部鉴权密钥 | 回退用 `DS2API_ADMIN_KEY` |
-| `DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS` | 流式 lease 过期秒数 | `900` |
-| `VERCEL_TOKEN` | Vercel 同步 token | — |
-| `VERCEL_PROJECT_ID` | Vercel 项目 ID | — |
-| `VERCEL_TEAM_ID` | Vercel 团队 ID | — |
-| `DS2API_VERCEL_PROTECTION_BYPASS` | Vercel 部署保护绕过密钥（内部 Node→Go 调用） | — |
-
-> 提示：当检测到 `DS2API_CONFIG_JSON` 时，管理台会显示当前模式风险与自动持久化状态（含 `DS2API_CONFIG_PATH` 路径与模式切换说明）。
-
-#### 必填 / 可选（按部署方式）
-
-- **所有部署都必填**：`DS2API_ADMIN_KEY`
-- **配置来源二选一（推荐前者）**：
-  - `config.json` 文件（推荐，持久化更直观）
-  - `DS2API_CONFIG_JSON`（可选，适合 Vercel；支持 JSON 或 Base64）
-- **仅在环境变量配置模式建议开启**：`DS2API_ENV_WRITEBACK=1`（避免管理台改动重启后丢失）
-- 其余环境变量均为可选调优项。
+环境变量完整列表见 [部署指南](docs/DEPLOY.md)，接口鉴权规则见 [API.md](API.md#鉴权规则)。
 
 ## 鉴权模式
 
@@ -460,44 +357,18 @@ go run ./cmd/ds2api
 
 ## 测试
 
-```bash
-# 单元测试（Go + Node）
-./tests/scripts/run-unit-all.sh
-
-# 一键端到端全链路测试（真实账号，生成完整请求/响应日志）
-./tests/scripts/run-live.sh
-
-# 或自定义参数
-go run ./cmd/ds2api-tests \
-  --config config.json \
-  --admin-key admin \
-  --out artifacts/testsuite \
-  --timeout 120 \
-  --retries 2
-```
-
-```bash
-# 发布前阻断门禁
-./tests/scripts/check-stage6-manual-smoke.sh
-./tests/scripts/check-refactor-line-gate.sh
-./tests/scripts/run-unit-all.sh
-npm ci --prefix webui && npm run build --prefix webui
-```
-
-## 测试
-
 详细测试指南请参阅 [docs/TESTING.md](docs/TESTING.md)。
 
 ### 快速测试命令
 
 ```bash
-# 运行所有单元测试
-go test ./...
+# 本地 PR 门禁
+./scripts/lint.sh
+./tests/scripts/check-refactor-line-gate.sh
+./tests/scripts/run-unit-all.sh
+npm run build --prefix webui
 
-# 运行 tool calls 相关测试（调试工具调用问题）
-go test -v -run 'TestParseToolCalls|TestRepair' ./internal/toolcall/
-
-# 运行端到端测试
+# 端到端全链路测试（真实账号，生成完整请求/响应日志）
 ./tests/scripts/run-live.sh
 ```
 

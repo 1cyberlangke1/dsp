@@ -4,9 +4,9 @@
 
 > 本文档用于集中维护“代码目录结构 + 模块边界 + 主链路调用关系”。
 
-## 1. 顶层目录结构（展开）
+## 1. 顶层目录结构（核心目录）
 
-> 说明：以下为仓库内业务相关目录的**完整展开**（排除 `.git/` 与 `webui/node_modules/` 这类依赖/元数据目录），并标注每个文件夹作用。
+> 说明：以下为仓库内主要业务目录（排除 `.git/` 与 `webui/node_modules/` 这类依赖/元数据目录），并标注每个文件夹作用。新增目录以代码为准，不要求在本文做逐文件展开。
 
 ```text
 ds2api/
@@ -27,6 +27,7 @@ ds2api/
 │   │   └── openai/                       # OpenAI 协议与统一执行核心
 │   ├── admin/                            # Admin API（配置/账号/运维）
 │   ├── auth/                             # 鉴权/JWT/凭证解析
+│   ├── chathistory/                      # 服务器端对话记录存储与查询
 │   ├── claudeconv/                       # Claude 消息格式转换工具
 │   ├── compat/                           # 兼容性辅助与回归支持
 │   ├── config/                           # 配置加载、校验、热更新
@@ -44,6 +45,7 @@ ds2api/
 │   ├── prompt/                           # Prompt 组装
 │   ├── rawsample/                        # raw sample 读写与管理
 │   ├── server/                           # 路由与中间件装配
+│   │   └── data/                         # 路由/运行时辅助数据
 │   ├── sse/                              # SSE 解析工具
 │   ├── stream/                           # 统一流式消费引擎
 │   ├── testsuite/                        # 测试集执行框架
@@ -118,6 +120,7 @@ flowchart LR
 - `internal/stream` + `internal/sse`：流式解析与增量处理。
 - `internal/toolcall`：canonical XML 工具调用解析与防泄漏筛分（唯一可执行格式：`<tool_calls>` / `<invoke name="...">` / `<parameter name="...">`）。
 - `internal/admin`：配置管理、账号管理、Vercel 同步、版本检查、开发抓包。
+- `internal/chathistory`：服务器端对话记录持久化、分页、单条详情和保留策略。
 - `internal/config`：配置加载、校验、运行时 settings 热更新。
 - `internal/account`：托管账号池、并发槽位、等待队列。
 

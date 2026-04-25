@@ -259,12 +259,13 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # optional for personal accounts
 | `DS2API_ENV_WRITEBACK` | When `DS2API_CONFIG_JSON` is present, auto-write to `DS2API_CONFIG_PATH` and switch to file-backed mode after success (`1/true/yes/on`) | Disabled |
 | `DS2API_VERCEL_INTERNAL_SECRET` | Hybrid streaming internal auth | Falls back to `DS2API_ADMIN_KEY` |
 | `DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS` | Stream lease TTL | `900` |
+| `DS2API_RAW_STREAM_SAMPLE_ROOT` | Raw stream sample root for saving/reading samples | `tests/raw_stream_samples` |
 | `VERCEL_TOKEN` | Vercel sync token | — |
 | `VERCEL_PROJECT_ID` | Vercel project ID | — |
 | `VERCEL_TEAM_ID` | Vercel team ID | — |
 | `DS2API_VERCEL_PROTECTION_BYPASS` | Deployment protection bypass for internal Node→Go calls | — |
 
-### 3.3 Vercel Architecture
+### 3.4 Vercel Architecture
 
 ```text
 Request ──────┐
@@ -306,7 +307,7 @@ Vercel Go Runtime applies platform-level response buffering, so this project use
 
 `vercel.json` sets `maxDuration: 300` for both `api/chat-stream.js` and `api/index.go` (subject to your Vercel plan limits).
 
-### 3.4 Vercel Troubleshooting
+### 3.5 Vercel Troubleshooting
 
 #### Go Build Failure
 
@@ -350,7 +351,7 @@ If API responses return Vercel HTML `Authentication Required`:
 - **Option B**: Add `x-vercel-protection-bypass` header to requests
 - **Option C**: Set `VERCEL_AUTOMATION_BYPASS_SECRET` (or `DS2API_VERCEL_PROTECTION_BYPASS`) for internal Node→Go calls
 
-### 3.5 Build Artifacts Not Committed
+### 3.6 Build Artifacts Not Committed
 
 - `static/admin` directory is not in Git
 - Vercel / Docker automatically generate WebUI assets during build
@@ -577,4 +578,4 @@ The testsuite automatically performs:
 - ✅ Live scenario verification (OpenAI/Claude/Admin/concurrency/toolcall/streaming)
 - ✅ Full request/response artifact logging for debugging
 
-For detailed testsuite documentation, see [TESTING.md](TESTING.md).
+For detailed testsuite documentation, see [TESTING.md](TESTING.md). The fixed local PR gates are listed in [TESTING.md](TESTING.md#pr-门禁--pr-gates).
