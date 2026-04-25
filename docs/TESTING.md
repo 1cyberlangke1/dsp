@@ -209,8 +209,8 @@ go test -v -run TestParseToolCallsWithDeepSeekHallucination ./internal/toolcall/
 # 运行 format 相关测试
 go test -v ./internal/format/...
 
-# 运行 adapter 相关测试
-go test -v ./internal/adapter/openai/...
+# 运行 HTTP API 相关测试
+go test -v ./internal/httpapi/openai/...
 ```
 
 ### 调试 Tool Call 问题 | Debugging Tool Call Issues

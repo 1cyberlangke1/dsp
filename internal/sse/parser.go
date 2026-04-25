@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"ds2api/internal/deepseek"
+	dsprotocol "ds2api/internal/deepseek/protocol"
 )
 
 type ContentPart struct {
@@ -34,10 +34,10 @@ func shouldSkipPath(path string) bool {
 	if isFragmentStatusPath(path) {
 		return true
 	}
-	if _, ok := deepseek.SkipExactPathSet[path]; ok {
+	if _, ok := dsprotocol.SkipExactPathSet[path]; ok {
 		return true
 	}
-	for _, p := range deepseek.SkipContainsPatterns {
+	for _, p := range dsprotocol.SkipContainsPatterns {
 		if strings.Contains(path, p) {
 			return true
 		}

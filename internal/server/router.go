@@ -15,14 +15,18 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"ds2api/internal/account"
-	"ds2api/internal/adapter/claude"
-	"ds2api/internal/adapter/gemini"
-	"ds2api/internal/adapter/openai"
-	"ds2api/internal/admin"
 	"ds2api/internal/auth"
 	"ds2api/internal/chathistory"
 	"ds2api/internal/config"
-	"ds2api/internal/deepseek"
+	dsclient "ds2api/internal/deepseek/client"
+	"ds2api/internal/httpapi/admin"
+	"ds2api/internal/httpapi/claude"
+	"ds2api/internal/httpapi/gemini"
+	"ds2api/internal/httpapi/openai/chat"
+	"ds2api/internal/httpapi/openai/embeddings"
+	"ds2api/internal/httpapi/openai/files"
+	"ds2api/internal/httpapi/openai/responses"
+	"ds2api/internal/httpapi/openai/shared"
 	"ds2api/internal/webui"
 )
 
@@ -30,7 +34,7 @@ type App struct {
 	Store    *config.Store
 	Pool     *account.Pool
 	Resolver *auth.Resolver
-	DS       *deepseek.Client
+	DS       *dsclient.Client
 	Router   http.Handler
 }
 
@@ -40,11 +44,11 @@ func NewApp() (*App, error) {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
 	pool := account.NewPool(store)
-	var dsClient *deepseek.Client
+	var dsClient *dsclient.Client
 	resolver := auth.NewResolver(store, pool, func(ctx context.Context, acc config.Account) (string, error) {
 		return dsClient.Login(ctx, acc)
 	})
-	dsClient = deepseek.NewClient(store, resolver)
+	dsClient = dsclient.NewClient(store, resolver)
 	if err := dsClient.PreloadPow(context.Background()); err != nil {
 		config.Logger.Warn("[PoW] init failed", "error", err)
 	} else {
@@ -55,10 +59,14 @@ func NewApp() (*App, error) {
 		config.Logger.Warn("[chat_history] unavailable", "path", chatHistoryStore.Path(), "error", err)
 	}
 
-	openaiHandler := &openai.Handler{Store: store, Auth: resolver, DS: dsClient, ChatHistory: chatHistoryStore}
-	claudeHandler := &claude.Handler{Store: store, Auth: resolver, DS: dsClient, OpenAI: openaiHandler}
-	geminiHandler := &gemini.Handler{Store: store, Auth: resolver, DS: dsClient, OpenAI: openaiHandler}
-	adminHandler := &admin.Handler{Store: store, Pool: pool, DS: dsClient, OpenAI: openaiHandler, ChatHistory: chatHistoryStore}
+	modelsHandler := &shared.ModelsHandler{Store: store}
+	chatHandler := &chat.Handler{Store: store, Auth: resolver, DS: dsClient, ChatHistory: chatHistoryStore}
+	responsesHandler := &responses.Handler{Store: store, Auth: resolver, DS: dsClient, ChatHistory: chatHistoryStore}
+	filesHandler := &files.Handler{Store: store, Auth: resolver, DS: dsClient, ChatHistory: chatHistoryStore}
+	embeddingsHandler := &embeddings.Handler{Store: store, Auth: resolver, DS: dsClient, ChatHistory: chatHistoryStore}
+	claudeHandler := &claude.Handler{Store: store, Auth: resolver, DS: dsClient, OpenAI: chatHandler}
+	geminiHandler := &gemini.Handler{Store: store, Auth: resolver, DS: dsClient, OpenAI: chatHandler}
+	adminHandler := &admin.Handler{Store: store, Pool: pool, DS: dsClient, OpenAI: chatHandler, ChatHistory: chatHistoryStore}
 	webuiHandler := webui.NewHandler()
 
 	r := chi.NewRouter()
@@ -83,7 +91,13 @@ func NewApp() (*App, error) {
 	r.Head("/healthz", healthzHandler)
 	r.Get("/readyz", readyzHandler)
 	r.Head("/readyz", readyzHandler)
-	openai.RegisterRoutes(r, openaiHandler)
+	r.Get("/v1/models", modelsHandler.ListModels)
+	r.Get("/v1/models/{model_id}", modelsHandler.GetModel)
+	r.Post("/v1/chat/completions", chatHandler.ChatCompletions)
+	r.Post("/v1/responses", responsesHandler.Responses)
+	r.Get("/v1/responses/{response_id}", responsesHandler.GetResponseByID)
+	r.Post("/v1/files", filesHandler.UploadFile)
+	r.Post("/v1/embeddings", embeddingsHandler.Embeddings)
 	claude.RegisterRoutes(r, claudeHandler)
 	gemini.RegisterRoutes(r, geminiHandler)
 	r.Route("/admin", func(ar chi.Router) {

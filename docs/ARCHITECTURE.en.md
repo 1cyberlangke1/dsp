@@ -21,28 +21,37 @@ ds2api/
 ├── docs/                                 # Project documentation
 ├── internal/                             # Core implementation (non-public packages)
 │   ├── account/                          # Account pool, inflight slots, waiting queue
-│   ├── adapter/                          # Multi-protocol adapters
-│   │   ├── claude/                       # Claude protocol adapter
-│   │   ├── gemini/                       # Gemini protocol adapter
-│   │   └── openai/                       # OpenAI adapter and shared execution core
-│   ├── admin/                            # Admin API (config/accounts/ops)
 │   ├── auth/                             # Auth/JWT/credential resolution
 │   ├── chathistory/                      # Server-side conversation history storage/query
 │   ├── claudeconv/                       # Claude message conversion helpers
 │   ├── compat/                           # Compatibility and regression helpers
 │   ├── config/                           # Config loading/validation/hot reload
-│   ├── deepseek/                         # DeepSeek upstream client capabilities
+│   ├── deepseek/                         # DeepSeek upstream client/protocol/transport
+│   │   ├── client/                       # Login/session/completion/upload/delete calls
+│   │   ├── protocol/                     # DeepSeek URLs, constants, skip path/pattern
 │   │   └── transport/                    # DeepSeek transport details
 │   ├── devcapture/                       # Dev capture and troubleshooting
 │   ├── format/                           # Response formatting layer
 │   │   ├── claude/                       # Claude output formatting
 │   │   └── openai/                       # OpenAI output formatting
+│   ├── httpapi/                          # HTTP surfaces: OpenAI/Claude/Gemini/Admin
+│   │   ├── admin/                        # Admin API root assembly and resource packages
+│   │   ├── claude/                       # Claude HTTP protocol adapter
+│   │   ├── gemini/                       # Gemini HTTP protocol adapter
+│   │   └── openai/                       # OpenAI HTTP surface
+│   │       ├── chat/                     # Chat Completions execution entrypoint
+│   │       ├── responses/                # Responses API and response store
+│   │       ├── files/                    # Files API and inline-file preprocessing
+│   │       ├── embeddings/               # Embeddings API
+│   │       ├── history/                  # OpenAI history split
+│   │       └── shared/                   # OpenAI HTTP errors/models/tool formatting
 │   ├── js/                               # Node runtime related logic
 │   │   ├── chat-stream/                  # Node streaming bridge
 │   │   ├── helpers/                      # JS helper modules
 │   │   │   └── stream-tool-sieve/        # JS implementation of tool sieve
 │   │   └── shared/                       # Shared semantics between Go/Node
 │   ├── prompt/                           # Prompt composition
+│   ├── promptcompat/                     # API request -> DeepSeek web-chat plain-text compatibility
 │   ├── rawsample/                        # Raw sample read/write and management
 │   ├── server/                           # Router and middleware assembly
 │   │   └── data/                         # Router/runtime helper data
@@ -51,6 +60,7 @@ ds2api/
 │   ├── testsuite/                        # Testsuite execution framework
 │   ├── textclean/                        # Text cleanup
 │   ├── toolcall/                         # Tool-call parsing and repair
+│   ├── toolstream/                       # Go streaming tool-call anti-leak and delta detection
 │   ├── translatorcliproxy/               # Cross-protocol translation bridge
 │   ├── util/                             # Shared utility helpers
 │   ├── version/                          # Version query/compare
@@ -93,33 +103,34 @@ ds2api/
 ```mermaid
 flowchart LR
     C[Client/SDK] --> R[internal/server/router.go]
-    R --> OA[OpenAI Adapter]
-    R --> CA[Claude Adapter]
-    R --> GA[Gemini Adapter]
-    R --> AD[Admin API]
+    R --> OA[OpenAI HTTP API]
+    R --> CA[Claude HTTP API]
+    R --> GA[Gemini HTTP API]
+    R --> AD[Admin HTTP API]
 
     CA --> BR[translatorcliproxy]
     GA --> BR
-    BR --> CORE[internal/adapter/openai ChatCompletions]
+    BR --> CORE[internal/httpapi/openai/chat ChatCompletions]
     OA --> CORE
 
     CORE --> AUTH[internal/auth + config key/account resolver]
     CORE --> POOL[internal/account queue + concurrency]
-    CORE --> TOOL[internal/toolcall parser + sieve]
-    CORE --> DS[internal/deepseek client]
+    CORE --> TOOL[internal/toolcall parser + internal/toolstream sieve]
+    CORE --> DS[internal/deepseek/client]
     DS --> U[DeepSeek upstream]
 ```
 
 ## 3. Responsibilities in `internal/`
 
 - `internal/server`: router tree + middlewares (health, protocol routes, Admin/WebUI).
-- `internal/adapter/openai`: shared execution core (chat/responses/embeddings + tool semantics).
-- `internal/adapter/{claude,gemini}`: protocol wrappers only (no duplicated upstream execution).
+- `internal/httpapi/openai/*`: OpenAI HTTP surface split into chat, responses, files, embeddings, history, and shared packages.
+- `internal/httpapi/{claude,gemini}`: protocol wrappers only (no duplicated upstream execution).
+- `internal/promptcompat`: compatibility core for turning OpenAI/Claude/Gemini requests into DeepSeek web-chat plain-text context.
 - `internal/translatorcliproxy`: structure translation between Claude/Gemini and OpenAI.
-- `internal/deepseek`: upstream request/session/PoW/SSE handling.
+- `internal/deepseek/{client,protocol,transport}`: upstream requests, sessions, PoW adaptation, protocol constants, and transport details.
 - `internal/stream` + `internal/sse`: stream parsing and incremental assembly.
-- `internal/toolcall`: canonical XML tool-call parsing + anti-leak sieve (the only executable format is `<tool_calls>` / `<invoke name="...">` / `<parameter name="...">`).
-- `internal/admin`: config/accounts/vercel sync/version/dev-capture endpoints.
+- `internal/toolcall` + `internal/toolstream`: canonical XML tool-call parsing + anti-leak sieve (the only executable format is `<tool_calls>` / `<invoke name="...">` / `<parameter name="...">`).
+- `internal/httpapi/admin/*`: Admin API root assembly plus auth/accounts/config/settings/proxies/rawsamples/vercel/history/devcapture/version resource packages.
 - `internal/chathistory`: server-side conversation history persistence, pagination, detail lookup, and retention policy.
 - `internal/config`: config loading/validation + runtime settings hot-reload.
 - `internal/account`: managed account pool, inflight slots, waiting queue.
