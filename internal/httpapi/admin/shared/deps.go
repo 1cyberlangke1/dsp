@@ -35,6 +35,9 @@ type ConfigStore interface {
 	AutoDeleteMode() string
 	HistorySplitEnabled() bool
 	HistorySplitTriggerAfterTurns() int
+	CurrentInputFileEnabled() bool
+	CurrentInputFileMinChars() int
+	ThinkingInjectionEnabled() bool
 	CompatStripReferenceMarkers() bool
 	AutoDeleteSessions() bool
 }

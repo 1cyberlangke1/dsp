@@ -34,6 +34,13 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 			"enabled":             h.Store.HistorySplitEnabled(),
 			"trigger_after_turns": h.Store.HistorySplitTriggerAfterTurns(),
 		},
+		"current_input_file": map[string]any{
+			"enabled":   h.Store.CurrentInputFileEnabled(),
+			"min_chars": h.Store.CurrentInputFileMinChars(),
+		},
+		"thinking_injection": map[string]any{
+			"enabled": h.Store.ThinkingInjectionEnabled(),
+		},
 		"model_aliases":     snap.ModelAliases,
 		"env_backed":        h.Store.IsEnvBacked(),
 		"needs_vercel_sync": needsSync,
