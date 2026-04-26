@@ -175,6 +175,26 @@ func TestParseToolCallsRejectsBareInvokeWithoutToolCallsWrapper(t *testing.T) {
 	}
 }
 
+func TestParseToolCallsRepairsMissingOpeningToolCallsWrapperWhenClosingTagExists(t *testing.T) {
+	text := `Before tool call
+<invoke name="read_file"><parameter name="path">README.md</parameter></invoke>
+</tool_calls>
+after`
+	res := ParseToolCallsDetailed(text, []string{"read_file"})
+	if len(res.Calls) != 1 {
+		t.Fatalf("expected repaired wrapper to parse exactly one call, got %#v", res)
+	}
+	if res.Calls[0].Name != "read_file" {
+		t.Fatalf("expected repaired wrapper to preserve tool name, got %#v", res.Calls[0])
+	}
+	if got, _ := res.Calls[0].Input["path"].(string); got != "README.md" {
+		t.Fatalf("expected repaired wrapper to preserve args, got %#v", res.Calls[0].Input)
+	}
+	if !res.SawToolCallSyntax {
+		t.Fatalf("expected repaired wrapper to mark tool syntax seen, got %#v", res)
+	}
+}
+
 func TestParseToolCallsRejectsLegacyCanonicalBody(t *testing.T) {
 	text := `<tool_calls><invoke name="read_file"><tool_name>read_file</tool_name><param>{"path":"README.md"}</param></invoke></tool_calls>`
 	calls := ParseToolCalls(text, []string{"read_file"})

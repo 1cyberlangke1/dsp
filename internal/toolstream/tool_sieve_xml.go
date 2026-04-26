@@ -10,7 +10,7 @@ import (
 
 //nolint:unused // kept as explicit tag inventory for future XML sieve refinements.
 var xmlToolCallClosingTags = []string{"</tool_calls>"}
-var xmlToolCallOpeningTags = []string{"<tool_calls"}
+var xmlToolCallOpeningTags = []string{"<tool_calls", "<invoke"}
 
 // xmlToolCallTagPairs maps each opening tag to its expected closing tag.
 // Order matters: longer/wrapper tags must be checked first.
@@ -24,7 +24,7 @@ var xmlToolCallTagPairs = []struct{ open, close string }{
 var xmlToolCallBlockPattern = regexp.MustCompile(`(?is)(<tool_calls\b[^>]*>\s*(?:.*?)\s*</tool_calls>)`)
 
 // xmlToolTagsToDetect is the set of XML tag prefixes used by findToolSegmentStart.
-var xmlToolTagsToDetect = []string{"<tool_calls>", "<tool_calls\n", "<tool_calls "}
+var xmlToolTagsToDetect = []string{"<tool_calls>", "<tool_calls\n", "<tool_calls ", "<invoke ", "<invoke\n", "<invoke\t", "<invoke\r"}
 
 // consumeXMLToolCapture tries to extract complete XML tool call blocks from captured text.
 func consumeXMLToolCapture(captured string, toolNames []string) (prefix string, calls []toolcall.ParsedToolCall, suffix string, ready bool) {
@@ -54,6 +54,22 @@ func consumeXMLToolCapture(captured string, toolNames []string) (prefix string, 
 		}
 		// If this block failed to become a tool call, pass it through as text.
 		return prefixPart + xmlBlock, nil, suffixPart, true
+	}
+	if !strings.Contains(lower, "<tool_calls") {
+		invokeIdx := strings.Index(lower, "<invoke")
+		closeIdx := strings.LastIndex(lower, "</tool_calls>")
+		if invokeIdx >= 0 && closeIdx > invokeIdx {
+			closeEnd := closeIdx + len("</tool_calls>")
+			xmlBlock := "<tool_calls>" + captured[invokeIdx:closeIdx] + "</tool_calls>"
+			prefixPart := captured[:invokeIdx]
+			suffixPart := captured[closeEnd:]
+			parsed := toolcall.ParseToolCalls(xmlBlock, toolNames)
+			if len(parsed) > 0 {
+				prefixPart, suffixPart = trimWrappingJSONFence(prefixPart, suffixPart)
+				return prefixPart, parsed, suffixPart, true
+			}
+			return prefixPart + captured[invokeIdx:closeEnd], nil, suffixPart, true
+		}
 	}
 	return "", nil, "", false
 }

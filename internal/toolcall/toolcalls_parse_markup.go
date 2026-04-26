@@ -11,9 +11,17 @@ var xmlToolCallsWrapperPattern = regexp.MustCompile(`(?is)<tool_calls\b[^>]*>\s*
 var xmlInvokePattern = regexp.MustCompile(`(?is)<invoke\b([^>]*)>\s*(.*?)\s*</invoke>`)
 var xmlParameterPattern = regexp.MustCompile(`(?is)<parameter\b([^>]*)>\s*(.*?)\s*</parameter>`)
 var xmlAttrPattern = regexp.MustCompile(`(?is)\b([a-z0-9_:-]+)\s*=\s*("([^"]*)"|'([^']*)')`)
+var xmlToolCallsClosePattern = regexp.MustCompile(`(?is)</tool_calls>`)
+var xmlInvokeStartPattern = regexp.MustCompile(`(?is)<invoke\b[^>]*\bname\s*=\s*("([^"]*)"|'([^']*)')`)
 
 func parseXMLToolCalls(text string) []ParsedToolCall {
 	wrappers := xmlToolCallsWrapperPattern.FindAllStringSubmatch(text, -1)
+	if len(wrappers) == 0 {
+		repaired := repairMissingXMLToolCallsOpeningWrapper(text)
+		if repaired != text {
+			wrappers = xmlToolCallsWrapperPattern.FindAllStringSubmatch(repaired, -1)
+		}
+	}
 	if len(wrappers) == 0 {
 		return nil
 	}
@@ -34,6 +42,28 @@ func parseXMLToolCalls(text string) []ParsedToolCall {
 		return nil
 	}
 	return out
+}
+
+func repairMissingXMLToolCallsOpeningWrapper(text string) string {
+	lower := strings.ToLower(text)
+	if strings.Contains(lower, "<tool_calls") {
+		return text
+	}
+
+	closeMatches := xmlToolCallsClosePattern.FindAllStringIndex(text, -1)
+	if len(closeMatches) == 0 {
+		return text
+	}
+	invokeLoc := xmlInvokeStartPattern.FindStringIndex(text)
+	if invokeLoc == nil {
+		return text
+	}
+	closeLoc := closeMatches[len(closeMatches)-1]
+	if invokeLoc[0] >= closeLoc[0] {
+		return text
+	}
+
+	return text[:invokeLoc[0]] + "<tool_calls>" + text[invokeLoc[0]:closeLoc[0]] + "</tool_calls>" + text[closeLoc[1]:]
 }
 
 func parseSingleXMLToolCall(block []string) (ParsedToolCall, bool) {
