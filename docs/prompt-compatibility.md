@@ -153,6 +153,7 @@ OpenAI Chat / Responses 在标准化后、history split / current input file 之
 
 工具调用正例现在优先示范官方 DSML 风格：`<|DSML|tool_calls>` → `<|DSML|invoke name="...">` → `<|DSML|parameter name="...">`。
 兼容层仍接受旧式纯 `<tool_calls>` wrapper，但提示词会优先要求模型输出官方 DSML 标签，并强调不能只输出 closing wrapper 而漏掉 opening tag。需要注意：这是“兼容 DSML 外壳，内部仍以 XML 解析语义为准”，不是原生 DSML 全链路实现；DSML 标签会在解析入口归一化回现有 XML 标签后继续走同一套 parser。
+数组参数使用 `<item>...</item>` 子节点表示；当某个参数体只包含 item 子节点时，Go / Node 解析器会把它还原成数组，避免 `questions` / `options` 这类 schema 中要求 array 的参数被误解析成 `{ "item": ... }` 对象。若模型把完整结构化 XML fragment 误包进 CDATA，兼容层会在保护 `content` / `command` 等原文字段的前提下，尝试把非原文字段中的 CDATA XML fragment 还原成 object / array。
 正例中的工具名只会来自当前请求实际声明的工具；如果当前请求没有足够的已知工具形态，就省略对应的单工具、多工具或嵌套示例，避免把不可用工具名写进 prompt。
 对执行类工具，脚本内容必须进入执行参数本身：`Bash` / `execute_command` 使用 `command`，`exec_command` 使用 `cmd`；不要把脚本示范成 `path` / `content` 文件写入参数。
 
