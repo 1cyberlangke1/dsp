@@ -53,6 +53,21 @@ func TestParseToolCallsSupportsDSMLShellWithCanonicalExampleInCDATA(t *testing.T
 	}
 }
 
+func TestParseToolCallsPreservesSimpleCDATAInlineMarkupAsText(t *testing.T) {
+	text := `<tool_calls><invoke name="Write"><parameter name="description"><![CDATA[<b>urgent</b>]]></parameter></invoke></tool_calls>`
+	calls := ParseToolCalls(text, []string{"Write"})
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 call, got %#v", calls)
+	}
+	got, ok := calls[0].Input["description"].(string)
+	if !ok {
+		t.Fatalf("expected description to remain a string, got %#v", calls[0].Input["description"])
+	}
+	if got != "<b>urgent</b>" {
+		t.Fatalf("expected inline markup CDATA to stay raw, got %q", got)
+	}
+}
+
 func TestParseToolCallsTreatsUnclosedCDATAAsText(t *testing.T) {
 	text := `<tool_calls><invoke name="Write"><parameter name="content"><![CDATA[hello world</parameter></invoke></tool_calls>`
 	res := ParseToolCallsDetailed(text, []string{"Write"})
@@ -215,6 +230,21 @@ func TestParseToolCallsTreatsCDATAItemOnlyBodyAsArray(t *testing.T) {
 	}
 	if first["activeForm"] != "Testing EnterWorktree tool" || first["content"] != "Test EnterWorktree tool" || first["status"] != "in_progress" {
 		t.Fatalf("unexpected first todo: %#v", first)
+	}
+}
+
+func TestParseToolCallsTreatsSingleItemCDATAAsArray(t *testing.T) {
+	text := `<tool_calls><invoke name="TodoWrite"><parameter name="todos"><![CDATA[<item>one</item>]]></parameter></invoke></tool_calls>`
+	calls := ParseToolCalls(text, []string{"TodoWrite"})
+	if len(calls) != 1 {
+		t.Fatalf("expected one TodoWrite call, got %#v", calls)
+	}
+	items, ok := calls[0].Input["todos"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("expected single-item CDATA body to parse as array, got %#v", calls[0].Input["todos"])
+	}
+	if got, ok := items[0].(string); !ok || got != "one" {
+		t.Fatalf("expected single item value to stay intact, got %#v", items[0])
 	}
 }
 

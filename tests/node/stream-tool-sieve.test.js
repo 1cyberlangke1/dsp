@@ -104,6 +104,13 @@ test('parseToolCalls keeps canonical XML examples inside DSML CDATA', () => {
   assert.deepEqual(calls[0].input, { path: 'notes.md', content });
 });
 
+test('parseToolCalls preserves simple inline markup inside CDATA as text', () => {
+  const payload = '<tool_calls><invoke name="Write"><parameter name="description"><![CDATA[<b>urgent</b>]]></parameter></invoke></tool_calls>';
+  const calls = parseToolCalls(payload, ['Write']);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].input.description, '<b>urgent</b>');
+});
+
 test('parseToolCalls recovers when CDATA never closes inside a valid wrapper', () => {
   const payload = '<tool_calls><invoke name="Write"><parameter name="content"><![CDATA[hello world</parameter></invoke></tool_calls>';
   const calls = parseToolCalls(payload, ['Write']);
@@ -172,6 +179,13 @@ test('parseToolCalls treats CDATA item-only body as array', () => {
       status: 'completed',
     },
   ]);
+});
+
+test('parseToolCalls treats single-item CDATA body as array', () => {
+  const payload = '<tool_calls><invoke name="TodoWrite"><parameter name="todos"><![CDATA[<item>one</item>]]></parameter></invoke></tool_calls>';
+  const calls = parseToolCalls(payload, ['TodoWrite']);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].input.todos, ['one']);
 });
 
 test('parseToolCalls treats CDATA object fragment as object', () => {
@@ -398,6 +412,31 @@ test('sieve emits tool_calls when DSML tag spans multiple chunks', () => {
   assert.equal(leakedText, '');
   assert.equal(finalCalls.length, 1);
   assert.equal(finalCalls[0].name, 'read_file');
+});
+
+test('sieve emits tool_calls when fullwidth DSML prefix variant spans multiple chunks', () => {
+  const events = runSieve(
+    [
+      '<｜DSML|tool',
+      '_calls>\n',
+      '<|DSML|invoke name="Bash">\n',
+      '<|DSML|parameter name="command"><![CDATA[ls -la /Users/aq/Desktop/myproject/ds2api/]]></|DSML|parameter>\n',
+      '<|DSML|parameter name="description"><![CDATA[List project root contents]]></|DSML|parameter>\n',
+      '</|DSML|invoke>\n',
+      '<|DSML|invoke name="Bash">\n',
+      '<|DSML|parameter name="command"><![CDATA[cat /Users/aq/Desktop/myproject/ds2api/package.json 2>/dev/null || echo "No package.json found"]]></|DSML|parameter>\n',
+      '<|DSML|parameter name="description"><![CDATA[Check for existing package.json]]></|DSML|parameter>\n',
+      '</|DSML|invoke>\n',
+      '</|DSML|tool_calls>',
+    ],
+    ['Bash'],
+  );
+  const leakedText = collectText(events);
+  const finalCalls = events.filter((evt) => evt.type === 'tool_calls').flatMap((evt) => evt.calls || []);
+  assert.equal(leakedText, '');
+  assert.equal(finalCalls.length, 2);
+  assert.equal(finalCalls[0].name, 'Bash');
+  assert.equal(finalCalls[1].name, 'Bash');
 });
 
 test('sieve keeps long XML tool calls buffered until the closing tag arrives', () => {
