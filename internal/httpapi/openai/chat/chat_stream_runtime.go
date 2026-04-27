@@ -128,7 +128,10 @@ func (s *chatStreamRuntime) resetStreamToolCallState() {
 	s.streamToolNames = map[int]string{}
 }
 
-func (s *chatStreamRuntime) finalize(finishReason string) {
+func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool) bool {
+	s.finalErrorStatus = 0
+	s.finalErrorMessage = ""
+	s.finalErrorCode = ""
 	finalThinking := s.thinking.String()
 	finalToolDetectionThinking := s.toolDetectionThinking.String()
 	finalText := cleanVisibleOutput(s.text.String(), s.stripReferenceMarkers)
@@ -204,8 +207,14 @@ func (s *chatStreamRuntime) finalize(finishReason string) {
 	}
 	if len(detected.Calls) == 0 && !s.toolCallsEmitted && strings.TrimSpace(finalText) == "" {
 		status, message, code := upstreamEmptyOutputDetail(finishReason == "content_filter", finalText, finalThinking)
+		if deferEmptyOutput {
+			s.finalErrorStatus = status
+			s.finalErrorMessage = message
+			s.finalErrorCode = code
+			return false
+		}
 		s.sendFailedChunk(status, message, code)
-		return
+		return true
 	}
 	usage := openaifmt.BuildChatUsage(s.finalPrompt, finalThinking, finalText)
 	s.finalFinishReason = finishReason
@@ -218,6 +227,7 @@ func (s *chatStreamRuntime) finalize(finishReason string) {
 		usage,
 	))
 	s.sendDone()
+	return true
 }
 
 func (s *chatStreamRuntime) onParsed(parsed sse.LineResult) streamengine.ParsedDecision {

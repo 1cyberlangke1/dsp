@@ -121,8 +121,15 @@ function parseSSEDataFrames(body) {
 }
 
 async function runMockVercelStream(upstreamLines, prepareOverrides = {}) {
+  return runMockVercelStreamSequence([upstreamLines], prepareOverrides);
+}
+
+async function runMockVercelStreamSequence(upstreamSequences, prepareOverrides = {}) {
   const originalFetch = global.fetch;
   const fetchURLs = [];
+  const fetchBodies = [];
+  let completionCalls = 0;
+  let continueCalls = 0;
   const prepareBody = {
     session_id: 'chatcmpl-test',
     lease_id: 'lease-test',
@@ -137,23 +144,33 @@ async function runMockVercelStream(upstreamLines, prepareOverrides = {}) {
     payload: { prompt: 'hello' },
     ...prepareOverrides,
   };
-  global.fetch = async (url) => {
+  global.fetch = async (url, init = {}) => {
     const textURL = String(url);
     fetchURLs.push(textURL);
+    if (init && init.body) {
+      fetchBodies.push(JSON.parse(String(init.body)));
+    }
     if (textURL.includes('__stream_prepare=1')) {
       return jsonResponse(prepareBody);
     }
     if (textURL.includes('__stream_release=1')) {
       return jsonResponse({ success: true });
     }
-    return sseResponse(upstreamLines);
+    if (textURL.includes('/continue')) {
+      const idx = Math.min(continueCalls + 1, upstreamSequences.length - 1);
+      continueCalls += 1;
+      return sseResponse(upstreamSequences[idx]);
+    }
+    const idx = Math.min(completionCalls, upstreamSequences.length - 1);
+    completionCalls += 1;
+    return sseResponse(upstreamSequences[idx]);
   };
   try {
     const req = new MockStreamRequest();
     const res = new MockStreamResponse();
     const payload = { model: 'gpt-test', stream: true };
     await handleVercelStream(req, res, Buffer.from(JSON.stringify(payload)), payload);
-    return { res, frames: parseSSEDataFrames(res.bodyText()), fetchURLs };
+    return { res, frames: parseSSEDataFrames(res.bodyText()), fetchURLs, fetchBodies };
   } finally {
     global.fetch = originalFetch;
   }
@@ -172,6 +189,37 @@ test('vercel stream emits Go-parity empty-output failure on DONE', async () => {
   assert.equal(failed.error.type, 'rate_limit_error');
   assert.equal(failed.error.code, 'upstream_empty_output');
   assert.equal(frames[1], '[DONE]');
+});
+
+test('vercel stream retries empty output once and keeps one terminal frame', async () => {
+  const { frames, fetchURLs, fetchBodies } = await runMockVercelStreamSequence([
+    ['data: [DONE]\n\n'],
+    ['data: {"p":"response/content","v":"visible"}\n\n', 'data: [DONE]\n\n'],
+  ]);
+  const parsed = frames.filter((frame) => frame !== '[DONE]').map((frame) => JSON.parse(frame));
+  const completionBodies = fetchBodies.filter((body) => Object.hasOwn(body, 'prompt'));
+  assert.equal(fetchURLs.filter((url) => url === 'https://chat.deepseek.com/api/v0/chat/completion').length, 2);
+  assert.equal(frames.filter((frame) => frame === '[DONE]').length, 1);
+  assert.equal(parsed[0].choices[0].delta.content, 'visible');
+  assert.equal(parsed[1].choices[0].finish_reason, 'stop');
+  assert.equal(parsed[0].id, parsed[1].id);
+  assert.match(completionBodies[1].prompt, /Previous reply had no visible output\. Please regenerate the visible final answer or tool call now\.$/);
+});
+
+test('vercel stream exhausts DeepSeek continue before synthetic retry', async () => {
+  const { frames, fetchURLs, fetchBodies } = await runMockVercelStreamSequence([
+    [
+      'data: {"response_message_id":7,"v":{"response":{"message_id":7,"status":"WIP","auto_continue":true}}}\n\n',
+      'data: [DONE]\n\n',
+    ],
+    ['data: {"p":"response/content","v":"continued"}\n\n', 'data: [DONE]\n\n'],
+  ]);
+  const parsed = frames.filter((frame) => frame !== '[DONE]').map((frame) => JSON.parse(frame));
+  assert.equal(fetchURLs.filter((url) => url === 'https://chat.deepseek.com/api/v0/chat/completion').length, 1);
+  assert.equal(fetchURLs.filter((url) => url === 'https://chat.deepseek.com/api/v0/chat/continue').length, 1);
+  assert.equal(parsed[0].choices[0].delta.content, 'continued');
+  assert.equal(parsed[1].choices[0].finish_reason, 'stop');
+  assert.equal(fetchBodies.some((body) => String(body.prompt || '').includes('Previous reply had no visible output')), false);
 });
 
 test('vercel stream emits content_filter failure when upstream filters empty output', async () => {

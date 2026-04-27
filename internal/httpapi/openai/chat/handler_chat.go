@@ -105,10 +105,10 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if stdReq.Stream {
-		h.handleStream(w, r, resp, sessionID, stdReq.ResponseModel, stdReq.FinalPrompt, stdReq.Thinking, stdReq.Search, stdReq.ToolNames, historySession)
+		h.handleStreamWithRetry(w, r, a, resp, payload, pow, sessionID, stdReq.ResponseModel, stdReq.FinalPrompt, stdReq.Thinking, stdReq.Search, stdReq.ToolNames, historySession)
 		return
 	}
-	h.handleNonStream(w, resp, sessionID, stdReq.ResponseModel, stdReq.FinalPrompt, stdReq.Thinking, stdReq.Search, stdReq.ToolNames, historySession)
+	h.handleNonStreamWithRetry(w, r.Context(), a, resp, payload, pow, sessionID, stdReq.ResponseModel, stdReq.FinalPrompt, stdReq.Thinking, stdReq.Search, stdReq.ToolNames, historySession)
 }
 
 func (h *Handler) autoDeleteRemoteSession(ctx context.Context, a *auth.RequestAuth, sessionID string) {
@@ -251,9 +251,9 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 		},
 		OnFinalize: func(reason streamengine.StopReason, _ error) {
 			if string(reason) == "content_filter" {
-				streamRuntime.finalize("content_filter")
+				streamRuntime.finalize("content_filter", false)
 			} else {
-				streamRuntime.finalize("stop")
+				streamRuntime.finalize("stop", false)
 			}
 			if historySession == nil {
 				return

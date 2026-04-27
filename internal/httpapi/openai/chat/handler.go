@@ -123,6 +123,22 @@ func writeUpstreamEmptyOutputError(w http.ResponseWriter, text, thinking string,
 	return shared.WriteUpstreamEmptyOutputError(w, text, thinking, contentFilter)
 }
 
+func emptyOutputRetryEnabled() bool {
+	return shared.EmptyOutputRetryEnabled()
+}
+
+func emptyOutputRetryMaxAttempts() int {
+	return shared.EmptyOutputRetryMaxAttempts()
+}
+
+func clonePayloadWithEmptyOutputRetryPrompt(payload map[string]any) map[string]any {
+	return shared.ClonePayloadWithEmptyOutputRetryPrompt(payload)
+}
+
+func usagePromptWithEmptyOutputRetry(originalPrompt string, retryAttempts int) string {
+	return shared.UsagePromptWithEmptyOutputRetry(originalPrompt, retryAttempts)
+}
+
 func formatIncrementalStreamToolCallDeltas(deltas []toolstream.ToolCallDelta, ids map[int]string) []map[string]any {
 	return shared.FormatIncrementalStreamToolCallDeltas(deltas, ids)
 }
