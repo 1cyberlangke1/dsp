@@ -2,6 +2,7 @@ package toolcall
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"html"
 	"regexp"
 	"strings"
@@ -350,6 +351,9 @@ func parseStructuredCDATAParameterValue(paramName, raw string) (any, bool) {
 	if !strings.Contains(normalized, "<") || !strings.Contains(normalized, ">") {
 		return nil, false
 	}
+	if !cdataFragmentLooksExplicitlyStructured(normalized) {
+		return nil, false
+	}
 	parsed, ok := parseXMLFragmentValue(normalized)
 	if !ok {
 		return nil, false
@@ -373,6 +377,65 @@ func normalizeCDATAForStructuredParse(raw string) string {
 	}
 	normalized := cdataBRSeparatorPattern.ReplaceAllString(raw, "\n")
 	return html.UnescapeString(strings.TrimSpace(normalized))
+}
+
+// Preserve flat CDATA fragments as strings. Only recover structure when the
+// fragment clearly encodes a data shape: multiple sibling elements, nested
+// child elements, or an explicit item list.
+func cdataFragmentLooksExplicitlyStructured(raw string) bool {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return false
+	}
+
+	dec := xml.NewDecoder(strings.NewReader("<root>" + trimmed + "</root>"))
+	tok, err := dec.Token()
+	if err != nil {
+		return false
+	}
+	start, ok := tok.(xml.StartElement)
+	if !ok || !strings.EqualFold(start.Name.Local, "root") {
+		return false
+	}
+
+	depth := 0
+	directChildren := 0
+	firstChildName := ""
+	firstChildHasNested := false
+
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return false
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			if depth == 0 {
+				directChildren++
+				if directChildren == 1 {
+					firstChildName = strings.ToLower(strings.TrimSpace(t.Name.Local))
+				} else {
+					return true
+				}
+			} else if directChildren == 1 && depth == 1 {
+				firstChildHasNested = true
+			}
+			depth++
+		case xml.EndElement:
+			if strings.EqualFold(t.Name.Local, "root") {
+				if directChildren != 1 {
+					return false
+				}
+				if firstChildName == "item" {
+					return true
+				}
+				return firstChildHasNested
+			}
+			if depth > 0 {
+				depth--
+			}
+		}
+	}
 }
 
 func preservesCDATAStringParameter(name string) bool {

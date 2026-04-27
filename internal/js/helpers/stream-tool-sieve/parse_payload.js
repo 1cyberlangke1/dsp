@@ -530,6 +530,7 @@ function findPartialToolMarkupStart(text) {
     '<|tool_calls', '<|invoke', '<|parameter',
     '<｜tool_calls', '<｜invoke', '<｜parameter',
     '<|dsml|tool_calls', '<|dsml|invoke', '<|dsml|parameter',
+    '<｜dsml|tool_calls', '<｜dsml|invoke', '<｜dsml|parameter',
     '<dsmltool_calls', '<dsmlinvoke', '<dsmlparameter',
     '<dsml tool_calls', '<dsml invoke', '<dsml parameter',
     '<dsml|tool_calls', '<dsml|invoke', '<dsml|parameter',
@@ -812,6 +813,9 @@ function parseStructuredCDATAParameterValue(paramName, raw) {
   if (!normalized.includes('<') || !normalized.includes('>')) {
     return { ok: false, value: null };
   }
+  if (!cdataFragmentLooksExplicitlyStructured(normalized)) {
+    return { ok: false, value: null };
+  }
   const parsed = parseMarkupInput(normalized);
   if (Array.isArray(parsed)) {
     return { ok: true, value: parsed };
@@ -824,6 +828,21 @@ function parseStructuredCDATAParameterValue(paramName, raw) {
 
 function normalizeCDATAForStructuredParse(raw) {
   return unescapeHtml(toStringSafe(raw).replace(/<br\s*\/?>/gi, '\n').trim());
+}
+
+function cdataFragmentLooksExplicitlyStructured(raw) {
+  const blocks = findGenericXmlElementBlocks(raw);
+  if (blocks.length === 0) {
+    return false;
+  }
+  if (blocks.length > 1) {
+    return true;
+  }
+  const block = blocks[0];
+  if (toStringSafe(block.localName).trim().toLowerCase() === 'item') {
+    return true;
+  }
+  return findGenericXmlElementBlocks(block.body).length > 0;
 }
 
 function preservesCDATAStringParameter(name) {
