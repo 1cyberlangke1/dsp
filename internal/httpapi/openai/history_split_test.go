@@ -327,20 +327,24 @@ func TestApplyCurrentInputFilePreservesFullContextPromptForTokenCounting(t *test
 	if err != nil {
 		t.Fatalf("normalize failed: %v", err)
 	}
-	originalPrompt := stdReq.FinalPrompt
 
 	out, err := h.applyCurrentInputFile(context.Background(), &auth.RequestAuth{DeepSeekToken: "token"}, stdReq)
 	if err != nil {
 		t.Fatalf("apply current input file failed: %v", err)
 	}
-	if out.PromptTokenText != originalPrompt {
-		t.Fatalf("expected prompt token text to preserve original prompt, got %q want %q", out.PromptTokenText, originalPrompt)
-	}
-	if out.FinalPrompt == originalPrompt {
+	if out.FinalPrompt == stdReq.FinalPrompt {
 		t.Fatalf("expected live prompt to be rewritten after current input file")
 	}
+	// PromptTokenText must include the uploaded file content (which contains the full context)
+	// plus the neutral live prompt — reflecting the actual downstream token cost.
 	if !strings.Contains(out.PromptTokenText, "first user turn") || !strings.Contains(out.PromptTokenText, "latest user turn") {
-		t.Fatalf("expected prompt token text to retain full context, got %q", out.PromptTokenText)
+		t.Fatalf("expected prompt token text to contain file context with full conversation, got %q", out.PromptTokenText)
+	}
+	if !strings.Contains(out.PromptTokenText, "[file content end]") || !strings.Contains(out.PromptTokenText, "[file name]: IGNORE") {
+		t.Fatalf("expected prompt token text to include IGNORE.txt file wrapper, got %q", out.PromptTokenText)
+	}
+	if !strings.Contains(out.PromptTokenText, "Answer the latest user request directly.") {
+		t.Fatalf("expected prompt token text to also include neutral live prompt, got %q", out.PromptTokenText)
 	}
 	if strings.Contains(out.FinalPrompt, "first user turn") || strings.Contains(out.FinalPrompt, "latest user turn") {
 		t.Fatalf("expected live prompt to hide original turns, got %q", out.FinalPrompt)
@@ -487,15 +491,9 @@ func TestChatCompletionsCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *t
 	}
 	usage, _ := body["usage"].(map[string]any)
 	promptTokens := int(usage["prompt_tokens"].(float64))
-	originalPrompt, _ := promptcompat.BuildOpenAIPrompt(historySplitTestMessages(), nil, "", defaultToolChoicePolicy(), true)
-	expectedMin := util.CountPromptTokens(originalPrompt, "deepseek-v4-flash")
-	neutralPrompt := promptText
-	neutralCount := util.CountPromptTokens(neutralPrompt, "deepseek-v4-flash")
-	if promptTokens != expectedMin {
-		t.Fatalf("expected prompt_tokens from full original context, got=%d want=%d", promptTokens, expectedMin)
-	}
+	neutralCount := util.CountPromptTokens(promptText, "deepseek-v4-flash")
 	if promptTokens <= neutralCount {
-		t.Fatalf("expected prompt_tokens to exceed neutral live prompt count, got=%d neutral=%d", promptTokens, neutralCount)
+		t.Fatalf("expected prompt_tokens to exceed neutral live prompt count (includes file context), got=%d neutral=%d", promptTokens, neutralCount)
 	}
 }
 
@@ -545,14 +543,9 @@ func TestResponsesCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *testing
 	}
 	usage, _ := body["usage"].(map[string]any)
 	inputTokens := int(usage["input_tokens"].(float64))
-	originalPrompt, _ := promptcompat.BuildOpenAIPrompt(historySplitTestMessages(), nil, "", defaultToolChoicePolicy(), true)
-	expectedMin := util.CountPromptTokens(originalPrompt, "deepseek-v4-flash")
 	neutralCount := util.CountPromptTokens(promptText, "deepseek-v4-flash")
-	if inputTokens != expectedMin {
-		t.Fatalf("expected input_tokens from full original context, got=%d want=%d", inputTokens, expectedMin)
-	}
 	if inputTokens <= neutralCount {
-		t.Fatalf("expected input_tokens to exceed neutral live prompt count, got=%d neutral=%d", inputTokens, neutralCount)
+		t.Fatalf("expected input_tokens to exceed neutral live prompt count (includes file context), got=%d neutral=%d", inputTokens, neutralCount)
 	}
 }
 
