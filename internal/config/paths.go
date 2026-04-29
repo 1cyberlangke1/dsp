@@ -38,6 +38,14 @@ func ConfigPath() string {
 	return ResolvePath("DS2API_CONFIG_PATH", "config.json")
 }
 
+func legacyContainerConfigPath() string {
+	return "/app/config.json"
+}
+
+func shouldTryLegacyContainerConfigPath() bool {
+	return strings.TrimSpace(os.Getenv("DS2API_CONFIG_PATH")) == "" && BaseDir() == "/app"
+}
+
 func RawStreamSampleRoot() string {
 	return ResolvePath("DS2API_RAW_STREAM_SAMPLE_ROOT", "tests/raw_stream_samples")
 }
