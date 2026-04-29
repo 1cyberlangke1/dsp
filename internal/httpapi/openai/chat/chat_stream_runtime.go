@@ -220,7 +220,7 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 		s.sendFailedChunk(status, message, code)
 		return true
 	}
-	usage := openaifmt.BuildChatUsage(s.finalPrompt, finalThinking, finalText)
+	usage := openaifmt.BuildChatUsageForModel(s.model, s.finalPrompt, finalThinking, finalText)
 	s.finalFinishReason = finishReason
 	s.finalUsage = usage
 	s.sendChunk(openaifmt.BuildChatStreamChunk(
