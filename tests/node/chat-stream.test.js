@@ -511,14 +511,23 @@ test('parseChunkForContent drops thinking content when thinking is disabled', ()
     'text',
   );
   assert.equal(thinking.finished, false);
-  assert.equal(thinking.newType, 'text');
+  assert.equal(thinking.newType, 'thinking');
   assert.deepEqual(thinking.parts, []);
+
+  const hiddenContinuation = parseChunkForContent(
+    { v: 'still hidden' },
+    false,
+    thinking.newType,
+  );
+  assert.equal(hiddenContinuation.newType, 'thinking');
+  assert.deepEqual(hiddenContinuation.parts, []);
 
   const answer = parseChunkForContent(
     { p: 'response/content', v: 'visible answer' },
     false,
-    thinking.newType,
+    hiddenContinuation.newType,
   );
+  assert.equal(answer.newType, 'text');
   assert.deepEqual(answer.parts, [{ text: 'visible answer', type: 'text' }]);
 });
 
