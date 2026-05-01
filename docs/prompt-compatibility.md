@@ -249,7 +249,7 @@ OpenAI 文件相关实现：
 
 兼容层现在只保留 `current_input_file` 这一种拆分方式；旧的 `history_split` 已废弃，只保留为兼容旧配置的字段，不再参与请求处理。
 
-- `current_input_file` 默认开启；它用于把“完整上下文”合并进 `HISTORY.txt` 上下文文件。当最新 user turn 的纯文本长度达到 `current_input_file.min_chars`（默认 `0`）时，兼容层会上传一个文件名为 `HISTORY.txt` 的上下文文件。文件内容会先做 OpenAI 消息标准化，再序列化成按轮次编号的 `HISTORY.txt` 风格 transcript，带有 `# HISTORY.txt` 标题和 `=== N. ROLE ===` 分段；live prompt 中则只保留一个中性的 user 消息要求模型直接回答最新请求，不再暴露文件名或要求模型读取本地文件。
+- `current_input_file` 默认开启；它用于把“完整上下文”合并进 `DS2API_HISTORY.txt` 上下文文件。当最新 user turn 的纯文本长度达到 `current_input_file.min_chars`（默认 `0`）时，兼容层会上传一个文件名为 `DS2API_HISTORY.txt` 的上下文文件。文件内容会先做 OpenAI 消息标准化，再序列化成按轮次编号的 `DS2API_HISTORY.txt` 风格 transcript，带有 `# DS2API_HISTORY.txt` 标题和 `=== N. ROLE ===` 分段；live prompt 中则只保留一个中性的 user 消息要求模型直接回答最新请求，不再暴露文件名或要求模型读取本地文件。
 - 如果 `current_input_file.enabled=false`，请求会直接透传，不上传任何拆分上下文文件。
 - 旧的 `history_split.enabled` / `history_split.trigger_after_turns` 会被读取进配置对象以保持兼容，但不会触发拆分上传，也不会影响 `current_input_file` 的默认开启。
 - 即使触发 `current_input_file` 后 live prompt 被缩短，对客户端回包里的上下文 token 统计，仍会沿用**拆分前的完整 prompt 语义**做计数，而不是按缩短后的占位 prompt 计算；否则会把真实上下文显著算小。
@@ -263,11 +263,11 @@ OpenAI 文件相关实现：
 - 旧历史拆分兼容壳：
   [internal/httpapi/openai/history/history_split.go](../internal/httpapi/openai/history/history_split.go)
 
-当前输入转文件启用并触发时，上传文件的真实文件名是 `HISTORY.txt`，文件内容是完整 `messages` 上下文；它仍会先用 OpenAI 消息标准化和 DeepSeek 角色标记序列化，再按轮次编号成 `HISTORY.txt` 风格的 transcript（不再注入文件边界标签）：
+当前输入转文件启用并触发时，上传文件的真实文件名是 `DS2API_HISTORY.txt`，文件内容是完整 `messages` 上下文；它仍会先用 OpenAI 消息标准化和 DeepSeek 角色标记序列化，再按轮次编号成 `DS2API_HISTORY.txt` 风格的 transcript（不再注入文件边界标签）：
 
 ```text
-[uploaded filename]: HISTORY.txt
-# HISTORY.txt
+[uploaded filename]: DS2API_HISTORY.txt
+# DS2API_HISTORY.txt
 Prior conversation history and tool progress.
 
 === 1. SYSTEM ===
@@ -347,7 +347,7 @@ Prior conversation history and tool progress.
 
 - 大部分结构化语义被压进 `prompt`
 - 文件保持文件
-- 需要时把完整上下文拆进 `HISTORY.txt` 上下文文件，并按轮次编号成 transcript
+- 需要时把完整上下文拆进 `DS2API_HISTORY.txt` 上下文文件，并按轮次编号成 transcript
 
 ## 12. 修改时必须同步本文档的场景
 
@@ -360,7 +360,7 @@ Prior conversation history and tool progress.
 - tool result 注入方式变更
 - tool prompt 模板或 tool_choice 约束变更
 - inline 文件上传 / 文件引用收集规则变更
-- current input file 触发条件、上传格式、`HISTORY.txt` transcript 结构变更
+- current input file 触发条件、上传格式、`DS2API_HISTORY.txt` transcript 结构变更
 - 旧 `history_split` 兼容逻辑的读取、忽略或退化行为变更
 - completion payload 字段语义变更
 - Claude / Gemini 对这套统一语义的复用关系变更

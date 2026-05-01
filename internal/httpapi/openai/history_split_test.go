@@ -68,7 +68,7 @@ func TestBuildOpenAICurrentInputContextTranscriptUsesNumberedHistorySections(t *
 	if strings.Contains(transcript, "[file content end]") || strings.Contains(transcript, "[file content begin]") || strings.Contains(transcript, "[file name]:") {
 		t.Fatalf("expected transcript without file wrapper tags, got %q", transcript)
 	}
-	if !strings.Contains(transcript, "# HISTORY.txt") {
+	if !strings.Contains(transcript, "# DS2API_HISTORY.txt") {
 		t.Fatalf("expected history transcript header, got %q", transcript)
 	}
 	if !strings.Contains(transcript, "Prior conversation history and tool progress.") {
@@ -280,7 +280,7 @@ func TestApplyCurrentInputFileUploadsFirstTurnWithNumberedHistoryTranscript(t *t
 		t.Fatalf("expected 1 current input upload, got %d", len(ds.uploadCalls))
 	}
 	upload := ds.uploadCalls[0]
-	if upload.Filename != "HISTORY.txt" {
+	if upload.Filename != "DS2API_HISTORY.txt" {
 		t.Fatalf("unexpected upload filename: %q", upload.Filename)
 	}
 	uploadedText := string(upload.Data)
@@ -288,7 +288,7 @@ func TestApplyCurrentInputFileUploadsFirstTurnWithNumberedHistoryTranscript(t *t
 		t.Fatalf("expected uploaded transcript without file wrapper tags, got %q", uploadedText)
 	}
 	for _, want := range []string{
-		"# HISTORY.txt",
+		"# DS2API_HISTORY.txt",
 		"=== 1. USER ===",
 		"first turn content that is long enough",
 	} {
@@ -303,7 +303,7 @@ func TestApplyCurrentInputFileUploadsFirstTurnWithNumberedHistoryTranscript(t *t
 	if strings.Contains(out.FinalPrompt, "first turn content that is long enough") {
 		t.Fatalf("expected current input text to be replaced in live prompt, got %s", out.FinalPrompt)
 	}
-	if strings.Contains(out.FinalPrompt, "CURRENT_USER_INPUT.txt") || strings.Contains(out.FinalPrompt, "history.txt") || strings.Contains(out.FinalPrompt, "HISTORY.txt") || strings.Contains(out.FinalPrompt, "Read that file") {
+	if strings.Contains(out.FinalPrompt, "CURRENT_USER_INPUT.txt") || strings.Contains(out.FinalPrompt, "DS2API_HISTORY.txt") || strings.Contains(out.FinalPrompt, "DS2API_HISTORY.txt") || strings.Contains(out.FinalPrompt, "Read that file") {
 		t.Fatalf("expected live prompt not to instruct file reads, got %s", out.FinalPrompt)
 	}
 	if !strings.Contains(out.FinalPrompt, "Answer the latest user request directly.") {
@@ -315,7 +315,7 @@ func TestApplyCurrentInputFileUploadsFirstTurnWithNumberedHistoryTranscript(t *t
 	if !strings.Contains(out.PromptTokenText, "first turn content that is long enough") {
 		t.Fatalf("expected prompt token text to preserve original full context, got %q", out.PromptTokenText)
 	}
-	if !strings.Contains(out.PromptTokenText, "# HISTORY.txt") || !strings.Contains(out.PromptTokenText, "=== 1. USER ===") {
+	if !strings.Contains(out.PromptTokenText, "# DS2API_HISTORY.txt") || !strings.Contains(out.PromptTokenText, "=== 1. USER ===") {
 		t.Fatalf("expected prompt token text to include numbered history transcript, got %q", out.PromptTokenText)
 	}
 }
@@ -355,7 +355,7 @@ func TestApplyCurrentInputFilePreservesFullContextPromptForTokenCounting(t *test
 	if strings.Contains(out.PromptTokenText, "[file content end]") || strings.Contains(out.PromptTokenText, "[file name]:") {
 		t.Fatalf("expected prompt token text to omit file wrapper tags, got %q", out.PromptTokenText)
 	}
-	if !strings.Contains(out.PromptTokenText, "# HISTORY.txt") || !strings.Contains(out.PromptTokenText, "=== 1. SYSTEM ===") {
+	if !strings.Contains(out.PromptTokenText, "# DS2API_HISTORY.txt") || !strings.Contains(out.PromptTokenText, "=== 1. SYSTEM ===") {
 		t.Fatalf("expected prompt token text to include numbered history transcript, got %q", out.PromptTokenText)
 	}
 	if !strings.Contains(out.PromptTokenText, "Answer the latest user request directly.") {
@@ -397,16 +397,16 @@ func TestApplyCurrentInputFileUploadsFullContextFile(t *testing.T) {
 		t.Fatalf("expected one current input upload, got %d", len(ds.uploadCalls))
 	}
 	upload := ds.uploadCalls[0]
-	if upload.Filename != "HISTORY.txt" {
-		t.Fatalf("expected HISTORY.txt upload, got %q", upload.Filename)
+	if upload.Filename != "DS2API_HISTORY.txt" {
+		t.Fatalf("expected DS2API_HISTORY.txt upload, got %q", upload.Filename)
 	}
 	uploadedText := string(upload.Data)
-	for _, want := range []string{"# HISTORY.txt", "=== 1. SYSTEM ===", "=== 2. USER ===", "=== 3. ASSISTANT ===", "=== 4. TOOL ===", "=== 5. USER ===", "system instructions", "first user turn", "hidden reasoning", "tool result", "latest user turn", promptcompat.ThinkingInjectionMarker} {
+	for _, want := range []string{"# DS2API_HISTORY.txt", "=== 1. SYSTEM ===", "=== 2. USER ===", "=== 3. ASSISTANT ===", "=== 4. TOOL ===", "=== 5. USER ===", "system instructions", "first user turn", "hidden reasoning", "tool result", "latest user turn", promptcompat.ThinkingInjectionMarker} {
 		if !strings.Contains(uploadedText, want) {
 			t.Fatalf("expected full context file to contain %q, got %q", want, uploadedText)
 		}
 	}
-	if strings.Contains(out.FinalPrompt, "first user turn") || strings.Contains(out.FinalPrompt, "latest user turn") || strings.Contains(out.FinalPrompt, "CURRENT_USER_INPUT.txt") || strings.Contains(out.FinalPrompt, "history.txt") || strings.Contains(out.FinalPrompt, "HISTORY.txt") || strings.Contains(out.FinalPrompt, "Read that file") {
+	if strings.Contains(out.FinalPrompt, "first user turn") || strings.Contains(out.FinalPrompt, "latest user turn") || strings.Contains(out.FinalPrompt, "CURRENT_USER_INPUT.txt") || strings.Contains(out.FinalPrompt, "DS2API_HISTORY.txt") || strings.Contains(out.FinalPrompt, "DS2API_HISTORY.txt") || strings.Contains(out.FinalPrompt, "Read that file") {
 		t.Fatalf("expected live prompt to use only a neutral continuation instruction, got %s", out.FinalPrompt)
 	}
 	if !strings.Contains(out.FinalPrompt, "Answer the latest user request directly.") {
@@ -442,7 +442,7 @@ func TestApplyCurrentInputFileCarriesHistoryText(t *testing.T) {
 	if out.HistoryText != string(ds.uploadCalls[0].Data) {
 		t.Fatalf("expected current input file flow to preserve uploaded text in history, got %q", out.HistoryText)
 	}
-	if !strings.Contains(out.HistoryText, "# HISTORY.txt") || !strings.Contains(out.HistoryText, "=== 1. SYSTEM ===") {
+	if !strings.Contains(out.HistoryText, "# DS2API_HISTORY.txt") || !strings.Contains(out.HistoryText, "=== 1. SYSTEM ===") {
 		t.Fatalf("expected history text to use numbered transcript format, got %q", out.HistoryText)
 	}
 }
@@ -476,7 +476,7 @@ func TestChatCompletionsCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *t
 		t.Fatalf("expected 1 upload call, got %d", len(ds.uploadCalls))
 	}
 	upload := ds.uploadCalls[0]
-	if upload.Filename != "HISTORY.txt" {
+	if upload.Filename != "DS2API_HISTORY.txt" {
 		t.Fatalf("unexpected upload filename: %q", upload.Filename)
 	}
 	if upload.Purpose != "assistants" {
@@ -486,7 +486,7 @@ func TestChatCompletionsCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *t
 	if strings.Contains(historyText, "[file content end]") || strings.Contains(historyText, "[file content begin]") || strings.Contains(historyText, "[file name]:") {
 		t.Fatalf("expected history transcript without file wrapper tags, got %s", historyText)
 	}
-	if !strings.Contains(historyText, "# HISTORY.txt") || !strings.Contains(historyText, "=== 1. SYSTEM ===") {
+	if !strings.Contains(historyText, "# DS2API_HISTORY.txt") || !strings.Contains(historyText, "=== 1. SYSTEM ===") {
 		t.Fatalf("expected history transcript to use numbered sections, got %s", historyText)
 	}
 	if !strings.Contains(historyText, "latest user turn") {
@@ -549,7 +549,7 @@ func TestResponsesCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *testing
 		t.Fatalf("expected 1 upload call, got %d", len(ds.uploadCalls))
 	}
 	historyText := string(ds.uploadCalls[0].Data)
-	if !strings.Contains(historyText, "# HISTORY.txt") || !strings.Contains(historyText, "=== 1. SYSTEM ===") {
+	if !strings.Contains(historyText, "# DS2API_HISTORY.txt") || !strings.Contains(historyText, "=== 1. SYSTEM ===") {
 		t.Fatalf("expected uploaded history text to use numbered transcript format, got %s", historyText)
 	}
 	if ds.completionReq == nil {
@@ -699,7 +699,7 @@ func TestCurrentInputFileWorksAcrossAutoDeleteModes(t *testing.T) {
 				t.Fatalf("expected current input upload for mode=%s, got %d", mode, len(ds.uploadCalls))
 			}
 			historyText := string(ds.uploadCalls[0].Data)
-			if !strings.Contains(historyText, "# HISTORY.txt") || !strings.Contains(historyText, "=== 1. SYSTEM ===") {
+			if !strings.Contains(historyText, "# DS2API_HISTORY.txt") || !strings.Contains(historyText, "=== 1. SYSTEM ===") {
 				t.Fatalf("expected uploaded history text to use numbered transcript format, got %s", historyText)
 			}
 			if ds.completionReq == nil {
