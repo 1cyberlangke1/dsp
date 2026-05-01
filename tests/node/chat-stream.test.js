@@ -210,6 +210,37 @@ test('vercel stream retries empty output once and keeps one terminal frame', asy
   assert.match(completionBodies[1].prompt, /Previous reply had no visible output\. Please regenerate the visible final answer or tool call now\.$/);
 });
 
+test('vercel stream coalesces many small content deltas while keeping one choice', async () => {
+  const lines = Array.from({ length: 100 }, () => `data: ${JSON.stringify({ p: 'response/content', v: '字' })}\n\n`);
+  lines.push('data: [DONE]\n\n');
+  const { frames } = await runMockVercelStream(lines);
+  const parsed = frames.filter((frame) => frame !== '[DONE]').map((frame) => JSON.parse(frame));
+  const contentFrames = parsed.filter((item) => item.choices?.[0]?.delta?.content);
+  const content = contentFrames.map((item) => item.choices[0].delta.content).join('');
+  assert.equal(content, '字'.repeat(100));
+  assert.ok(contentFrames.length < 100, `expected fewer than 100 content frames, got ${contentFrames.length}`);
+  for (const item of parsed) {
+    assert.equal(item.choices.length, 1);
+  }
+});
+
+test('vercel stream flushes reasoning before content and before stop', async () => {
+  const { frames } = await runMockVercelStream([
+    `data: ${JSON.stringify({ p: 'response/fragments', o: 'APPEND', v: [
+      { type: 'THINK', content: '思考' },
+      { type: 'THINK', content: '过程' },
+      { type: 'RESPONSE', content: '回答' },
+    ] })}\n\n`,
+    'data: [DONE]\n\n',
+  ], { thinking_enabled: true });
+  const parsed = frames.filter((frame) => frame !== '[DONE]').map((frame) => JSON.parse(frame));
+  const reasoning = parsed.map((item) => item.choices?.[0]?.delta?.reasoning_content || '').join('');
+  const content = parsed.map((item) => item.choices?.[0]?.delta?.content || '').join('');
+  assert.equal(reasoning, '思考过程');
+  assert.equal(content, '回答');
+  assert.equal(parsed.at(-1).choices[0].finish_reason, 'stop');
+});
+
 test('vercel stream exhausts DeepSeek continue before synthetic retry', async () => {
   const { frames, fetchURLs, fetchBodies } = await runMockVercelStreamSequence([
     [

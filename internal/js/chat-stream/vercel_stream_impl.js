@@ -20,7 +20,7 @@ const {
   boolDefaultTrue,
   resetStreamToolCallState,
 } = require('./toolcall_policy');
-const { createChatCompletionEmitter } = require('./stream_emitter');
+const { createChatCompletionEmitter, createDeltaCoalescer } = require('./stream_emitter');
 const {
   asString,
   isAbortError,
@@ -191,6 +191,7 @@ async function handleVercelStream(req, res, rawBody, payload) {
       model,
       isClosed: () => clientClosed,
     });
+    const deltaCoalescer = createDeltaCoalescer({ sendDeltaFrame });
 
     const finish = async (reason, options = {}) => {
       if (ended) {
@@ -201,6 +202,7 @@ async function handleVercelStream(req, res, rawBody, payload) {
         await releaseLease();
         return true;
       }
+      deltaCoalescer.flush();
       const detected = parseStandaloneToolCalls(outputText, toolNames);
       if (detected.length > 0 && !toolCallsDoneEmitted) {
         toolCallsEmitted = true;
@@ -210,6 +212,7 @@ async function handleVercelStream(req, res, rawBody, payload) {
         const tailEvents = flushToolSieve(toolSieveState, toolNames);
         for (const evt of tailEvents) {
           if (evt.type === 'tool_calls' && Array.isArray(evt.calls) && evt.calls.length > 0) {
+            deltaCoalescer.flush();
             toolCallsEmitted = true;
             toolCallsDoneEmitted = true;
             sendDeltaFrame({ tool_calls: formatOpenAIStreamToolCalls(evt.calls, streamToolCallIDs, payload.tools) });
@@ -217,9 +220,10 @@ async function handleVercelStream(req, res, rawBody, payload) {
             continue;
           }
           if (evt.text) {
-            sendDeltaFrame({ content: evt.text });
+            deltaCoalescer.append('content', evt.text);
           }
         }
+        deltaCoalescer.flush();
       }
       if (detected.length > 0 || toolCallsEmitted) {
         reason = 'tool_calls';
@@ -327,7 +331,7 @@ async function handleVercelStream(req, res, rawBody, payload) {
                       continue;
                     }
                     thinkingText += trimmed;
-                    sendDeltaFrame({ reasoning_content: trimmed });
+                    deltaCoalescer.append('reasoning_content', trimmed);
                   }
                 } else {
                   const trimmed = trimContinuationOverlap(outputText, p.text);
@@ -339,7 +343,7 @@ async function handleVercelStream(req, res, rawBody, payload) {
                   }
                   outputText += trimmed;
                   if (!toolSieveEnabled) {
-                    sendDeltaFrame({ content: trimmed });
+                    deltaCoalescer.append('content', trimmed);
                     continue;
                   }
                   const events = processToolSieveChunk(toolSieveState, trimmed, toolNames);
@@ -352,19 +356,21 @@ async function handleVercelStream(req, res, rawBody, payload) {
                       const formatted = formatIncrementalToolCallDeltas(filtered, streamToolCallIDs);
                       if (formatted.length > 0) {
                         toolCallsEmitted = true;
-                      sendDeltaFrame({ tool_calls: formatted });
+                        deltaCoalescer.flush();
+                        sendDeltaFrame({ tool_calls: formatted });
                       }
                       continue;
                     }
                     if (evt.type === 'tool_calls') {
                       toolCallsEmitted = true;
                       toolCallsDoneEmitted = true;
+                      deltaCoalescer.flush();
                       sendDeltaFrame({ tool_calls: formatOpenAIStreamToolCalls(evt.calls, streamToolCallIDs, payload.tools) });
                       resetStreamToolCallState(streamToolCallIDs, streamToolNames);
                       continue;
                     }
                     if (evt.text) {
-                      sendDeltaFrame({ content: evt.text });
+                      deltaCoalescer.append('content', evt.text);
                     }
                   }
                 }

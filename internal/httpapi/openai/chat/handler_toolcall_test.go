@@ -309,6 +309,49 @@ func TestHandleStreamEmitsSingleChoiceFramesForMultipleParsedParts(t *testing.T)
 	}
 }
 
+func TestHandleStreamCoalescesSmallContentDeltas(t *testing.T) {
+	h := &Handler{}
+	lines := make([]string, 0, 101)
+	for i := 0; i < 100; i++ {
+		b, _ := json.Marshal(map[string]any{
+			"p": "response/content",
+			"v": "字",
+		})
+		lines = append(lines, "data: "+string(b))
+	}
+	lines = append(lines, "data: [DONE]")
+	resp := makeSSEHTTPResponse(lines...)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	h.handleStream(rec, req, resp, "cid-coalesce", "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, nil)
+
+	frames, done := parseSSEDataFrames(t, rec.Body.String())
+	if !done {
+		t.Fatalf("expected [DONE], body=%s", rec.Body.String())
+	}
+	var content strings.Builder
+	contentDeltaFrames := 0
+	for _, frame := range frames {
+		choices, _ := frame["choices"].([]any)
+		if len(choices) != 1 {
+			t.Fatalf("expected exactly one choice per stream frame, got %d frame=%#v body=%s", len(choices), frame, rec.Body.String())
+		}
+		choice, _ := choices[0].(map[string]any)
+		delta, _ := choice["delta"].(map[string]any)
+		if c, ok := delta["content"].(string); ok {
+			contentDeltaFrames++
+			content.WriteString(c)
+		}
+	}
+	if got, want := content.String(), strings.Repeat("字", 100); got != want {
+		t.Fatalf("coalesced stream content mismatch: got %q want %q body=%s", got, want, rec.Body.String())
+	}
+	if contentDeltaFrames >= 100 {
+		t.Fatalf("expected coalescing to reduce 100 tiny content frames, got %d body=%s", contentDeltaFrames, rec.Body.String())
+	}
+}
+
 func TestHandleStreamIncompleteCapturedToolJSONFlushesAsTextOnFinalize(t *testing.T) {
 	h := &Handler{}
 	resp := makeSSEHTTPResponse(
