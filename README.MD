@@ -285,7 +285,7 @@ base64 < config.json | tr -d '\n'
 
 ### 方式四：本地源码运行
 
-**前置要求**：Go 1.26+，Node.js `20.19+` 或 `22.12+`（仅在需要构建 WebUI 时）
+**前置要求**：Go 1.26+，Node.js `20.19+` 或 `22.12+`（仅在需要构建 WebUI 时）；同时确保 `npm` 可用，建议 `npm 10+`
 
 ```bash
 # 1. 克隆仓库
@@ -304,7 +304,7 @@ go run ./cmd/ds2api
 
 服务实际绑定：`0.0.0.0:5001`，因此同一局域网设备通常也可以通过你的内网 IP 访问。
 
-> **WebUI 自动构建**：本地首次启动时，若 `static/admin` 不存在，会自动尝试执行 `npm ci`（仅在缺少依赖时）和 `npm run build -- --outDir static/admin --emptyOutDir`（需要本机有 Node.js）。你也可以手动构建：`./scripts/build-webui.sh`
+> **WebUI 自动构建**：本地首次启动时，若 `static/admin` 不存在，会自动尝试执行 `npm ci`（仅在缺少依赖时）和 `npm run build -- --outDir static/admin --emptyOutDir`（需要本机有 Node.js 和 npm）。你也可以手动构建：`./scripts/build-webui.sh`
 
 ## 配置说明
 
@@ -334,6 +334,7 @@ go run ./cmd/ds2api
 | **直通 token 模式** | 传入 token 不在 `config.keys` 中时，直接作为 DeepSeek token 使用 |
 
 可选请求头 `X-Ds2-Target-Account`：指定使用某个托管账号（值为 email 或 mobile）。
+如果指定账号不存在，或者当前管理账号队列已满，请求会返回 `429`；当前 `429` 不附带 `Retry-After` 头。若账号存在但登录/刷新失败，则返回对应的鉴权错误。
 Gemini 路由还可以使用 `x-goog-api-key`，或在没有认证头时使用 `?key=` / `?api_key=` 作为调用方凭据。
 
 ## 并发模型
@@ -346,7 +347,7 @@ Gemini 路由还可以使用 `x-goog-api-key`，或在没有认证头时使用 `
 ```
 
 - 当 in-flight 槽位满时，请求进入等待队列，**不会立即 429**
-- 超出总承载上限后才返回 `429 Too Many Requests`
+- 超出总承载上限后才返回 `429 Too Many Requests`，当前响应不附带 `Retry-After`
 - `GET /admin/queue/status` 返回实时并发状态
 
 ## Tool Call 适配
