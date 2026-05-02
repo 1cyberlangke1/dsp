@@ -122,7 +122,13 @@ func (s *chatStreamRuntime) sendKeepAlive() {
 		return
 	}
 	_, _ = s.w.Write([]byte(": keep-alive\n\n"))
-	_ = s.rc.Flush()
+	s.sendChunk(openaifmt.BuildChatStreamChunk(
+		s.completionID,
+		s.created,
+		s.model,
+		[]map[string]any{},
+		nil,
+	))
 }
 
 func (s *chatStreamRuntime) sendChunk(v any) {
