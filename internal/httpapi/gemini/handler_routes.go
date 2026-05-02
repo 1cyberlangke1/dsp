@@ -18,11 +18,8 @@ type Handler struct {
 }
 
 //nolint:unused // used by native Gemini stream/non-stream runtime helpers.
-func (h *Handler) compatStripReferenceMarkers() bool {
-	if h == nil || h.Store == nil {
-		return true
-	}
-	return h.Store.CompatStripReferenceMarkers()
+func stripReferenceMarkersEnabled() bool {
+	return true
 }
 
 func RegisterRoutes(r chi.Router, h *Handler) {

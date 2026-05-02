@@ -18,10 +18,9 @@ import (
 
 type testGeminiConfig struct{}
 
-func (testGeminiConfig) ModelAliases() map[string]string   { return nil }
-func (testGeminiConfig) CompatStripReferenceMarkers() bool { return true }
-func (testGeminiConfig) CurrentInputFileEnabled() bool     { return true }
-func (testGeminiConfig) CurrentInputFileMinChars() int     { return 0 }
+func (testGeminiConfig) ModelAliases() map[string]string { return nil }
+func (testGeminiConfig) CurrentInputFileEnabled() bool   { return true }
+func (testGeminiConfig) CurrentInputFileMinChars() int   { return 0 }
 
 type testGeminiAuth struct {
 	a   *auth.RequestAuth

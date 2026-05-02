@@ -81,7 +81,7 @@ func (h *Handler) handleGeminiDirect(w http.ResponseWriter, r *http.Request, str
 		return true
 	}
 	result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-		StripReferenceMarkers: h.compatStripReferenceMarkers(),
+		StripReferenceMarkers: stripReferenceMarkersEnabled(),
 		RetryEnabled:          true,
 		CurrentInputFile:      h.Store,
 	})
@@ -294,7 +294,7 @@ func (h *Handler) handleNonStreamGenerateContent(w http.ResponseWriter, resp *ht
 	}
 
 	result := sse.CollectStream(resp, thinkingEnabled, true)
-	stripReferenceMarkers := h.compatStripReferenceMarkers()
+	stripReferenceMarkers := stripReferenceMarkersEnabled()
 	writeJSON(w, http.StatusOK, buildGeminiGenerateContentResponse(
 		model,
 		finalPrompt,

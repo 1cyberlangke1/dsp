@@ -230,7 +230,6 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 	s.finalThinking = turn.Thinking
 	s.finalText = turn.Text
 	if len(turn.ToolCalls) > 0 && !s.toolCallsDoneEmitted {
-		finishReason = "tool_calls"
 		s.sendDelta(map[string]any{
 			"tool_calls": formatFinalStreamToolCallsWithStableIDs(turn.ToolCalls, s.streamToolCallIDs, s.toolsRaw),
 		})
@@ -241,7 +240,6 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 		for _, evt := range toolstream.Flush(&s.toolSieve, s.toolNames) {
 			if len(evt.ToolCalls) > 0 {
 				batch.flush()
-				finishReason = "tool_calls"
 				s.toolCallsEmitted = true
 				s.toolCallsDoneEmitted = true
 				s.sendDelta(map[string]any{
@@ -261,14 +259,11 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 		batch.flush()
 	}
 
-	if len(turn.ToolCalls) > 0 || s.toolCallsEmitted {
-		finishReason = "tool_calls"
-	}
-	if len(turn.ToolCalls) == 0 && !s.toolCallsEmitted && strings.TrimSpace(turn.Text) == "" {
-		status, message, code := upstreamEmptyOutputDetail(finishReason == "content_filter", turn.Text, turn.Thinking)
-		if turn.Error != nil {
-			status, message, code = turn.Error.Status, turn.Error.Message, turn.Error.Code
-		}
+	outcome := assistantturn.FinalizeTurn(turn, assistantturn.FinalizeOptions{
+		AlreadyEmittedToolCalls: s.toolCallsEmitted || s.toolCallsDoneEmitted,
+	})
+	if outcome.ShouldFail {
+		status, message, code := outcome.Error.Status, outcome.Error.Message, outcome.Error.Code
 		if deferEmptyOutput {
 			s.finalErrorStatus = status
 			s.finalErrorMessage = message
@@ -278,29 +273,18 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 		s.sendFailedChunk(status, message, code)
 		return true
 	}
-	usage := chatUsageFromTurn(turn)
-	s.finalFinishReason = finishReason
+	usage := assistantturn.OpenAIChatUsage(turn)
+	s.finalFinishReason = outcome.FinishReason
 	s.finalUsage = usage
 	s.sendChunk(openaifmt.BuildChatStreamChunk(
 		s.completionID,
 		s.created,
 		s.model,
-		[]map[string]any{openaifmt.BuildChatStreamFinishChoice(0, finishReason)},
+		[]map[string]any{openaifmt.BuildChatStreamFinishChoice(0, outcome.FinishReason)},
 		usage,
 	))
 	s.sendDone()
 	return true
-}
-
-func chatUsageFromTurn(turn assistantturn.Turn) map[string]any {
-	return map[string]any{
-		"prompt_tokens":     turn.Usage.InputTokens,
-		"completion_tokens": turn.Usage.OutputTokens,
-		"total_tokens":      turn.Usage.TotalTokens,
-		"completion_tokens_details": map[string]any{
-			"reasoning_tokens": turn.Usage.ReasoningTokens,
-		},
-	}
 }
 
 func (s *chatStreamRuntime) onParsed(parsed sse.LineResult) streamengine.ParsedDecision {

@@ -135,7 +135,7 @@ func captureStatusMiddleware(statuses *[]int) func(http.Handler) http.Handler {
 func TestChatCompletionsStreamStatusCapturedAs200(t *testing.T) {
 	statuses := make([]int, 0, 1)
 	h := &openAITestSurface{
-		Store: mockOpenAIConfig{wideInput: true},
+		Store: mockOpenAIConfig{},
 		Auth:  streamStatusAuthStub{},
 		DS:    streamStatusDSStub{resp: makeOpenAISSEHTTPResponse(`data: {"p":"response/content","v":"hello"}`, "data: [DONE]")},
 	}
@@ -164,7 +164,7 @@ func TestChatCompletionsStreamStatusCapturedAs200(t *testing.T) {
 func TestResponsesStreamStatusCapturedAs200(t *testing.T) {
 	statuses := make([]int, 0, 1)
 	h := &openAITestSurface{
-		Store: mockOpenAIConfig{wideInput: true},
+		Store: mockOpenAIConfig{},
 		Auth:  streamStatusAuthStub{},
 		DS:    streamStatusDSStub{resp: makeOpenAISSEHTTPResponse(`data: {"p":"response/content","v":"hello"}`, "data: [DONE]")},
 	}
@@ -193,7 +193,7 @@ func TestResponsesStreamStatusCapturedAs200(t *testing.T) {
 func TestChatCompletionsStreamContentFilterStopsNormallyWithoutLeak(t *testing.T) {
 	statuses := make([]int, 0, 1)
 	h := &openAITestSurface{
-		Store: mockOpenAIConfig{wideInput: true},
+		Store: mockOpenAIConfig{},
 		Auth:  streamStatusAuthStub{},
 		DS: streamStatusDSStub{resp: makeOpenAISSEHTTPResponse(
 			`data: {"p":"response/content","v":"合法前缀"}`,
@@ -243,7 +243,7 @@ func TestChatCompletionsStreamContentFilterStopsNormallyWithoutLeak(t *testing.T
 func TestChatCompletionsStreamEmitsFailureFrameWhenUpstreamOutputEmpty(t *testing.T) {
 	statuses := make([]int, 0, 1)
 	h := &openAITestSurface{
-		Store: mockOpenAIConfig{wideInput: true},
+		Store: mockOpenAIConfig{},
 		Auth:  streamStatusAuthStub{},
 		DS:    streamStatusDSStub{resp: makeOpenAISSEHTTPResponse("data: [DONE]")},
 	}
@@ -289,7 +289,7 @@ func TestChatCompletionsStreamRetriesEmptyOutputOnSameSession(t *testing.T) {
 		makeOpenAISSEHTTPResponse(`data: {"p":"response/content","v":"visible"}`, "data: [DONE]"),
 	}}
 	h := &openAITestSurface{
-		Store: mockOpenAIConfig{wideInput: true},
+		Store: mockOpenAIConfig{},
 		Auth:  streamStatusAuthStub{},
 		DS:    ds,
 	}
@@ -349,7 +349,7 @@ func TestChatCompletionsNonStreamRetriesThinkingOnlyOutput(t *testing.T) {
 		makeOpenAISSEHTTPResponse(`data: {"p":"response/content","v":"visible"}`, "data: [DONE]"),
 	}}
 	h := &openAITestSurface{
-		Store: mockOpenAIConfig{wideInput: true},
+		Store: mockOpenAIConfig{},
 		Auth:  streamStatusAuthStub{},
 		DS:    ds,
 	}
@@ -388,7 +388,7 @@ func TestChatCompletionsContentFilterDoesNotRetry(t *testing.T) {
 		makeOpenAISSEHTTPResponse(`data: {"p":"response/content","v":"visible"}`, "data: [DONE]"),
 	}}
 	h := &openAITestSurface{
-		Store: mockOpenAIConfig{wideInput: true},
+		Store: mockOpenAIConfig{},
 		Auth:  streamStatusAuthStub{},
 		DS:    ds,
 	}
@@ -410,7 +410,7 @@ func TestChatCompletionsContentFilterDoesNotRetry(t *testing.T) {
 func TestResponsesStreamUsageIgnoresBatchAccumulatedTokenUsage(t *testing.T) {
 	statuses := make([]int, 0, 1)
 	h := &openAITestSurface{
-		Store: mockOpenAIConfig{wideInput: true},
+		Store: mockOpenAIConfig{},
 		Auth:  streamStatusAuthStub{},
 		DS: streamStatusDSStub{resp: makeOpenAISSEHTTPResponse(
 			`data: {"p":"response/content","v":"hello"}`,
@@ -461,7 +461,7 @@ func TestResponsesStreamRetriesThinkingOnlyOutput(t *testing.T) {
 		makeOpenAISSEHTTPResponse(`data: {"p":"response/content","v":"visible"}`, "data: [DONE]"),
 	}}
 	h := &openAITestSurface{
-		Store: mockOpenAIConfig{wideInput: true},
+		Store: mockOpenAIConfig{},
 		Auth:  streamStatusAuthStub{},
 		DS:    ds,
 	}
@@ -500,7 +500,7 @@ func TestResponsesNonStreamRetriesThinkingOnlyOutput(t *testing.T) {
 		makeOpenAISSEHTTPResponse(`data: {"p":"response/content","v":"visible"}`, "data: [DONE]"),
 	}}
 	h := &openAITestSurface{
-		Store: mockOpenAIConfig{wideInput: true},
+		Store: mockOpenAIConfig{},
 		Auth:  streamStatusAuthStub{},
 		DS:    ds,
 	}
@@ -546,7 +546,7 @@ func TestResponsesNonStreamRetriesThinkingOnlyOutput(t *testing.T) {
 func TestResponsesNonStreamUsageIgnoresPromptAndOutputTokenUsage(t *testing.T) {
 	statuses := make([]int, 0, 1)
 	h := &openAITestSurface{
-		Store: mockOpenAIConfig{wideInput: true},
+		Store: mockOpenAIConfig{},
 		Auth:  streamStatusAuthStub{},
 		DS: streamStatusDSStub{resp: makeOpenAISSEHTTPResponse(
 			`data: {"p":"response/content","v":"ok"}`,

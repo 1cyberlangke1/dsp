@@ -29,7 +29,7 @@ func (h *Handler) handleStreamGenerateContent(w http.ResponseWriter, r *http.Req
 
 	rc := http.NewResponseController(w)
 	_, canFlush := w.(http.Flusher)
-	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, h.compatStripReferenceMarkers(), toolNames, toolsRaw)
+	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw)
 
 	initialType := "text"
 	if thinkingEnabled {
@@ -192,6 +192,7 @@ func (s *geminiStreamRuntime) finalize() {
 		ToolNames:             s.toolNames,
 		ToolsRaw:              s.toolsRaw,
 	})
+	outcome := assistantturn.FinalizeTurn(turn, assistantturn.FinalizeOptions{})
 
 	if s.bufferContent {
 		parts := buildGeminiPartsFromTurn(turn)
@@ -224,9 +225,9 @@ func (s *geminiStreamRuntime) finalize() {
 		},
 		"modelVersion": s.model,
 		"usageMetadata": map[string]any{
-			"promptTokenCount":     turn.Usage.InputTokens,
-			"candidatesTokenCount": turn.Usage.OutputTokens,
-			"totalTokenCount":      turn.Usage.TotalTokens,
+			"promptTokenCount":     outcome.Usage.InputTokens,
+			"candidatesTokenCount": outcome.Usage.OutputTokens,
+			"totalTokenCount":      outcome.Usage.TotalTokens,
 		},
 	})
 }

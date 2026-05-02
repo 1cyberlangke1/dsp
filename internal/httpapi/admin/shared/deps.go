@@ -37,7 +37,6 @@ type ConfigStore interface {
 	CurrentInputFileMinChars() int
 	ThinkingInjectionEnabled() bool
 	ThinkingInjectionPrompt() string
-	CompatStripReferenceMarkers() bool
 	AutoDeleteSessions() bool
 }
 

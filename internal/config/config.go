@@ -15,7 +15,6 @@ type Config struct {
 	ModelAliases      map[string]string       `json:"model_aliases,omitempty"`
 	Admin             AdminConfig             `json:"admin,omitempty"`
 	Runtime           RuntimeConfig           `json:"runtime,omitempty"`
-	Compat            CompatConfig            `json:"compat,omitempty"`
 	Responses         ResponsesConfig         `json:"responses,omitempty"`
 	Embeddings        EmbeddingsConfig        `json:"embeddings,omitempty"`
 	AutoDelete        AutoDeleteConfig        `json:"auto_delete"`
@@ -139,11 +138,6 @@ func (c *Config) normalizeModelAliases() {
 	} else {
 		c.ModelAliases = aliases
 	}
-}
-
-type CompatConfig struct {
-	WideInputStrictOutput *bool `json:"wide_input_strict_output,omitempty"`
-	StripReferenceMarkers *bool `json:"strip_reference_markers,omitempty"`
 }
 
 type AdminConfig struct {

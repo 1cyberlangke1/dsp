@@ -51,6 +51,20 @@ type Turn struct {
 	Error             *OutputError
 }
 
+type FinalizeOptions struct {
+	AlreadyEmittedToolCalls bool
+}
+
+type FinalOutcome struct {
+	FinishReason     string
+	Error            *OutputError
+	Usage            Usage
+	HasToolCalls     bool
+	HasVisibleText   bool
+	HasVisibleOutput bool
+	ShouldFail       bool
+}
+
 type BuildOptions struct {
 	Model                 string
 	Prompt                string
@@ -213,6 +227,48 @@ func ShouldRetryEmptyOutput(turn Turn, attempts, maxAttempts int) bool {
 		len(turn.ToolCalls) == 0 &&
 		strings.TrimSpace(turn.Text) == "" &&
 		strings.TrimSpace(turn.Thinking) == ""
+}
+
+func FinalizeTurn(turn Turn, opts FinalizeOptions) FinalOutcome {
+	hasToolCalls := len(turn.ToolCalls) > 0 || opts.AlreadyEmittedToolCalls
+	hasVisibleText := strings.TrimSpace(turn.Text) != ""
+	hasVisibleThinking := strings.TrimSpace(turn.Thinking) != ""
+	err := turn.Error
+	if hasToolCalls {
+		err = nil
+	}
+	finishReason := FinishReason(turn)
+	if hasToolCalls {
+		finishReason = "tool_calls"
+	}
+	return FinalOutcome{
+		FinishReason:     finishReason,
+		Error:            err,
+		Usage:            turn.Usage,
+		HasToolCalls:     hasToolCalls,
+		HasVisibleText:   hasVisibleText,
+		HasVisibleOutput: hasVisibleText || hasVisibleThinking || hasToolCalls,
+		ShouldFail:       err != nil,
+	}
+}
+
+func OpenAIChatUsage(turn Turn) map[string]any {
+	return map[string]any{
+		"prompt_tokens":     turn.Usage.InputTokens,
+		"completion_tokens": turn.Usage.OutputTokens,
+		"total_tokens":      turn.Usage.TotalTokens,
+		"completion_tokens_details": map[string]any{
+			"reasoning_tokens": turn.Usage.ReasoningTokens,
+		},
+	}
+}
+
+func OpenAIResponsesUsage(turn Turn) map[string]any {
+	return map[string]any{
+		"input_tokens":  turn.Usage.InputTokens,
+		"output_tokens": turn.Usage.OutputTokens,
+		"total_tokens":  turn.Usage.TotalTokens,
+	}
 }
 
 func FinishReason(turn Turn) string {

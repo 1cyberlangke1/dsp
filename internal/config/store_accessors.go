@@ -21,24 +21,6 @@ func (s *Store) ModelAliases() map[string]string {
 	return out
 }
 
-func (s *Store) CompatWideInputStrictOutput() bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.cfg.Compat.WideInputStrictOutput == nil {
-		return true
-	}
-	return *s.cfg.Compat.WideInputStrictOutput
-}
-
-func (s *Store) CompatStripReferenceMarkers() bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.cfg.Compat.StripReferenceMarkers == nil {
-		return true
-	}
-	return *s.cfg.Compat.StripReferenceMarkers
-}
-
 func (s *Store) ToolcallMode() string {
 	return "feature_match"
 }

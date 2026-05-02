@@ -65,7 +65,7 @@ ds2api/
 │   ├── textclean/                        # Text cleanup
 │   ├── toolcall/                         # Tool-call parsing and repair
 │   ├── toolstream/                       # Go streaming tool-call anti-leak and delta detection
-│   ├── translatorcliproxy/               # Cross-protocol translation bridge
+│   ├── translatorcliproxy/               # Vercel/fallback/test protocol translation bridge
 │   ├── util/                             # Shared utility helpers
 │   ├── version/                          # Version query/compare
 │   └── webui/                            # WebUI static hosting logic
@@ -187,12 +187,12 @@ flowchart LR
 
 - `internal/server`: router tree + middlewares (health, protocol routes, Admin/WebUI).
 - `internal/httpapi/openai/*`: OpenAI HTTP surface split into chat, responses, files, embeddings, history, and shared packages; chat/responses share the promptcompat, stream, and toolcall semantics.
-- `internal/httpapi/{claude,gemini}`: protocol adapters that normalize into the same prompt compatibility semantics; direct paths share DeepSeek session/PoW/completion execution through `completionruntime`, while Vercel/proxy paths can still translate through `translatorcliproxy` into the OpenAI handler.
+- `internal/httpapi/{claude,gemini}`: protocol adapters that normalize into the same prompt compatibility semantics; normal direct paths must share DeepSeek session/PoW/completion execution through `completionruntime`, while `translatorcliproxy` is reserved for Vercel prepare/release, missing-backend fallback, and regression tests.
 - `internal/httpapi/requestbody`: shared HTTP body reading, JSON pre-validation, and UTF-8 error helpers across protocol adapters.
 - `internal/promptcompat`: compatibility core for turning OpenAI/Claude/Gemini requests into DeepSeek web-chat plain-text context.
 - `internal/assistantturn`: Go output-side canonical semantics, converting DeepSeek SSE collection results and stream finalization state into assistant turns and centralizing thinking, tool call, citation, usage, stop/error behavior.
 - `internal/completionruntime`: shared Go completion execution helpers for DeepSeek session/PoW/call startup, non-stream collection, and empty-output retry; streaming paths use it to start upstream requests, continue to use `internal/stream` for real-time consumption, and use `assistantturn` during finalization.
-- `internal/translatorcliproxy`: structure translation between Claude/Gemini and OpenAI.
+- `internal/translatorcliproxy`: bridge compatibility layer for Claude/Gemini and OpenAI shape translation; it is not the main business protocol conversion center.
 - `internal/deepseek/{client,protocol,transport}`: upstream requests, sessions, PoW adaptation, protocol constants, and transport details.
 - `internal/js/chat-stream` + `api/chat-stream.js`: Vercel Node streaming bridge; Go prepare/release owns auth, account lease, and completion payload assembly, while Node relays real-time SSE with Go-aligned finalization and tool sieve semantics.
 - `internal/stream` + `internal/sse`: Go stream parsing and incremental assembly.

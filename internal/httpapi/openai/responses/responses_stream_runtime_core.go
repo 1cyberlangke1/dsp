@@ -194,15 +194,11 @@ func (s *responsesStreamRuntime) finalize(finishReason string, deferEmptyOutput 
 
 	s.closeMessageItem()
 
-	if turn.Error != nil && turn.Error.Code == "tool_choice_violation" {
-		s.failResponse(turn.Error.Status, turn.Error.Message, turn.Error.Code)
-		return true
-	}
-	if len(detected) == 0 && strings.TrimSpace(turn.Text) == "" {
-		status, message, code := upstreamEmptyOutputDetail(finishReason == "content_filter", turn.Text, turn.Thinking)
-		if turn.Error != nil {
-			status, message, code = turn.Error.Status, turn.Error.Message, turn.Error.Code
-		}
+	outcome := assistantturn.FinalizeTurn(turn, assistantturn.FinalizeOptions{
+		AlreadyEmittedToolCalls: s.toolCallsEmitted || s.toolCallsDoneEmitted,
+	})
+	if outcome.ShouldFail {
+		status, message, code := outcome.Error.Status, outcome.Error.Message, outcome.Error.Code
 		if deferEmptyOutput {
 			s.finalErrorStatus = status
 			s.finalErrorMessage = message
@@ -221,14 +217,6 @@ func (s *responsesStreamRuntime) finalize(finishReason string, deferEmptyOutput 
 	s.sendEvent("response.completed", openaifmt.BuildResponsesCompletedPayload(obj))
 	s.sendDone()
 	return true
-}
-
-func responsesUsageFromTurn(turn assistantturn.Turn) map[string]any {
-	return map[string]any{
-		"input_tokens":  turn.Usage.InputTokens,
-		"output_tokens": turn.Usage.OutputTokens,
-		"total_tokens":  turn.Usage.TotalTokens,
-	}
 }
 
 func (s *responsesStreamRuntime) logToolPolicyRejections(textParsed toolcall.ToolCallParseResult) {

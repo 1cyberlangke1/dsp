@@ -84,7 +84,7 @@ func (h *Handler) handleClaudeDirect(w http.ResponseWriter, r *http.Request) boo
 		return true
 	}
 	result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, norm.Standard, completionruntime.Options{
-		StripReferenceMarkers: h.compatStripReferenceMarkers(),
+		StripReferenceMarkers: stripReferenceMarkersEnabled(),
 		RetryEnabled:          true,
 		CurrentInputFile:      h.Store,
 	})
@@ -290,7 +290,7 @@ func (h *Handler) handleClaudeStreamRealtime(w http.ResponseWriter, r *http.Requ
 		messages,
 		thinkingEnabled,
 		searchEnabled,
-		h.compatStripReferenceMarkers(),
+		stripReferenceMarkersEnabled(),
 		toolNames,
 		toolsRaw,
 		buildClaudePromptTokenText(messages, thinkingEnabled),

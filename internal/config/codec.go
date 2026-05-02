@@ -35,9 +35,6 @@ func (c Config) MarshalJSON() ([]byte, error) {
 	if c.Runtime.AccountMaxInflight > 0 || c.Runtime.AccountMaxQueue > 0 || c.Runtime.GlobalMaxInflight > 0 || c.Runtime.TokenRefreshIntervalHours > 0 {
 		m["runtime"] = c.Runtime
 	}
-	if c.Compat.WideInputStrictOutput != nil || c.Compat.StripReferenceMarkers != nil {
-		m["compat"] = c.Compat
-	}
 	if c.Responses.StoreTTLSeconds > 0 {
 		m["responses"] = c.Responses
 	}
@@ -100,9 +97,7 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 				return fmt.Errorf("invalid field %q: %w", k, err)
 			}
 		case "compat":
-			if err := json.Unmarshal(v, &c.Compat); err != nil {
-				return fmt.Errorf("invalid field %q: %w", k, err)
-			}
+			// Removed field ignored instead of persisted.
 		case "toolcall":
 			// Legacy field ignored. Toolcall policy is fixed and no longer configurable.
 		case "responses":
@@ -155,13 +150,9 @@ func (c Config) Clone() Config {
 		ModelAliases: cloneStringMap(c.ModelAliases),
 		Admin:        c.Admin,
 		Runtime:      c.Runtime,
-		Compat: CompatConfig{
-			WideInputStrictOutput: cloneBoolPtr(c.Compat.WideInputStrictOutput),
-			StripReferenceMarkers: cloneBoolPtr(c.Compat.StripReferenceMarkers),
-		},
-		Responses:  c.Responses,
-		Embeddings: c.Embeddings,
-		AutoDelete: c.AutoDelete,
+		Responses:    c.Responses,
+		Embeddings:   c.Embeddings,
+		AutoDelete:   c.AutoDelete,
 		CurrentInputFile: CurrentInputFileConfig{
 			Enabled:  cloneBoolPtr(c.CurrentInputFile.Enabled),
 			MinChars: c.CurrentInputFile.MinChars,

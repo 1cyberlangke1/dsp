@@ -14,9 +14,8 @@ type claudeProxyStoreStub struct {
 
 func (s claudeProxyStoreStub) ModelAliases() map[string]string { return s.aliases }
 
-func (claudeProxyStoreStub) CompatStripReferenceMarkers() bool { return true }
-func (claudeProxyStoreStub) CurrentInputFileEnabled() bool     { return true }
-func (claudeProxyStoreStub) CurrentInputFileMinChars() int     { return 0 }
+func (claudeProxyStoreStub) CurrentInputFileEnabled() bool { return true }
+func (claudeProxyStoreStub) CurrentInputFileMinChars() int { return 0 }
 
 type openAIProxyStub struct {
 	status int

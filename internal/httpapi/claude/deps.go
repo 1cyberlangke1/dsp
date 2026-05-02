@@ -23,7 +23,6 @@ type DeepSeekCaller interface {
 
 type ConfigReader interface {
 	ModelAliases() map[string]string
-	CompatStripReferenceMarkers() bool
 	CurrentInputFileEnabled() bool
 	CurrentInputFileMinChars() int
 }

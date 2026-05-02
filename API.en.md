@@ -733,7 +733,6 @@ Reads runtime settings and status, including:
 - `success`
 - `admin` (`has_password_hash`, `jwt_expire_hours`, `jwt_valid_after_unix`, `default_password_warning`)
 - `runtime` (`account_max_inflight`, `account_max_queue`, `global_max_inflight`, `token_refresh_interval_hours`)
-- `compat` (`wide_input_strict_output`, `strip_reference_markers`)
 - `responses` / `embeddings`
 - `auto_delete` (`mode`: `none` / `single` / `all`; legacy `sessions=true` is still treated as `all`)
 - `current_input_file` (`enabled` defaults to `true`, plus `min_chars`)
@@ -747,7 +746,6 @@ Hot-updates runtime settings. Supported fields:
 
 - `admin.jwt_expire_hours`
 - `runtime.account_max_inflight` / `runtime.account_max_queue` / `runtime.global_max_inflight` / `runtime.token_refresh_interval_hours`
-- `compat.wide_input_strict_output` / `compat.strip_reference_markers`
 - `responses.store_ttl_seconds`
 - `embeddings.provider`
 - `auto_delete.mode`
@@ -776,9 +774,9 @@ Imports full config with:
 
 The request can send config directly, or wrapped as `{"config": {...}, "mode":"merge"}`.
 Query params `?mode=merge` / `?mode=replace` are also supported.
-`replace` mode replaces the full config shape while preserving Vercel sync metadata. `merge` mode merges `keys`, `api_keys`, `accounts`, and `model_aliases`, and overwrites non-empty fields under `admin`, `runtime`, `responses`, and `embeddings`. Manage `compat`, `auto_delete`, and `current_input_file` via `/admin/settings` or the config file; legacy `toolcall` fields are ignored.
+`replace` mode replaces the full config shape while preserving Vercel sync metadata. `merge` mode merges `keys`, `api_keys`, `accounts`, and `model_aliases`, and overwrites non-empty fields under `admin`, `runtime`, `responses`, and `embeddings`. Manage `auto_delete` and `current_input_file` via `/admin/settings` or the config file; legacy `compat` and `toolcall` fields are ignored.
 
-> Note: `merge` mode does not update `compat`, `auto_delete`, or `current_input_file`.
+> Note: `merge` mode does not update `auto_delete` or `current_input_file`.
 
 ### `GET /admin/config/export`
 

@@ -93,7 +93,7 @@ func (h *Handler) collectChatNonStreamAttempt(w http.ResponseWriter, resp *http.
 		Model:                 model,
 		Prompt:                usagePrompt,
 		SearchEnabled:         searchEnabled,
-		StripReferenceMarkers: h.compatStripReferenceMarkers(),
+		StripReferenceMarkers: stripReferenceMarkersEnabled(),
 		ToolNames:             toolNames,
 		ToolsRaw:              toolsRaw,
 	})
@@ -223,7 +223,7 @@ func (h *Handler) prepareChatStreamRuntime(w http.ResponseWriter, resp *http.Res
 	}
 	streamRuntime := newChatStreamRuntime(
 		w, rc, canFlush, completionID, time.Now().Unix(), model, finalPrompt,
-		thinkingEnabled, searchEnabled, h.compatStripReferenceMarkers(), toolNames, toolsRaw,
+		thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw,
 		toolChoice,
 		len(toolNames) > 0, h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence(),
 	)

@@ -120,7 +120,7 @@ func newMultipartUploadRequest(t *testing.T, purpose string, filename string, da
 
 func TestFilesRouteUploadSuccess(t *testing.T) {
 	ds := &filesRouteDSStub{}
-	h := &openAITestSurface{Store: mockOpenAIConfig{wideInput: true}, Auth: streamStatusAuthStub{}, DS: ds}
+	h := &openAITestSurface{Store: mockOpenAIConfig{}, Auth: streamStatusAuthStub{}, DS: ds}
 	r := chi.NewRouter()
 	registerOpenAITestRoutes(r, h)
 
@@ -160,7 +160,7 @@ func TestFilesRouteUploadSuccess(t *testing.T) {
 
 func TestFilesRouteUploadIncludesAccountIDForManagedAccount(t *testing.T) {
 	ds := &filesRouteDSStub{}
-	h := &openAITestSurface{Store: mockOpenAIConfig{wideInput: true}, Auth: managedFilesAuthStub{}, DS: ds}
+	h := &openAITestSurface{Store: mockOpenAIConfig{}, Auth: managedFilesAuthStub{}, DS: ds}
 	r := chi.NewRouter()
 	registerOpenAITestRoutes(r, h)
 
@@ -188,7 +188,7 @@ func TestFilesRouteRetrieveSuccess(t *testing.T) {
 		Purpose:  "assistants",
 		Status:   "processed",
 	}}
-	h := &openAITestSurface{Store: mockOpenAIConfig{wideInput: true}, Auth: managedFilesAuthStub{}, DS: ds}
+	h := &openAITestSurface{Store: mockOpenAIConfig{}, Auth: managedFilesAuthStub{}, DS: ds}
 	r := chi.NewRouter()
 	registerOpenAITestRoutes(r, h)
 
@@ -214,7 +214,7 @@ func TestFilesRouteRetrieveSuccess(t *testing.T) {
 
 func TestFilesRouteRetrieveNotFound(t *testing.T) {
 	ds := &filesRouteDSStub{err: dsclient.ErrUploadFileNotFound}
-	h := &openAITestSurface{Store: mockOpenAIConfig{wideInput: true}, Auth: streamStatusAuthStub{}, DS: ds}
+	h := &openAITestSurface{Store: mockOpenAIConfig{}, Auth: streamStatusAuthStub{}, DS: ds}
 	r := chi.NewRouter()
 	registerOpenAITestRoutes(r, h)
 
@@ -229,7 +229,7 @@ func TestFilesRouteRetrieveNotFound(t *testing.T) {
 }
 
 func TestFilesRouteRejectsNonMultipart(t *testing.T) {
-	h := &openAITestSurface{Store: mockOpenAIConfig{wideInput: true}, Auth: streamStatusAuthStub{}, DS: &filesRouteDSStub{}}
+	h := &openAITestSurface{Store: mockOpenAIConfig{}, Auth: streamStatusAuthStub{}, DS: &filesRouteDSStub{}}
 	r := chi.NewRouter()
 	registerOpenAITestRoutes(r, h)
 
@@ -245,7 +245,7 @@ func TestFilesRouteRejectsNonMultipart(t *testing.T) {
 }
 
 func TestFilesRouteRequiresFileField(t *testing.T) {
-	h := &openAITestSurface{Store: mockOpenAIConfig{wideInput: true}, Auth: streamStatusAuthStub{}, DS: &filesRouteDSStub{}}
+	h := &openAITestSurface{Store: mockOpenAIConfig{}, Auth: streamStatusAuthStub{}, DS: &filesRouteDSStub{}}
 	r := chi.NewRouter()
 	registerOpenAITestRoutes(r, h)
 

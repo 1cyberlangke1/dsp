@@ -133,6 +133,9 @@ func (s *claudeStreamRuntime) finalize(stopReason string) {
 		ToolsRaw:              s.toolsRaw,
 	})
 	finalText := turn.Text
+	outcome := assistantturn.FinalizeTurn(turn, assistantturn.FinalizeOptions{
+		AlreadyEmittedToolCalls: s.toolCallsDetected,
+	})
 
 	if s.bufferToolContent && !s.toolCallsDetected {
 		if len(turn.ToolCalls) > 0 {
@@ -169,7 +172,7 @@ func (s *claudeStreamRuntime) finalize(stopReason string) {
 		}
 	}
 
-	if s.toolCallsDetected {
+	if outcome.HasToolCalls {
 		stopReason = "tool_use"
 	}
 
@@ -180,7 +183,7 @@ func (s *claudeStreamRuntime) finalize(stopReason string) {
 			"stop_sequence": nil,
 		},
 		"usage": map[string]any{
-			"output_tokens": turn.Usage.OutputTokens,
+			"output_tokens": outcome.Usage.OutputTokens,
 		},
 	})
 	s.send("message_stop", map[string]any{"type": "message_stop"})

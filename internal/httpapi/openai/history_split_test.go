@@ -96,7 +96,6 @@ func TestApplyCurrentInputFileSkipsShortInputWhenThresholdNotReached(t *testing.
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:           true,
 			currentInputEnabled: true,
 			currentInputMin:     10,
 		},
@@ -129,7 +128,6 @@ func TestApplyThinkingInjectionAppendsLatestUserPrompt(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:         true,
 			thinkingInjection: boolPtr(true),
 		},
 		DS: ds,
@@ -161,7 +159,6 @@ func TestApplyThinkingInjectionUsesCustomPrompt(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:         true,
 			thinkingInjection: boolPtr(true),
 			thinkingPrompt:    "custom thinking format",
 		},
@@ -191,7 +188,6 @@ func TestApplyCurrentInputFileDisabledPassThrough(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:           true,
 			currentInputEnabled: false,
 		},
 		DS: ds,
@@ -224,7 +220,6 @@ func TestApplyCurrentInputFileUploadsFirstTurnWithNumberedHistoryTranscript(t *t
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:           true,
 			currentInputEnabled: true,
 			currentInputMin:     10,
 			thinkingInjection:   boolPtr(true),
@@ -294,7 +289,6 @@ func TestApplyCurrentInputFilePreservesFullContextPromptForTokenCounting(t *test
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:           true,
 			currentInputEnabled: true,
 			currentInputMin:     0,
 			thinkingInjection:   boolPtr(true),
@@ -340,7 +334,6 @@ func TestApplyCurrentInputFileUploadsFullContextFile(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:           true,
 			currentInputEnabled: true,
 			currentInputMin:     0,
 			thinkingInjection:   boolPtr(true),
@@ -391,7 +384,6 @@ func TestApplyCurrentInputFileCarriesHistoryText(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:           true,
 			currentInputEnabled: true,
 		},
 		DS: ds,
@@ -424,7 +416,6 @@ func TestChatCompletionsCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *t
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:           true,
 			currentInputEnabled: true,
 		},
 		Auth: streamStatusAuthStub{},
@@ -495,7 +486,6 @@ func TestResponsesCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *testing
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:           true,
 			currentInputEnabled: true,
 		},
 		Auth: streamStatusAuthStub{},
@@ -553,7 +543,6 @@ func TestChatCompletionsCurrentInputFileMapsManagedAuthFailureTo401(t *testing.T
 	}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:           true,
 			currentInputEnabled: true,
 		},
 		Auth: streamStatusManagedAuthStub{},
@@ -585,7 +574,6 @@ func TestResponsesCurrentInputFileMapsDirectAuthFailureTo401(t *testing.T) {
 	}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:           true,
 			currentInputEnabled: true,
 		},
 		Auth: streamStatusAuthStub{},
@@ -617,7 +605,6 @@ func TestChatCompletionsCurrentInputFileUploadFailureReturnsInternalServerError(
 	ds := &inlineUploadDSStub{uploadErr: errors.New("boom")}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			wideInput:           true,
 			currentInputEnabled: true,
 		},
 		Auth: streamStatusAuthStub{},
@@ -646,7 +633,6 @@ func TestCurrentInputFileWorksAcrossAutoDeleteModes(t *testing.T) {
 			ds := &inlineUploadDSStub{}
 			h := &openAITestSurface{
 				Store: mockOpenAIConfig{
-					wideInput:           true,
 					autoDeleteMode:      mode,
 					currentInputEnabled: true,
 				},

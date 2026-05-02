@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"ds2api/internal/assistantturn"
 	"ds2api/internal/auth"
 	"ds2api/internal/completionruntime"
 	"ds2api/internal/config"
@@ -96,7 +97,7 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 	responseID := "resp_" + strings.ReplaceAll(uuid.NewString(), "-", "")
 	if !stdReq.Stream {
 		result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-			StripReferenceMarkers: h.compatStripReferenceMarkers(),
+			StripReferenceMarkers: stripReferenceMarkersEnabled(),
 			RetryEnabled:          true,
 			CurrentInputFile:      h.Store,
 		})
@@ -105,7 +106,7 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		responseObj := openaifmt.BuildResponseObjectWithToolCalls(responseID, stdReq.ResponseModel, result.Turn.Prompt, result.Turn.Thinking, result.Turn.Text, result.Turn.ToolCalls, stdReq.ToolsRaw)
-		responseObj["usage"] = responsesUsageFromTurn(result.Turn)
+		responseObj["usage"] = assistantturn.OpenAIResponsesUsage(result.Turn)
 		h.getResponseStore().put(owner, responseID, responseObj)
 		writeJSON(w, http.StatusOK, responseObj)
 		return
@@ -132,28 +133,26 @@ func (h *Handler) handleResponsesNonStream(w http.ResponseWriter, resp *http.Res
 		return
 	}
 	result := sse.CollectStream(resp, thinkingEnabled, true)
-	stripReferenceMarkers := h.compatStripReferenceMarkers()
-	sanitizedThinking := cleanVisibleOutput(result.Thinking, stripReferenceMarkers)
-	sanitizedText := cleanVisibleOutput(result.Text, stripReferenceMarkers)
-	if searchEnabled {
-		sanitizedText = replaceCitationMarkersWithLinks(sanitizedText, result.CitationLinks)
-	}
-	textParsed := detectAssistantToolCalls(result.Text, sanitizedText, result.Thinking, result.ToolDetectionThinking, toolNames)
-	if len(textParsed.Calls) == 0 && writeUpstreamEmptyOutputError(w, sanitizedText, sanitizedThinking, result.ContentFilter) {
+
+	turn := assistantturn.BuildTurnFromCollected(result, assistantturn.BuildOptions{
+		Model:                 model,
+		Prompt:                finalPrompt,
+		RefFileTokens:         refFileTokens,
+		SearchEnabled:         searchEnabled,
+		StripReferenceMarkers: stripReferenceMarkersEnabled(),
+		ToolNames:             toolNames,
+		ToolsRaw:              toolsRaw,
+		ToolChoice:            toolChoice,
+	})
+	logResponsesToolPolicyRejection(traceID, toolChoice, turn.ParsedToolCalls, "text")
+	outcome := assistantturn.FinalizeTurn(turn, assistantturn.FinalizeOptions{})
+	if outcome.ShouldFail {
+		writeOpenAIErrorWithCode(w, outcome.Error.Status, outcome.Error.Message, outcome.Error.Code)
 		return
 	}
-	logResponsesToolPolicyRejection(traceID, toolChoice, textParsed, "text")
 
-	callCount := len(textParsed.Calls)
-	if toolChoice.IsRequired() && callCount == 0 {
-		writeOpenAIErrorWithCode(w, http.StatusUnprocessableEntity, "tool_choice requires at least one valid tool call.", "tool_choice_violation")
-		return
-	}
-
-	responseObj := openaifmt.BuildResponseObjectWithToolCalls(responseID, model, finalPrompt, sanitizedThinking, sanitizedText, textParsed.Calls, toolsRaw)
-	if refFileTokens > 0 {
-		addRefFileTokensToUsage(responseObj, refFileTokens)
-	}
+	responseObj := openaifmt.BuildResponseObjectWithToolCalls(responseID, model, finalPrompt, turn.Thinking, turn.Text, turn.ToolCalls, toolsRaw)
+	responseObj["usage"] = assistantturn.OpenAIResponsesUsage(turn)
 	h.getResponseStore().put(owner, responseID, responseObj)
 	writeJSON(w, http.StatusOK, responseObj)
 }
@@ -178,7 +177,7 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 	}
 	bufferToolContent := len(toolNames) > 0
 	emitEarlyToolDeltas := h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence()
-	stripReferenceMarkers := h.compatStripReferenceMarkers()
+	stripReferenceMarkers := stripReferenceMarkersEnabled()
 
 	streamRuntime := newResponsesStreamRuntime(
 		w,

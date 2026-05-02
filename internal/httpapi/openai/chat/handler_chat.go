@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"ds2api/internal/assistantturn"
 	"ds2api/internal/auth"
 	"ds2api/internal/completionruntime"
 	"ds2api/internal/config"
@@ -79,7 +80,7 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 
 	if !stdReq.Stream {
 		result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-			StripReferenceMarkers: h.compatStripReferenceMarkers(),
+			StripReferenceMarkers: stripReferenceMarkersEnabled(),
 			RetryEnabled:          true,
 			CurrentInputFile:      h.Store,
 		})
@@ -92,10 +93,10 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		respBody := openaifmt.BuildChatCompletionWithToolCalls(result.SessionID, stdReq.ResponseModel, result.Turn.Prompt, result.Turn.Thinking, result.Turn.Text, result.Turn.ToolCalls, stdReq.ToolsRaw)
-		respBody["usage"] = chatUsageFromTurn(result.Turn)
-		finishReason := chatFinishReason(respBody)
+		respBody["usage"] = assistantturn.OpenAIChatUsage(result.Turn)
+		finishReason := assistantturn.FinalizeTurn(result.Turn, assistantturn.FinalizeOptions{}).FinishReason
 		if historySession != nil {
-			historySession.success(http.StatusOK, result.Turn.Thinking, result.Turn.Text, finishReason, chatUsageFromTurn(result.Turn))
+			historySession.success(http.StatusOK, result.Turn.Thinking, result.Turn.Text, finishReason, assistantturn.OpenAIChatUsage(result.Turn))
 		}
 		writeJSON(w, http.StatusOK, respBody)
 		return
@@ -162,33 +163,29 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, resp *http.Response, co
 	}
 	result := sse.CollectStream(resp, thinkingEnabled, true)
 
-	stripReferenceMarkers := h.compatStripReferenceMarkers()
-	finalThinking := cleanVisibleOutput(result.Thinking, stripReferenceMarkers)
-	finalText := cleanVisibleOutput(result.Text, stripReferenceMarkers)
-	if searchEnabled {
-		finalText = replaceCitationMarkersWithLinks(finalText, result.CitationLinks)
-	}
-	detected := detectAssistantToolCalls(result.Text, finalText, result.Thinking, result.ToolDetectionThinking, toolNames)
-	if shouldWriteUpstreamEmptyOutputError(finalText, finalThinking) && len(detected.Calls) == 0 {
-		status, message, code := upstreamEmptyOutputDetail(result.ContentFilter, finalText, finalThinking)
+	turn := assistantturn.BuildTurnFromCollected(result, assistantturn.BuildOptions{
+		Model:                 model,
+		Prompt:                finalPrompt,
+		RefFileTokens:         refFileTokens,
+		SearchEnabled:         searchEnabled,
+		StripReferenceMarkers: stripReferenceMarkersEnabled(),
+		ToolNames:             toolNames,
+		ToolsRaw:              toolsRaw,
+		ToolChoice:            promptcompat.DefaultToolChoicePolicy(),
+	})
+	outcome := assistantturn.FinalizeTurn(turn, assistantturn.FinalizeOptions{})
+	if outcome.ShouldFail {
+		status, message, code := outcome.Error.Status, outcome.Error.Message, outcome.Error.Code
 		if historySession != nil {
-			historySession.error(status, message, code, finalThinking, finalText)
+			historySession.error(status, message, code, turn.Thinking, turn.Text)
 		}
-		writeUpstreamEmptyOutputError(w, finalText, finalThinking, result.ContentFilter)
+		writeOpenAIErrorWithCode(w, status, message, code)
 		return
 	}
-	respBody := openaifmt.BuildChatCompletionWithToolCalls(completionID, model, finalPrompt, finalThinking, finalText, detected.Calls, toolsRaw)
-	if refFileTokens > 0 {
-		addRefFileTokensToUsage(respBody, refFileTokens)
-	}
-	finishReason := "stop"
-	if choices, ok := respBody["choices"].([]map[string]any); ok && len(choices) > 0 {
-		if fr, _ := choices[0]["finish_reason"].(string); strings.TrimSpace(fr) != "" {
-			finishReason = fr
-		}
-	}
+	respBody := openaifmt.BuildChatCompletionWithToolCalls(completionID, model, finalPrompt, turn.Thinking, turn.Text, turn.ToolCalls, toolsRaw)
+	respBody["usage"] = assistantturn.OpenAIChatUsage(turn)
 	if historySession != nil {
-		historySession.success(http.StatusOK, finalThinking, finalText, finishReason, openaifmt.BuildChatUsageForModel(model, finalPrompt, finalThinking, finalText, refFileTokens))
+		historySession.success(http.StatusOK, turn.Thinking, turn.Text, outcome.FinishReason, assistantturn.OpenAIChatUsage(turn))
 	}
 	writeJSON(w, http.StatusOK, respBody)
 }
@@ -216,7 +213,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 	created := time.Now().Unix()
 	bufferToolContent := len(toolNames) > 0
 	emitEarlyToolDeltas := h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence()
-	stripReferenceMarkers := h.compatStripReferenceMarkers()
+	stripReferenceMarkers := stripReferenceMarkersEnabled()
 	initialType := "text"
 	if thinkingEnabled {
 		initialType = "thinking"

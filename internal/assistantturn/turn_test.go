@@ -98,3 +98,30 @@ func TestBuildTurnFromStreamSnapshotAlreadyEmittedToolAvoidsEmptyError(t *testin
 		t.Fatalf("stop reason mismatch: %q", turn.StopReason)
 	}
 }
+
+func TestFinalizeTurnStopOutcome(t *testing.T) {
+	turn := BuildTurnFromCollected(sse.CollectResult{Text: "hello"}, BuildOptions{})
+	outcome := FinalizeTurn(turn, FinalizeOptions{})
+	if outcome.ShouldFail {
+		t.Fatalf("unexpected failure: %#v", outcome.Error)
+	}
+	if outcome.FinishReason != "stop" || !outcome.HasVisibleText || !outcome.HasVisibleOutput {
+		t.Fatalf("unexpected outcome: %#v", outcome)
+	}
+}
+
+func TestFinalizeTurnToolCallsOutcome(t *testing.T) {
+	turn := BuildTurnFromStreamSnapshot(StreamSnapshot{AlreadyEmittedCalls: true}, BuildOptions{})
+	outcome := FinalizeTurn(turn, FinalizeOptions{AlreadyEmittedToolCalls: true})
+	if outcome.ShouldFail || outcome.FinishReason != "tool_calls" || !outcome.HasToolCalls {
+		t.Fatalf("unexpected tool outcome: %#v", outcome)
+	}
+}
+
+func TestFinalizeTurnContentFilterOutcome(t *testing.T) {
+	turn := BuildTurnFromCollected(sse.CollectResult{ContentFilter: true}, BuildOptions{})
+	outcome := FinalizeTurn(turn, FinalizeOptions{})
+	if !outcome.ShouldFail || outcome.Error == nil || outcome.Error.Code != "content_filter" {
+		t.Fatalf("expected content filter failure, got %#v", outcome)
+	}
+}

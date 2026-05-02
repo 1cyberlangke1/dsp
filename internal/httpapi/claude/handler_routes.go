@@ -21,11 +21,8 @@ type Handler struct {
 	OpenAI OpenAIChatRunner
 }
 
-func (h *Handler) compatStripReferenceMarkers() bool {
-	if h == nil || h.Store == nil {
-		return true
-	}
-	return h.Store.CompatStripReferenceMarkers()
+func stripReferenceMarkersEnabled() bool {
+	return true
 }
 
 var (
