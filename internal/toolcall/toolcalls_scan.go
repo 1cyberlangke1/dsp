@@ -30,7 +30,7 @@ type ToolMarkupTag struct {
 func ContainsToolMarkupSyntaxOutsideIgnored(text string) (hasDSML, hasCanonical bool) {
 	lower := strings.ToLower(text)
 	for i := 0; i < len(text); {
-		next, advanced, blocked := skipXMLIgnoredSection(lower, i)
+		next, advanced, blocked := skipXMLIgnoredSection(text, lower, i)
 		if blocked {
 			return hasDSML, hasCanonical
 		}
@@ -58,7 +58,7 @@ func ContainsToolMarkupSyntaxOutsideIgnored(text string) (hasDSML, hasCanonical 
 func ContainsToolCallWrapperSyntaxOutsideIgnored(text string) (hasDSML, hasCanonical bool) {
 	lower := strings.ToLower(text)
 	for i := 0; i < len(text); {
-		next, advanced, blocked := skipXMLIgnoredSection(lower, i)
+		next, advanced, blocked := skipXMLIgnoredSection(text, lower, i)
 		if blocked {
 			return hasDSML, hasCanonical
 		}
@@ -90,7 +90,7 @@ func ContainsToolCallWrapperSyntaxOutsideIgnored(text string) (hasDSML, hasCanon
 func FindToolMarkupTagOutsideIgnored(text string, start int) (ToolMarkupTag, bool) {
 	lower := strings.ToLower(text)
 	for i := maxInt(start, 0); i < len(text); {
-		next, advanced, blocked := skipXMLIgnoredSection(lower, i)
+		next, advanced, blocked := skipXMLIgnoredSection(text, lower, i)
 		if blocked {
 			return ToolMarkupTag{}, false
 		}
