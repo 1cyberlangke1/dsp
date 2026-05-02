@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"strings"
 
+	"ds2api/internal/assistantturn"
 	openaifmt "ds2api/internal/format/openai"
 	"ds2api/internal/httpapi/openai/shared"
+	"ds2api/internal/promptcompat"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolstream"
@@ -24,6 +26,7 @@ type chatStreamRuntime struct {
 	refFileTokens int
 	toolNames     []string
 	toolsRaw      any
+	toolChoice    promptcompat.ToolChoicePolicy
 
 	thinkingEnabled       bool
 	searchEnabled         bool
@@ -89,6 +92,7 @@ func newChatStreamRuntime(
 	stripReferenceMarkers bool,
 	toolNames []string,
 	toolsRaw any,
+	toolChoice promptcompat.ToolChoicePolicy,
 	bufferToolContent bool,
 	emitEarlyToolDeltas bool,
 ) *chatStreamRuntime {
@@ -102,6 +106,7 @@ func newChatStreamRuntime(
 		finalPrompt:           finalPrompt,
 		toolNames:             toolNames,
 		toolsRaw:              toolsRaw,
+		toolChoice:            toolChoice,
 		thinkingEnabled:       thinkingEnabled,
 		searchEnabled:         searchEnabled,
 		stripReferenceMarkers: stripReferenceMarkers,
@@ -201,14 +206,33 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 	s.finalErrorCode = ""
 	finalThinking := s.accumulator.Thinking.String()
 	finalToolDetectionThinking := s.accumulator.ToolDetectionThinking.String()
-	finalText := cleanVisibleOutput(s.accumulator.Text.String(), s.stripReferenceMarkers)
-	s.finalThinking = finalThinking
-	s.finalText = finalText
-	detected := detectAssistantToolCalls(s.accumulator.RawText.String(), finalText, s.accumulator.RawThinking.String(), finalToolDetectionThinking, s.toolNames)
-	if len(detected.Calls) > 0 && !s.toolCallsDoneEmitted {
+	finalText := s.accumulator.Text.String()
+	turn := assistantturn.BuildTurnFromStreamSnapshot(assistantturn.StreamSnapshot{
+		RawText:               s.accumulator.RawText.String(),
+		VisibleText:           finalText,
+		RawThinking:           s.accumulator.RawThinking.String(),
+		VisibleThinking:       finalThinking,
+		DetectionThinking:     finalToolDetectionThinking,
+		ContentFilter:         finishReason == "content_filter",
+		ResponseMessageID:     s.responseMessageID,
+		AlreadyEmittedCalls:   s.toolCallsEmitted,
+		AlreadyEmittedToolRaw: s.toolCallsDoneEmitted,
+	}, assistantturn.BuildOptions{
+		Model:                 s.model,
+		Prompt:                s.finalPrompt,
+		RefFileTokens:         s.refFileTokens,
+		SearchEnabled:         s.searchEnabled,
+		StripReferenceMarkers: s.stripReferenceMarkers,
+		ToolNames:             s.toolNames,
+		ToolsRaw:              s.toolsRaw,
+		ToolChoice:            s.toolChoice,
+	})
+	s.finalThinking = turn.Thinking
+	s.finalText = turn.Text
+	if len(turn.ToolCalls) > 0 && !s.toolCallsDoneEmitted {
 		finishReason = "tool_calls"
 		s.sendDelta(map[string]any{
-			"tool_calls": formatFinalStreamToolCallsWithStableIDs(detected.Calls, s.streamToolCallIDs, s.toolsRaw),
+			"tool_calls": formatFinalStreamToolCallsWithStableIDs(turn.ToolCalls, s.streamToolCallIDs, s.toolsRaw),
 		})
 		s.toolCallsEmitted = true
 		s.toolCallsDoneEmitted = true
@@ -237,11 +261,14 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 		batch.flush()
 	}
 
-	if len(detected.Calls) > 0 || s.toolCallsEmitted {
+	if len(turn.ToolCalls) > 0 || s.toolCallsEmitted {
 		finishReason = "tool_calls"
 	}
-	if len(detected.Calls) == 0 && !s.toolCallsEmitted && strings.TrimSpace(finalText) == "" {
-		status, message, code := upstreamEmptyOutputDetail(finishReason == "content_filter", finalText, finalThinking)
+	if len(turn.ToolCalls) == 0 && !s.toolCallsEmitted && strings.TrimSpace(turn.Text) == "" {
+		status, message, code := upstreamEmptyOutputDetail(finishReason == "content_filter", turn.Text, turn.Thinking)
+		if turn.Error != nil {
+			status, message, code = turn.Error.Status, turn.Error.Message, turn.Error.Code
+		}
 		if deferEmptyOutput {
 			s.finalErrorStatus = status
 			s.finalErrorMessage = message
@@ -251,7 +278,7 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 		s.sendFailedChunk(status, message, code)
 		return true
 	}
-	usage := openaifmt.BuildChatUsageForModel(s.model, s.finalPrompt, finalThinking, finalText, s.refFileTokens)
+	usage := chatUsageFromTurn(turn)
 	s.finalFinishReason = finishReason
 	s.finalUsage = usage
 	s.sendChunk(openaifmt.BuildChatStreamChunk(
@@ -263,6 +290,17 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 	))
 	s.sendDone()
 	return true
+}
+
+func chatUsageFromTurn(turn assistantturn.Turn) map[string]any {
+	return map[string]any{
+		"prompt_tokens":     turn.Usage.InputTokens,
+		"completion_tokens": turn.Usage.OutputTokens,
+		"total_tokens":      turn.Usage.TotalTokens,
+		"completion_tokens_details": map[string]any{
+			"reasoning_tokens": turn.Usage.ReasoningTokens,
+		},
+	}
 }
 
 func (s *chatStreamRuntime) onParsed(parsed sse.LineResult) streamengine.ParsedDecision {

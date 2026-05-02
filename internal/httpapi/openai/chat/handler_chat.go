@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ds2api/internal/auth"
+	"ds2api/internal/completionruntime"
 	"ds2api/internal/config"
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	openaifmt "ds2api/internal/format/openai"
@@ -76,44 +77,40 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 	historySession := startChatHistory(h.ChatHistory, r, a, stdReq)
 
-	sessionID, err = h.DS.CreateSession(r.Context(), a, 3)
-	if err != nil {
-		if a.UseConfigToken {
+	if !stdReq.Stream {
+		result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
+			StripReferenceMarkers: h.compatStripReferenceMarkers(),
+			RetryEnabled:          true,
+		})
+		sessionID = result.SessionID
+		if outErr != nil {
 			if historySession != nil {
-				historySession.error(http.StatusUnauthorized, "Account token is invalid. Please re-login the account in admin.", "error", "", "")
+				historySession.error(outErr.Status, outErr.Message, outErr.Code, result.Turn.Thinking, result.Turn.Text)
 			}
-			writeOpenAIError(w, http.StatusUnauthorized, "Account token is invalid. Please re-login the account in admin.")
-		} else {
-			if historySession != nil {
-				historySession.error(http.StatusUnauthorized, "Invalid token. If this should be a DS2API key, add it to config.keys first.", "error", "", "")
-			}
-			writeOpenAIError(w, http.StatusUnauthorized, "Invalid token. If this should be a DS2API key, add it to config.keys first.")
+			writeOpenAIErrorWithCode(w, outErr.Status, outErr.Message, outErr.Code)
+			return
 		}
+		respBody := openaifmt.BuildChatCompletionWithToolCalls(result.SessionID, stdReq.ResponseModel, result.Turn.Prompt, result.Turn.Thinking, result.Turn.Text, result.Turn.ToolCalls, stdReq.ToolsRaw)
+		respBody["usage"] = chatUsageFromTurn(result.Turn)
+		finishReason := chatFinishReason(respBody)
+		if historySession != nil {
+			historySession.success(http.StatusOK, result.Turn.Thinking, result.Turn.Text, finishReason, chatUsageFromTurn(result.Turn))
+		}
+		writeJSON(w, http.StatusOK, respBody)
 		return
 	}
-	pow, err := h.DS.GetPow(r.Context(), a, 3)
-	if err != nil {
+
+	start, outErr := completionruntime.StartCompletion(r.Context(), h.DS, a, stdReq, completionruntime.Options{})
+	sessionID = start.SessionID
+	if outErr != nil {
 		if historySession != nil {
-			historySession.error(http.StatusUnauthorized, "Failed to get PoW (invalid token or unknown error).", "error", "", "")
+			historySession.error(outErr.Status, outErr.Message, outErr.Code, "", "")
 		}
-		writeOpenAIError(w, http.StatusUnauthorized, "Failed to get PoW (invalid token or unknown error).")
-		return
-	}
-	payload := stdReq.CompletionPayload(sessionID)
-	resp, err := h.DS.CallCompletion(r.Context(), a, payload, pow, 3)
-	if err != nil {
-		if historySession != nil {
-			historySession.error(http.StatusInternalServerError, "Failed to get completion.", "error", "", "")
-		}
-		writeOpenAIError(w, http.StatusInternalServerError, "Failed to get completion.")
+		writeOpenAIErrorWithCode(w, outErr.Status, outErr.Message, outErr.Code)
 		return
 	}
 	refFileTokens := stdReq.RefFileTokens
-	if stdReq.Stream {
-		h.handleStreamWithRetry(w, r, a, resp, payload, pow, sessionID, stdReq.ResponseModel, stdReq.PromptTokenText, refFileTokens, stdReq.Thinking, stdReq.Search, stdReq.ToolNames, stdReq.ToolsRaw, historySession)
-		return
-	}
-	h.handleNonStreamWithRetry(w, r.Context(), a, resp, payload, pow, sessionID, stdReq.ResponseModel, stdReq.PromptTokenText, refFileTokens, stdReq.Thinking, stdReq.Search, stdReq.ToolNames, stdReq.ToolsRaw, historySession)
+	h.handleStreamWithRetry(w, r, a, start.Response, start.Payload, start.Pow, sessionID, stdReq.ResponseModel, stdReq.PromptTokenText, refFileTokens, stdReq.Thinking, stdReq.Search, stdReq.ToolNames, stdReq.ToolsRaw, stdReq.ToolChoice, historySession)
 }
 
 func (h *Handler) autoDeleteRemoteSession(ctx context.Context, a *auth.RequestAuth, sessionID string) {
@@ -234,6 +231,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 		stripReferenceMarkers,
 		toolNames,
 		toolsRaw,
+		promptcompat.DefaultToolChoicePolicy(),
 		bufferToolContent,
 		emitEarlyToolDeltas,
 	)

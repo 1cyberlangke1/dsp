@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"ds2api/internal/assistantturn"
 	"ds2api/internal/sse"
 	"ds2api/internal/toolcall"
 	"ds2api/internal/toolstream"
@@ -9,7 +10,6 @@ import (
 	"time"
 
 	streamengine "ds2api/internal/stream"
-	"ds2api/internal/util"
 )
 
 func (s *claudeStreamRuntime) closeThinkingBlock() {
@@ -115,18 +115,28 @@ func (s *claudeStreamRuntime) finalize(stopReason string) {
 
 	s.closeTextBlock()
 
-	finalThinking := s.thinking.String()
-	finalText := cleanVisibleOutput(s.text.String(), s.stripReferenceMarkers)
+	turn := assistantturn.BuildTurnFromStreamSnapshot(assistantturn.StreamSnapshot{
+		RawText:               s.rawText.String(),
+		VisibleText:           s.text.String(),
+		RawThinking:           s.rawThinking.String(),
+		VisibleThinking:       s.thinking.String(),
+		DetectionThinking:     s.toolDetectionThinking.String(),
+		AlreadyEmittedCalls:   s.toolCallsDetected,
+		AlreadyEmittedToolRaw: s.toolCallsDetected,
+	}, assistantturn.BuildOptions{
+		Model:                 s.model,
+		Prompt:                s.promptTokenText,
+		SearchEnabled:         s.searchEnabled,
+		StripReferenceMarkers: s.stripReferenceMarkers,
+		ToolNames:             s.toolNames,
+		ToolsRaw:              s.toolsRaw,
+	})
+	finalText := turn.Text
 
 	if s.bufferToolContent && !s.toolCallsDetected {
-		detected := toolcall.ParseStandaloneToolCallsDetailed(s.rawText.String(), s.toolNames)
-		if len(detected.Calls) == 0 {
-			detected = toolcall.ParseStandaloneToolCallsDetailed(s.rawThinking.String(), s.toolNames)
-		}
-		if len(detected.Calls) > 0 {
-			normalized := toolcall.NormalizeParsedToolCallsForSchemas(detected.Calls, s.toolsRaw)
+		if len(turn.ToolCalls) > 0 {
 			stopReason = "tool_use"
-			for _, tc := range normalized {
+			for _, tc := range turn.ToolCalls {
 				idx := s.nextBlockIndex
 				s.nextBlockIndex++
 				s.sendToolUseBlock(idx, tc)
@@ -161,7 +171,6 @@ func (s *claudeStreamRuntime) finalize(stopReason string) {
 		stopReason = "tool_use"
 	}
 
-	outputTokens := util.CountOutputTokens(finalThinking, s.model) + util.CountOutputTokens(finalText, s.model)
 	s.send("message_delta", map[string]any{
 		"type": "message_delta",
 		"delta": map[string]any{
@@ -169,7 +178,7 @@ func (s *claudeStreamRuntime) finalize(stopReason string) {
 			"stop_sequence": nil,
 		},
 		"usage": map[string]any{
-			"output_tokens": outputTokens,
+			"output_tokens": turn.Usage.OutputTokens,
 		},
 	})
 	s.send("message_stop", map[string]any{"type": "message_stop"})

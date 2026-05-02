@@ -25,6 +25,8 @@ ds2api/
 │   ├── chathistory/                      # 服务器端对话记录存储与查询
 │   ├── claudeconv/                       # Claude 消息格式转换工具
 │   ├── compat/                           # 兼容性辅助与回归支持
+│   ├── assistantturn/                    # 上游输出到统一 assistant turn / stream event 的语义层
+│   ├── completionruntime/                # Go 主路径共享 DeepSeek completion 启动、非流式收集与 retry
 │   ├── config/                           # 配置加载、校验、热更新
 │   ├── deepseek/                         # DeepSeek 上游 client/protocol/transport
 │   │   ├── client/                       # 登录、会话、completion、上传/删除等上游调用
@@ -171,6 +173,8 @@ flowchart LR
 - `internal/httpapi/openai/*`：OpenAI HTTP surface，按 chat、responses、files、embeddings、history、shared 拆分；chat/responses 共享 promptcompat、stream、toolcall 等核心语义。
 - `internal/httpapi/{claude,gemini}`：协议输入输出适配，归一到同一套 prompt compatibility 语义，不重复实现上游调用逻辑。
 - `internal/promptcompat`：OpenAI/Claude/Gemini 请求到 DeepSeek 网页纯文本上下文的兼容内核。
+- `internal/assistantturn`：Go 输出侧统一语义层，把 DeepSeek SSE 收集结果和流式收尾状态归一成 assistant turn，集中处理 thinking、tool call、citation、usage、stop/error 语义。
+- `internal/completionruntime`：Go surface 共享的 completion 执行辅助，负责 DeepSeek session/PoW/call 启动、非流式 collect 和 empty-output retry；流式路径复用它启动上游请求，继续用 `internal/stream` 做实时消费，并在最终收尾阶段接入 `assistantturn`。
 - `internal/translatorcliproxy`：Claude/Gemini 与 OpenAI 结构互转。
 - `internal/deepseek/{client,protocol,transport}`：上游请求、会话、PoW 适配、协议常量与传输层。
 - `internal/js/chat-stream` + `api/chat-stream.js`：Vercel Node 流式桥；Go prepare/release 管理鉴权、账号租约和 completion payload，Node 侧负责实时 SSE 转发并保持 Go 对齐的终结态和 tool sieve 语义。

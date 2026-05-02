@@ -7,10 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"ds2api/internal/assistantturn"
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	openaifmt "ds2api/internal/format/openai"
+	"ds2api/internal/promptcompat"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 )
@@ -26,6 +28,7 @@ type chatNonStreamResult struct {
 	body                  map[string]any
 	finishReason          string
 	responseMessageID     int
+	outputError           *assistantturn.OutputError
 }
 
 func (h *Handler) handleNonStreamWithRetry(w http.ResponseWriter, ctx context.Context, a *auth.RequestAuth, resp *http.Response, payload map[string]any, pow, completionID, model, finalPrompt string, refFileTokens int, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, historySession *chatHistorySession) {
@@ -86,35 +89,40 @@ func (h *Handler) collectChatNonStreamAttempt(w http.ResponseWriter, resp *http.
 		return chatNonStreamResult{}, false
 	}
 	result := sse.CollectStream(resp, thinkingEnabled, true)
-	stripReferenceMarkers := h.compatStripReferenceMarkers()
-	finalThinking := cleanVisibleOutput(result.Thinking, stripReferenceMarkers)
-	finalText := cleanVisibleOutput(result.Text, stripReferenceMarkers)
-	if searchEnabled {
-		finalText = replaceCitationMarkersWithLinks(finalText, result.CitationLinks)
-	}
-	detected := detectAssistantToolCalls(result.Text, finalText, result.Thinking, result.ToolDetectionThinking, toolNames)
-	respBody := openaifmt.BuildChatCompletionWithToolCalls(completionID, model, usagePrompt, finalThinking, finalText, detected.Calls, toolsRaw)
+	turn := assistantturn.BuildTurnFromCollected(result, assistantturn.BuildOptions{
+		Model:                 model,
+		Prompt:                usagePrompt,
+		SearchEnabled:         searchEnabled,
+		StripReferenceMarkers: h.compatStripReferenceMarkers(),
+		ToolNames:             toolNames,
+		ToolsRaw:              toolsRaw,
+	})
+	respBody := openaifmt.BuildChatCompletionWithToolCalls(completionID, model, usagePrompt, turn.Thinking, turn.Text, turn.ToolCalls, toolsRaw)
 	return chatNonStreamResult{
 		rawThinking:           result.Thinking,
 		rawText:               result.Text,
-		thinking:              finalThinking,
+		thinking:              turn.Thinking,
 		toolDetectionThinking: result.ToolDetectionThinking,
-		text:                  finalText,
+		text:                  turn.Text,
 		contentFilter:         result.ContentFilter,
-		detectedCalls:         len(detected.Calls),
+		detectedCalls:         len(turn.ToolCalls),
 		body:                  respBody,
 		finishReason:          chatFinishReason(respBody),
 		responseMessageID:     result.ResponseMessageID,
+		outputError:           turn.Error,
 	}, true
 }
 
 func (h *Handler) finishChatNonStreamResult(w http.ResponseWriter, result chatNonStreamResult, attempts int, usagePrompt string, refFileTokens int, historySession *chatHistorySession) {
-	if result.detectedCalls == 0 && shouldWriteUpstreamEmptyOutputError(result.text, result.thinking) {
+	if result.detectedCalls == 0 && strings.TrimSpace(result.text) == "" {
 		status, message, code := upstreamEmptyOutputDetail(result.contentFilter, result.text, result.thinking)
+		if result.outputError != nil {
+			status, message, code = result.outputError.Status, result.outputError.Message, result.outputError.Code
+		}
 		if historySession != nil {
 			historySession.error(status, message, code, result.thinking, result.text)
 		}
-		writeUpstreamEmptyOutputError(w, result.text, result.thinking, result.contentFilter)
+		writeOpenAIErrorWithCode(w, status, message, code)
 		config.Logger.Info("[openai_empty_retry] terminal empty output", "surface", "chat.completions", "stream", false, "retry_attempts", attempts, "success_source", "none", "content_filter", result.contentFilter)
 		return
 	}
@@ -147,8 +155,8 @@ func shouldRetryChatNonStream(result chatNonStreamResult, attempts int) bool {
 		strings.TrimSpace(result.thinking) == ""
 }
 
-func (h *Handler) handleStreamWithRetry(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, resp *http.Response, payload map[string]any, pow, completionID, model, finalPrompt string, refFileTokens int, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, historySession *chatHistorySession) {
-	streamRuntime, initialType, ok := h.prepareChatStreamRuntime(w, resp, completionID, model, finalPrompt, refFileTokens, thinkingEnabled, searchEnabled, toolNames, toolsRaw, historySession)
+func (h *Handler) handleStreamWithRetry(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, resp *http.Response, payload map[string]any, pow, completionID, model, finalPrompt string, refFileTokens int, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, toolChoice promptcompat.ToolChoicePolicy, historySession *chatHistorySession) {
+	streamRuntime, initialType, ok := h.prepareChatStreamRuntime(w, resp, completionID, model, finalPrompt, refFileTokens, thinkingEnabled, searchEnabled, toolNames, toolsRaw, toolChoice, historySession)
 	if !ok {
 		return
 	}
@@ -190,7 +198,7 @@ func (h *Handler) handleStreamWithRetry(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
-func (h *Handler) prepareChatStreamRuntime(w http.ResponseWriter, resp *http.Response, completionID, model, finalPrompt string, refFileTokens int, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, historySession *chatHistorySession) (*chatStreamRuntime, string, bool) {
+func (h *Handler) prepareChatStreamRuntime(w http.ResponseWriter, resp *http.Response, completionID, model, finalPrompt string, refFileTokens int, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, toolChoice promptcompat.ToolChoicePolicy, historySession *chatHistorySession) (*chatStreamRuntime, string, bool) {
 	if resp.StatusCode != http.StatusOK {
 		defer func() { _ = resp.Body.Close() }()
 		body, _ := io.ReadAll(resp.Body)
@@ -216,6 +224,7 @@ func (h *Handler) prepareChatStreamRuntime(w http.ResponseWriter, resp *http.Res
 	streamRuntime := newChatStreamRuntime(
 		w, rc, canFlush, completionID, time.Now().Unix(), model, finalPrompt,
 		thinkingEnabled, searchEnabled, h.compatStripReferenceMarkers(), toolNames, toolsRaw,
+		toolChoice,
 		len(toolNames) > 0, h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence(),
 	)
 	streamRuntime.refFileTokens = refFileTokens

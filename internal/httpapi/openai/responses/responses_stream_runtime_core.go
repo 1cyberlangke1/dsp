@@ -1,6 +1,7 @@
 package responses
 
 import (
+	"ds2api/internal/assistantturn"
 	"ds2api/internal/toolcall"
 	"net/http"
 	"strings"
@@ -159,9 +160,29 @@ func (s *responsesStreamRuntime) finalize(finishReason string, deferEmptyOutput 
 
 	finalThinking := s.accumulator.Thinking.String()
 	finalToolDetectionThinking := s.accumulator.ToolDetectionThinking.String()
-	finalText := cleanVisibleOutput(s.accumulator.Text.String(), s.stripReferenceMarkers)
-	textParsed := detectAssistantToolCalls(s.accumulator.RawText.String(), finalText, s.accumulator.RawThinking.String(), finalToolDetectionThinking, s.toolNames)
-	detected := textParsed.Calls
+	finalText := s.accumulator.Text.String()
+	turn := assistantturn.BuildTurnFromStreamSnapshot(assistantturn.StreamSnapshot{
+		RawText:               s.accumulator.RawText.String(),
+		VisibleText:           finalText,
+		RawThinking:           s.accumulator.RawThinking.String(),
+		VisibleThinking:       finalThinking,
+		DetectionThinking:     finalToolDetectionThinking,
+		ContentFilter:         finishReason == "content_filter",
+		ResponseMessageID:     s.responseMessageID,
+		AlreadyEmittedCalls:   s.toolCallsEmitted,
+		AlreadyEmittedToolRaw: s.toolCallsDoneEmitted,
+	}, assistantturn.BuildOptions{
+		Model:                 s.model,
+		Prompt:                s.finalPrompt,
+		RefFileTokens:         s.refFileTokens,
+		SearchEnabled:         s.searchEnabled,
+		StripReferenceMarkers: s.stripReferenceMarkers,
+		ToolNames:             s.toolNames,
+		ToolsRaw:              s.toolsRaw,
+		ToolChoice:            s.toolChoice,
+	})
+	textParsed := turn.ParsedToolCalls
+	detected := turn.ToolCalls
 	s.logToolPolicyRejections(textParsed)
 
 	if len(detected) > 0 {
@@ -173,12 +194,15 @@ func (s *responsesStreamRuntime) finalize(finishReason string, deferEmptyOutput 
 
 	s.closeMessageItem()
 
-	if s.toolChoice.IsRequired() && len(detected) == 0 {
-		s.failResponse(http.StatusUnprocessableEntity, "tool_choice requires at least one valid tool call.", "tool_choice_violation")
+	if turn.Error != nil && turn.Error.Code == "tool_choice_violation" {
+		s.failResponse(turn.Error.Status, turn.Error.Message, turn.Error.Code)
 		return true
 	}
-	if len(detected) == 0 && strings.TrimSpace(finalText) == "" {
-		status, message, code := upstreamEmptyOutputDetail(finishReason == "content_filter", finalText, finalThinking)
+	if len(detected) == 0 && strings.TrimSpace(turn.Text) == "" {
+		status, message, code := upstreamEmptyOutputDetail(finishReason == "content_filter", turn.Text, turn.Thinking)
+		if turn.Error != nil {
+			status, message, code = turn.Error.Status, turn.Error.Message, turn.Error.Code
+		}
 		if deferEmptyOutput {
 			s.finalErrorStatus = status
 			s.finalErrorMessage = message
@@ -190,13 +214,21 @@ func (s *responsesStreamRuntime) finalize(finishReason string, deferEmptyOutput 
 	}
 	s.closeIncompleteFunctionItems()
 
-	obj := s.buildCompletedResponseObject(finalThinking, finalText, detected)
+	obj := s.buildCompletedResponseObject(turn.Thinking, turn.Text, detected)
 	if s.persistResponse != nil {
 		s.persistResponse(obj)
 	}
 	s.sendEvent("response.completed", openaifmt.BuildResponsesCompletedPayload(obj))
 	s.sendDone()
 	return true
+}
+
+func responsesUsageFromTurn(turn assistantturn.Turn) map[string]any {
+	return map[string]any{
+		"input_tokens":  turn.Usage.InputTokens,
+		"output_tokens": turn.Usage.OutputTokens,
+		"total_tokens":  turn.Usage.TotalTokens,
+	}
 }
 
 func (s *responsesStreamRuntime) logToolPolicyRejections(textParsed toolcall.ToolCallParseResult) {

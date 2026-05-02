@@ -11,7 +11,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"ds2api/internal/assistantturn"
+	"ds2api/internal/auth"
+	"ds2api/internal/completionruntime"
 	"ds2api/internal/httpapi/requestbody"
+	"ds2api/internal/promptcompat"
 	"ds2api/internal/sse"
 	"ds2api/internal/toolcall"
 	"ds2api/internal/translatorcliproxy"
@@ -21,14 +25,80 @@ import (
 )
 
 func (h *Handler) handleGenerateContent(w http.ResponseWriter, r *http.Request, stream bool) {
-	if h.OpenAI == nil {
-		writeGeminiError(w, http.StatusInternalServerError, "OpenAI proxy backend unavailable.")
+	if isGeminiVercelProxyRequest(r) && h.proxyViaOpenAI(w, r, stream) {
 		return
 	}
-	if h.proxyViaOpenAI(w, r, stream) {
+	if h.Auth == nil || h.DS == nil {
+		if h.OpenAI != nil && h.proxyViaOpenAI(w, r, stream) {
+			return
+		}
+		writeGeminiError(w, http.StatusInternalServerError, "Gemini runtime backend unavailable.")
 		return
 	}
-	writeGeminiError(w, http.StatusBadGateway, "Failed to proxy Gemini request.")
+	if h.handleGeminiDirect(w, r, stream) {
+		return
+	}
+	writeGeminiError(w, http.StatusBadGateway, "Failed to handle Gemini request.")
+}
+
+func isGeminiVercelProxyRequest(r *http.Request) bool {
+	if r == nil || r.URL == nil {
+		return false
+	}
+	return strings.TrimSpace(r.URL.Query().Get("__stream_prepare")) == "1" ||
+		strings.TrimSpace(r.URL.Query().Get("__stream_release")) == "1"
+}
+
+func (h *Handler) handleGeminiDirect(w http.ResponseWriter, r *http.Request, stream bool) bool {
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		if errors.Is(err, requestbody.ErrInvalidUTF8Body) {
+			writeGeminiError(w, http.StatusBadRequest, "invalid json")
+		} else {
+			writeGeminiError(w, http.StatusBadRequest, "invalid body")
+		}
+		return true
+	}
+	routeModel := strings.TrimSpace(chi.URLParam(r, "model"))
+	var req map[string]any
+	if err := json.Unmarshal(raw, &req); err != nil {
+		writeGeminiError(w, http.StatusBadRequest, "invalid json")
+		return true
+	}
+	stdReq, err := normalizeGeminiRequest(h.Store, routeModel, req, stream)
+	if err != nil {
+		writeGeminiError(w, http.StatusBadRequest, err.Error())
+		return true
+	}
+	a, err := h.Auth.Determine(r)
+	if err != nil {
+		writeGeminiError(w, http.StatusUnauthorized, err.Error())
+		return true
+	}
+	defer h.Auth.Release(a)
+	if stream {
+		h.handleGeminiDirectStream(w, r, a, stdReq)
+		return true
+	}
+	result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
+		StripReferenceMarkers: h.compatStripReferenceMarkers(),
+		RetryEnabled:          true,
+	})
+	if outErr != nil {
+		writeGeminiError(w, outErr.Status, outErr.Message)
+		return true
+	}
+	writeJSON(w, http.StatusOK, buildGeminiGenerateContentResponseFromTurn(result.Turn))
+	return true
+}
+
+func (h *Handler) handleGeminiDirectStream(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, stdReq promptcompat.StandardRequest) {
+	start, outErr := completionruntime.StartCompletion(r.Context(), h.DS, a, stdReq, completionruntime.Options{})
+	if outErr != nil {
+		writeGeminiError(w, outErr.Status, outErr.Message)
+		return
+	}
+	h.handleStreamGenerateContent(w, r, start.Response, stdReq.ResponseModel, stdReq.PromptTokenText, stdReq.Thinking, stdReq.Search, stdReq.ToolNames, stdReq.ToolsRaw)
 }
 
 func (h *Handler) proxyViaOpenAI(w http.ResponseWriter, r *http.Request, stream bool) bool {
@@ -248,6 +318,48 @@ func buildGeminiGenerateContentResponse(model, finalPrompt, finalThinking, final
 		"modelVersion":  model,
 		"usageMetadata": usage,
 	}
+}
+
+func buildGeminiGenerateContentResponseFromTurn(turn assistantturn.Turn) map[string]any {
+	parts := buildGeminiPartsFromTurn(turn)
+	return map[string]any{
+		"candidates": []map[string]any{
+			{
+				"index": 0,
+				"content": map[string]any{
+					"role":  "model",
+					"parts": parts,
+				},
+				"finishReason": "STOP",
+			},
+		},
+		"modelVersion": turn.Model,
+		"usageMetadata": map[string]any{
+			"promptTokenCount":     turn.Usage.InputTokens,
+			"candidatesTokenCount": turn.Usage.OutputTokens,
+			"totalTokenCount":      turn.Usage.TotalTokens,
+		},
+	}
+}
+
+func buildGeminiPartsFromTurn(turn assistantturn.Turn) []map[string]any {
+	if len(turn.ToolCalls) > 0 {
+		parts := make([]map[string]any, 0, len(turn.ToolCalls))
+		for _, tc := range turn.ToolCalls {
+			parts = append(parts, map[string]any{
+				"functionCall": map[string]any{
+					"name": tc.Name,
+					"args": tc.Input,
+				},
+			})
+		}
+		return parts
+	}
+	text := turn.Text
+	if text == "" {
+		text = turn.Thinking
+	}
+	return []map[string]any{{"text": text}}
 }
 
 //nolint:unused // retained for native Gemini non-stream handling path.

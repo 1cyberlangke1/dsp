@@ -25,6 +25,8 @@ ds2api/
 │   ├── chathistory/                      # Server-side conversation history storage/query
 │   ├── claudeconv/                       # Claude message conversion helpers
 │   ├── compat/                           # Compatibility and regression helpers
+│   ├── assistantturn/                    # Upstream output to canonical assistant turn / stream event semantics
+│   ├── completionruntime/                # Shared Go DeepSeek completion startup, non-stream collection, and retry
 │   ├── config/                           # Config loading/validation/hot reload
 │   ├── deepseek/                         # DeepSeek upstream client/protocol/transport
 │   │   ├── client/                       # Login/session/completion/upload/delete calls
@@ -171,6 +173,8 @@ flowchart LR
 - `internal/httpapi/openai/*`: OpenAI HTTP surface split into chat, responses, files, embeddings, history, and shared packages; chat/responses share the promptcompat, stream, and toolcall semantics.
 - `internal/httpapi/{claude,gemini}`: protocol wrappers that normalize into the same prompt compatibility semantics without duplicating upstream execution.
 - `internal/promptcompat`: compatibility core for turning OpenAI/Claude/Gemini requests into DeepSeek web-chat plain-text context.
+- `internal/assistantturn`: Go output-side canonical semantics, converting DeepSeek SSE collection results and stream finalization state into assistant turns and centralizing thinking, tool call, citation, usage, stop/error behavior.
+- `internal/completionruntime`: shared Go completion execution helpers for DeepSeek session/PoW/call startup, non-stream collection, and empty-output retry; streaming paths use it to start upstream requests, continue to use `internal/stream` for real-time consumption, and use `assistantturn` during finalization.
 - `internal/translatorcliproxy`: structure translation between Claude/Gemini and OpenAI.
 - `internal/deepseek/{client,protocol,transport}`: upstream requests, sessions, PoW adaptation, protocol constants, and transport details.
 - `internal/js/chat-stream` + `api/chat-stream.js`: Vercel Node streaming bridge; Go prepare/release owns auth, account lease, and completion payload assembly, while Node relays real-time SSE with Go-aligned finalization and tool sieve semantics.
