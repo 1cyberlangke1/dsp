@@ -111,6 +111,7 @@ Gemini-compatible clients can also send `x-goog-api-key`, `?key=`, or `?api_key=
 | GET | `/v1/responses/{response_id}` | Business | Query stored response (in-memory TTL) |
 | POST | `/v1/embeddings` | Business | OpenAI Embeddings API |
 | POST | `/v1/files` | Business | OpenAI Files upload (multipart/form-data) |
+| GET | `/v1/files/{file_id}` | Business | Retrieve uploaded file status |
 | GET | `/anthropic/v1/models` | None | Claude model list |
 | POST | `/anthropic/v1/messages` | Business | Claude messages |
 | POST | `/anthropic/v1/messages/count_tokens` | Business | Claude token counting |
@@ -167,7 +168,7 @@ Gemini-compatible clients can also send `x-goog-api-key`, `?key=`, or `?api_key=
 | PUT | `/admin/chat-history/settings` | Admin | Update conversation history retention limit |
 | GET | `/admin/version` | Admin | Check current version and latest Release |
 
-OpenAI `/v1/*` paths are canonical. For clients configured with the bare DS2API service URL, the same OpenAI handlers are also exposed through root shortcuts: `/models`, `/models/{id}`, `/chat/completions`, `/responses`, `/responses/{response_id}`, `/embeddings`, and `/files`.
+OpenAI `/v1/*` paths are canonical. For clients configured with the bare DS2API service URL, the same OpenAI handlers are also exposed through root shortcuts: `/models`, `/models/{id}`, `/chat/completions`, `/responses`, `/responses/{response_id}`, `/embeddings`, `/files`, and `/files/{file_id}`.
 
 ---
 
@@ -439,6 +440,10 @@ Constraints and behavior:
 - `Content-Type` must be `multipart/form-data` (otherwise `400`).
 - Total request size limit is **100 MiB** (over-limit returns `413`).
 - Success returns an OpenAI `file` object (`id/object/bytes/filename/purpose/status`, etc.) and includes `account_id` for source-account tracing.
+
+### `GET /v1/files/{file_id}`
+
+Business auth required. Retrieves the current DeepSeek upload status for a file and returns an OpenAI `file` object. Returns `404` when no matching file is found.
 
 ---
 

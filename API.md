@@ -111,6 +111,7 @@ Gemini 兼容客户端还可以使用 `x-goog-api-key`、`?key=` 或 `?api_key=`
 | GET | `/v1/responses/{response_id}` | 业务 | 查询已生成 response（内存 TTL） |
 | POST | `/v1/embeddings` | 业务 | OpenAI Embeddings 接口 |
 | POST | `/v1/files` | 业务 | OpenAI Files 上传（multipart/form-data） |
+| GET | `/v1/files/{file_id}` | 业务 | 查询已上传文件状态 |
 | GET | `/anthropic/v1/models` | 无 | Claude 模型列表 |
 | POST | `/anthropic/v1/messages` | 业务 | Claude 消息接口 |
 | POST | `/anthropic/v1/messages/count_tokens` | 业务 | Claude token 计数 |
@@ -167,7 +168,7 @@ Gemini 兼容客户端还可以使用 `x-goog-api-key`、`?key=` 或 `?api_key=`
 | PUT | `/admin/chat-history/settings` | Admin | 更新对话记录保留条数 |
 | GET | `/admin/version` | Admin | 查询当前版本与最新 Release |
 
-OpenAI `/v1/*` 仍是规范路径。对于只配置 DS2API 根地址的客户端，同一套 OpenAI handler 也通过根路径快捷路由暴露：`/models`、`/models/{id}`、`/chat/completions`、`/responses`、`/responses/{response_id}`、`/embeddings`、`/files`。
+OpenAI `/v1/*` 仍是规范路径。对于只配置 DS2API 根地址的客户端，同一套 OpenAI handler 也通过根路径快捷路由暴露：`/models`、`/models/{id}`、`/chat/completions`、`/responses`、`/responses/{response_id}`、`/embeddings`、`/files`、`/files/{file_id}`。
 
 ---
 
@@ -442,6 +443,10 @@ data: [DONE]
 - 请求必须为 `multipart/form-data`，否则返回 `400`。
 - 请求体总大小上限 **100 MiB**（超限返回 `413`）。
 - 成功返回 OpenAI `file` 对象（`id/object/bytes/filename/purpose/status` 等字段），并附带 `account_id` 便于定位来源账号。
+
+### `GET /v1/files/{file_id}`
+
+需要业务鉴权。查询 DeepSeek 上传文件的当前状态，并返回 OpenAI `file` 对象；未找到匹配文件时返回 `404`。
 
 ---
 
