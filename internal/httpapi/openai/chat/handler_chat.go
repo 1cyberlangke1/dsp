@@ -87,7 +87,7 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 		sessionID = result.SessionID
 		if outErr != nil {
 			if historySession != nil {
-				historySession.error(outErr.Status, outErr.Message, outErr.Code, result.Turn.Thinking, result.Turn.Text)
+				historySession.error(outErr.Status, outErr.Message, outErr.Code, historyThinkingForArchive(result.Turn.RawThinking, result.Turn.DetectionThinking, result.Turn.Thinking), historyTextForArchive(result.Turn.RawText, result.Turn.Text))
 			}
 			writeOpenAIErrorWithCode(w, outErr.Status, outErr.Message, outErr.Code)
 			return
@@ -96,7 +96,7 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 		respBody["usage"] = assistantturn.OpenAIChatUsage(result.Turn)
 		finishReason := assistantturn.FinalizeTurn(result.Turn, assistantturn.FinalizeOptions{}).FinishReason
 		if historySession != nil {
-			historySession.success(http.StatusOK, result.Turn.Thinking, result.Turn.Text, finishReason, assistantturn.OpenAIChatUsage(result.Turn))
+			historySession.success(http.StatusOK, historyThinkingForArchive(result.Turn.RawThinking, result.Turn.DetectionThinking, result.Turn.Thinking), historyTextForArchive(result.Turn.RawText, result.Turn.Text), finishReason, assistantturn.OpenAIChatUsage(result.Turn))
 		}
 		writeJSON(w, http.StatusOK, respBody)
 		return
@@ -177,7 +177,7 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, resp *http.Response, co
 	if outcome.ShouldFail {
 		status, message, code := outcome.Error.Status, outcome.Error.Message, outcome.Error.Code
 		if historySession != nil {
-			historySession.error(status, message, code, turn.Thinking, turn.Text)
+			historySession.error(status, message, code, historyThinkingForArchive(turn.RawThinking, turn.DetectionThinking, turn.Thinking), historyTextForArchive(turn.RawText, turn.Text))
 		}
 		writeOpenAIErrorWithCode(w, status, message, code)
 		return
@@ -185,7 +185,7 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, resp *http.Response, co
 	respBody := openaifmt.BuildChatCompletionWithToolCalls(completionID, model, finalPrompt, turn.Thinking, turn.Text, turn.ToolCalls, toolsRaw)
 	respBody["usage"] = assistantturn.OpenAIChatUsage(turn)
 	if historySession != nil {
-		historySession.success(http.StatusOK, turn.Thinking, turn.Text, outcome.FinishReason, assistantturn.OpenAIChatUsage(turn))
+		historySession.success(http.StatusOK, historyThinkingForArchive(turn.RawThinking, turn.DetectionThinking, turn.Thinking), historyTextForArchive(turn.RawText, turn.Text), outcome.FinishReason, assistantturn.OpenAIChatUsage(turn))
 	}
 	writeJSON(w, http.StatusOK, respBody)
 }
@@ -253,7 +253,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 		OnParsed: func(parsed sse.LineResult) streamengine.ParsedDecision {
 			decision := streamRuntime.onParsed(parsed)
 			if historySession != nil {
-				historySession.progress(streamRuntime.accumulator.Thinking.String(), streamRuntime.accumulator.Text.String())
+				historySession.progress(streamRuntime.historyThinking(), streamRuntime.historyText())
 			}
 			return decision
 		},
@@ -267,14 +267,15 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 				return
 			}
 			if streamRuntime.finalErrorMessage != "" {
-				historySession.error(streamRuntime.finalErrorStatus, streamRuntime.finalErrorMessage, streamRuntime.finalErrorCode, streamRuntime.accumulator.Thinking.String(), streamRuntime.accumulator.Text.String())
+				historySession.error(streamRuntime.finalErrorStatus, streamRuntime.finalErrorMessage, streamRuntime.finalErrorCode, streamRuntime.historyThinking(), streamRuntime.historyText())
 				return
 			}
-			historySession.success(http.StatusOK, streamRuntime.finalThinking, streamRuntime.finalText, streamRuntime.finalFinishReason, streamRuntime.finalUsage)
+			historySession.success(http.StatusOK, streamRuntime.historyThinking(), streamRuntime.historyText(), streamRuntime.finalFinishReason, streamRuntime.finalUsage)
 		},
 		OnContextDone: func() {
+			streamRuntime.markContextCancelled()
 			if historySession != nil {
-				historySession.stopped(streamRuntime.accumulator.Thinking.String(), streamRuntime.accumulator.Text.String(), string(streamengine.StopReasonContextCancelled))
+				historySession.stopped(streamRuntime.historyThinking(), streamRuntime.historyText(), string(streamengine.StopReasonContextCancelled))
 			}
 		},
 	})

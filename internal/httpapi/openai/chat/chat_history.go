@@ -188,6 +188,23 @@ func (s *chatHistorySession) stopped(thinking, content, finishReason string) {
 	})
 }
 
+func historyTextForArchive(raw, visible string) string {
+	if strings.TrimSpace(raw) != "" {
+		return raw
+	}
+	return visible
+}
+
+func historyThinkingForArchive(raw, detection, visible string) string {
+	if strings.TrimSpace(raw) != "" {
+		return raw
+	}
+	if strings.TrimSpace(detection) != "" {
+		return detection
+	}
+	return visible
+}
+
 func (s *chatHistorySession) retryMissingEntry() bool {
 	if s == nil || s.store == nil || s.disabled {
 		return false
