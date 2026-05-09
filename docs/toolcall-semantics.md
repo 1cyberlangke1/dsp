@@ -39,7 +39,7 @@
 兼容修复：
 
 - 如果模型漏掉 opening wrapper，但后面仍输出了一个或多个 invoke 并以 closing wrapper 收尾，Go 解析链路会在解析前补回缺失的 opening wrapper。
-- Go / Node 解析层不再枚举每一种 DSML typo。它会把工具标签名前的 `DSML`、管道符 `|` / `｜`、空白、重复 leading `<` 视为可容忍的协议噪声，然后只匹配固定本地标签名 `tool_calls` / `invoke` / `parameter`。例如 `<DSML|tool_calls>`、`<<|DSML|tool_calls>`、`<|DSML tool_calls>`、`<DSMLtool_calls>`、`<<DSML|DSML|tool_calls>` 都会归一化；相似但非固定标签名（如 `tool_calls_extra`）仍按普通文本处理。
+- Go / Node 解析层不再枚举每一种 DSML typo。它以固定本地标签名 `tool_calls` / `invoke` / `parameter` 为准，把标签名前的任意协议前缀壳视为可容忍噪声，并继续兼容管道符 `|` / `｜`、空白、重复 leading `<`、可视控制符 `␂`、原始 STX `\x02`、非 ASCII 分隔符等漂移。例如 `<DSML|tool_calls>`、`<<|DSML|tool_calls>`、`<|DSML tool_calls>`、`<DSMLtool_calls>`、`<<DSML|DSML|tool_calls>`、`<DSML␂tool_calls>`、`<proto💥tool_calls>` 都会归一化；相似但非固定标签名（如 `tool_calls_extra`）仍按普通文本处理。
 - 如果模型在固定工具标签名后多输出一个尾部管道符，例如 `<|DSML|tool_calls|` / `<|DSML|invoke|` / `<|DSML|parameter|`，兼容层会把这个尾部 `|` 当作异常标签终止符并补齐缺失的 `>`；如果后面已经有 `>`，也会消费这个多余 `|` 后再归一化。
 - 这是一个针对常见模型失误的窄修复，不改变推荐输出格式；prompt 仍要求模型直接输出完整 DSML 外壳。
 - 裸 `<invoke ...>` / `<parameter ...>` 不会被当成“已支持的工具语法”；只有 `tool_calls` wrapper 或可修复的缺失 opening wrapper 才会进入工具调用路径。

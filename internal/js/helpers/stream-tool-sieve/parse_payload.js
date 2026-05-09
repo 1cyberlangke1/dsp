@@ -458,11 +458,19 @@ function scanToolMarkupTagAt(text, start) {
     i += 1;
   }
   const prefix = consumeToolMarkupNamePrefix(raw, lower, i);
+  const prefixStart = i;
   i = prefix.next;
-  const dsmlLike = prefix.dsmlLike;
-  const { name, len } = matchToolMarkupName(raw, i, dsmlLike);
+  let dsmlLike = prefix.dsmlLike;
+  let { name, len } = matchToolMarkupName(raw, i, dsmlLike);
   if (!name) {
-    return null;
+    const fallback = matchToolMarkupNameAfterArbitraryPrefix(raw, prefixStart);
+    if (!fallback.ok) {
+      return null;
+    }
+    name = fallback.name;
+    i = fallback.start;
+    len = fallback.len;
+    dsmlLike = true;
   }
   const originalNameEnd = i + len;
   let nameEnd = originalNameEnd;
@@ -574,7 +582,7 @@ function includeDuplicateLeadingLessThan(text, idx) {
 }
 
 function isToolMarkupPipe(ch) {
-  return ch === '|' || ch === '｜';
+  return ch === '|' || ch === '｜' || ch === '␂' || ch === '\x02';
 }
 
 function isPartialToolMarkupTagPrefix(text) {
@@ -603,6 +611,9 @@ function isPartialToolMarkupTagPrefix(text) {
     if (normalizedASCIITailAt(raw, i).startsWith('dsml') || 'dsml'.startsWith(normalizedASCIITailAt(raw, i))) {
       return true;
     }
+    if (hasPartialToolMarkupNameAfterArbitraryPrefix(raw, i)) {
+      return true;
+    }
     const next = consumeToolMarkupNamePrefixOnce(raw, lower, i);
     if (!next.ok) {
       return false;
@@ -623,6 +634,53 @@ function consumeToolMarkupNamePrefix(raw, lower, idx) {
     next = consumed.next;
     dsmlLike = true;
   }
+}
+
+function matchToolMarkupNameAfterArbitraryPrefix(raw, start) {
+  for (let idx = start; idx < raw.length;) {
+    if (isToolMarkupTagTerminator(raw, idx)) {
+      return { ok: false };
+    }
+    for (const name of TOOL_MARKUP_NAMES) {
+      const matched = matchNormalizedASCII(raw, idx, name.raw);
+      if (!matched.ok) continue;
+      if (!toolMarkupPrefixAllowsLocalName(raw.slice(start, idx))) continue;
+      return { ok: true, name: name.canonical, start: idx, len: matched.len };
+    }
+    idx += 1;
+  }
+  return { ok: false };
+}
+
+function hasPartialToolMarkupNameAfterArbitraryPrefix(raw, start) {
+  for (let idx = start; idx < raw.length;) {
+    if (isToolMarkupTagTerminator(raw, idx)) {
+      return false;
+    }
+    if (toolMarkupPrefixAllowsLocalName(raw.slice(start, idx)) && hasToolMarkupNamePrefix(raw, idx)) {
+      return true;
+    }
+    idx += 1;
+  }
+  return false;
+}
+
+function toolMarkupPrefixAllowsLocalName(prefix) {
+  if (!prefix) {
+    return false;
+  }
+  if (normalizedASCIITailAt(prefix, 0).includes('dsml')) {
+    return true;
+  }
+  if (/[="'"]/.test(prefix)) {
+    return false;
+  }
+  const previous = normalizeFullwidthASCIIChar(prefix[prefix.length - 1] || '');
+  return !/^[A-Za-z0-9]$/.test(previous);
+}
+
+function isToolMarkupTagTerminator(raw, idx) {
+  return raw[idx] === '>' || normalizeFullwidthASCIIChar(raw[idx] || '') === '>';
 }
 
 function consumeToolMarkupNamePrefixOnce(raw, lower, idx) {

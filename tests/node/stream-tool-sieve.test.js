@@ -129,6 +129,32 @@ test('parseToolCalls parses fullwidth DSML shell drift', () => {
   assert.deepEqual(calls[1].input, { file_path: '/Users/aq/Desktop/myproject/Personal_Blog/index.html' });
 });
 
+test('parseToolCalls parses DSML control separator drift', () => {
+  for (const sep of ['␂', '\x02']) {
+    const payload = `<DSML${sep}tool_calls>
+  <DSML${sep}invoke name="Read">
+    <DSML${sep}parameter name="file_path"><![CDATA[/tmp/input.txt]]></DSML${sep}parameter>
+  </DSML${sep}invoke>
+</DSML${sep}tool_calls>`;
+    const calls = parseToolCalls(payload, ['Read']);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].name, 'Read');
+    assert.deepEqual(calls[0].input, { file_path: '/tmp/input.txt' });
+  }
+});
+
+test('parseToolCalls parses arbitrary-prefixed tool tags', () => {
+  const payload = `<proto💥tool_calls>
+  <proto💥invoke name="Read">
+    <proto💥parameter name="file_path"><![CDATA[/tmp/input.txt]]></proto💥parameter>
+  </proto💥invoke>
+</proto💥tool_calls>`;
+  const calls = parseToolCalls(payload, ['Read']);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].name, 'Read');
+  assert.deepEqual(calls[0].input, { file_path: '/tmp/input.txt' });
+});
+
 test('parseToolCalls ignores bare hyphenated tool_calls lookalike', () => {
   const payload = '<tool-calls><invoke name="Bash"><parameter name="command">pwd</parameter></invoke></tool-calls>';
   const calls = parseToolCalls(payload, ['Bash']);
@@ -443,6 +469,44 @@ test('sieve emits tool_calls for DSML trailing pipe tag terminator', () => {
   assert.equal(finalCalls[0].name, 'terminal');
   assert.deepEqual(finalCalls[0].input, { command: 'find "/home" -type d', timeout: 10 });
   assert.equal(text.toLowerCase().includes('dsml'), false);
+});
+
+test('sieve emits tool_calls for DSML control separator drift', () => {
+  for (const sep of ['␂', '\x02']) {
+    const events = runSieve([
+      `<DSML${sep}tool`,
+      '_calls>\n',
+      `<DSML${sep}invoke name="Read">\n`,
+      `<DSML${sep}parameter name="file_path"><![CDATA[/tmp/input.txt]]></DSML${sep}parameter>\n`,
+      `</DSML${sep}invoke>\n`,
+      `</DSML${sep}tool_calls>`,
+    ], ['Read']);
+    const finalCalls = events.filter((evt) => evt.type === 'tool_calls').flatMap((evt) => evt.calls || []);
+    assert.equal(finalCalls.length, 1);
+    assert.equal(finalCalls[0].name, 'Read');
+    assert.equal(finalCalls[0].input.file_path, '/tmp/input.txt');
+    const text = collectText(events);
+    assert.equal(text.toLowerCase().includes('dsml'), false);
+    assert.equal(text.includes(sep), false);
+  }
+});
+
+test('sieve emits tool_calls for arbitrary-prefixed tool tags', () => {
+  const events = runSieve([
+    '<proto💥tool',
+    '_calls>\n',
+    '<proto💥invoke name="Read">\n',
+    '<proto💥parameter name="file_path"><![CDATA[/tmp/input.txt]]></proto💥parameter>\n',
+    '</proto💥invoke>\n',
+    '</proto💥tool_calls>',
+  ], ['Read']);
+  const finalCalls = events.filter((evt) => evt.type === 'tool_calls').flatMap((evt) => evt.calls || []);
+  assert.equal(finalCalls.length, 1);
+  assert.equal(finalCalls[0].name, 'Read');
+  assert.equal(finalCalls[0].input.file_path, '/tmp/input.txt');
+  const text = collectText(events);
+  assert.equal(text.includes('proto'), false);
+  assert.equal(text.includes('💥'), false);
 });
 
 test('sieve emits tool_calls for extra leading less-than DSML tags without leaking prefix', () => {

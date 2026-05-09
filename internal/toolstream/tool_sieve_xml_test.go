@@ -104,6 +104,111 @@ func TestProcessToolSieveInterceptsDSMLTrailingPipeToolCallWithoutLeak(t *testin
 	}
 }
 
+func TestProcessToolSieveInterceptsDSMLControlSeparatorWithoutLeak(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		sep  string
+	}{
+		{name: "control_picture", sep: "␂"},
+		{name: "raw_stx", sep: "\x02"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sep := tc.sep
+			var state State
+			chunks := []string{
+				"<DSML" + sep + "tool",
+				"_calls>\n",
+				`  <DSML` + sep + `invoke name="Read">` + "\n",
+				`    <DSML` + sep + `parameter name="file_path"><![CDATA[/tmp/input.txt]]></DSML` + sep + `parameter>` + "\n",
+				"  </DSML" + sep + "invoke>\n",
+				"</DSML" + sep + "tool_calls>",
+			}
+			var events []Event
+			for _, c := range chunks {
+				events = append(events, ProcessChunk(&state, c, []string{"Read"})...)
+			}
+			events = append(events, Flush(&state, []string{"Read"})...)
+
+			var textContent strings.Builder
+			var calls []any
+			for _, evt := range events {
+				textContent.WriteString(evt.Content)
+				for _, call := range evt.ToolCalls {
+					calls = append(calls, call)
+				}
+			}
+			if text := textContent.String(); strings.Contains(strings.ToLower(text), "dsml") || strings.Contains(text, "Read") || strings.Contains(text, sep) {
+				t.Fatalf("control-separator DSML tool call leaked to text: %q events=%#v", text, events)
+			}
+			if len(calls) != 1 {
+				t.Fatalf("expected one control-separator DSML tool call, got %d events=%#v", len(calls), events)
+			}
+		})
+	}
+}
+
+func TestProcessToolSieveInterceptsArbitraryPrefixedToolTagsWithoutLeak(t *testing.T) {
+	var state State
+	chunks := []string{
+		"<proto💥tool",
+		"_calls>\n",
+		`  <proto💥invoke name="Read">` + "\n",
+		`    <proto💥parameter name="file_path"><![CDATA[/tmp/input.txt]]></proto💥parameter>` + "\n",
+		"  </proto💥invoke>\n",
+		"</proto💥tool_calls>",
+	}
+	var events []Event
+	for _, c := range chunks {
+		events = append(events, ProcessChunk(&state, c, []string{"Read"})...)
+	}
+	events = append(events, Flush(&state, []string{"Read"})...)
+
+	var textContent strings.Builder
+	var calls []any
+	for _, evt := range events {
+		textContent.WriteString(evt.Content)
+		for _, call := range evt.ToolCalls {
+			calls = append(calls, call)
+		}
+	}
+	if text := textContent.String(); strings.Contains(text, "proto") || strings.Contains(text, "Read") || strings.Contains(text, "💥") {
+		t.Fatalf("arbitrary-prefixed tool call leaked to text: %q events=%#v", text, events)
+	}
+	if len(calls) != 1 {
+		t.Fatalf("expected one arbitrary-prefixed tool call, got %d events=%#v", len(calls), events)
+	}
+}
+
+func TestProcessToolSieveSuppressesEmptyDSMLControlSeparatorBlockWithoutLeak(t *testing.T) {
+	var state State
+	sep := "␂"
+	chunks := []string{
+		"<DSML" + sep + "tool_calls>\n",
+		`  <DSML` + sep + `invoke name="Read">` + "\n",
+		`    <DSML` + sep + `parameter name="file_path"></DSML` + sep + `parameter>` + "\n",
+		"  </DSML" + sep + "invoke>\n",
+		"</DSML" + sep + "tool_calls>",
+	}
+	var events []Event
+	for _, c := range chunks {
+		events = append(events, ProcessChunk(&state, c, []string{"Read"})...)
+	}
+	events = append(events, Flush(&state, []string{"Read"})...)
+
+	var textContent strings.Builder
+	toolCalls := 0
+	for _, evt := range events {
+		textContent.WriteString(evt.Content)
+		toolCalls += len(evt.ToolCalls)
+	}
+	if toolCalls != 0 {
+		t.Fatalf("expected empty control-separator block not to produce calls, got %d events=%#v", toolCalls, events)
+	}
+	if text := textContent.String(); strings.Contains(strings.ToLower(text), "dsml") || strings.Contains(text, "Read") || strings.Contains(text, sep) {
+		t.Fatalf("expected empty control-separator block not to leak as text, got %q", text)
+	}
+}
+
 func TestProcessToolSieveInterceptsExtraLeadingLessThanDSMLToolCallWithoutLeak(t *testing.T) {
 	var state State
 	chunks := []string{
