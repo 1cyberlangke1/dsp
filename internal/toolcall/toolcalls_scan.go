@@ -383,13 +383,20 @@ func hasPartialToolMarkupNameAfterArbitraryPrefix(text string, start int) bool {
 		if toolMarkupPrefixAllowsLocalName(text[start:idx]) && hasToolMarkupNamePrefix(text, idx) {
 			return true
 		}
+		if toolMarkupPrefixAllowsLocalName(text[start:idx]) && hasDSMLNamePrefixOrPartial(text, idx) {
+			return true
+		}
 		_, size := utf8.DecodeRuneInString(text[idx:])
 		if size <= 0 {
 			size = 1
 		}
 		idx += size
 	}
-	return false
+	return toolMarkupPrefixAllowsLocalName(text[start:])
+}
+
+func hasDSMLNamePrefixOrPartial(text string, start int) bool {
+	return hasASCIIPrefixFoldAt(text, start, "dsml") || hasASCIIPartialPrefixFoldAt(text, start, "dsml")
 }
 
 func toolMarkupPrefixAllowsLocalName(prefix string) bool {

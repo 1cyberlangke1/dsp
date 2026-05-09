@@ -155,6 +155,20 @@ test('parseToolCalls parses arbitrary-prefixed tool tags', () => {
   assert.deepEqual(calls[0].input, { file_path: '/tmp/input.txt' });
 });
 
+test('parseToolCalls allows all-empty parameter payloads', () => {
+  const payload = `<T｜DSML｜tool_calls>
+  <T｜DSML｜invoke name="TaskOutput">
+    <T｜DSML｜parameter name="task_id"></T｜DSML｜parameter>
+    <T｜DSML｜parameter name="block"></T｜DSML｜parameter>
+    <T｜DSML｜parameter name="timeout"></T｜DSML｜parameter>
+  </T｜DSML｜invoke>
+</T｜DSML｜tool_calls>`;
+  const calls = parseToolCalls(payload, ['TaskOutput']);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].name, 'TaskOutput');
+  assert.deepEqual(calls[0].input, { task_id: '', block: '', timeout: '' });
+});
+
 test('parseToolCalls ignores bare hyphenated tool_calls lookalike', () => {
   const payload = '<tool-calls><invoke name="Bash"><parameter name="command">pwd</parameter></invoke></tool-calls>';
   const calls = parseToolCalls(payload, ['Bash']);
@@ -509,6 +523,26 @@ test('sieve emits tool_calls for arbitrary-prefixed tool tags', () => {
   assert.equal(text.includes('💥'), false);
 });
 
+test('sieve emits all-empty arbitrary-prefixed tool tags without leaking text', () => {
+  const payload = [
+    '<T｜DSML｜tool_calls>\n',
+    '  <T｜DSML｜invoke name="TaskOutput">\n',
+    '    <T｜DSML｜parameter name="task_id"></T｜DSML｜parameter>\n',
+    '    <T｜DSML｜parameter name="block"></T｜DSML｜parameter>\n',
+    '    <T｜DSML｜parameter name="timeout"></T｜DSML｜parameter>\n',
+    '  </T｜DSML｜invoke>\n',
+    '</T｜DSML｜tool_calls>',
+  ].join('');
+  for (const chunks of [[payload], payload.match(/.{1,8}/gs)]) {
+    const events = runSieve(chunks, ['TaskOutput']);
+    const finalCalls = events.filter((evt) => evt.type === 'tool_calls').flatMap((evt) => evt.calls || []);
+    assert.equal(finalCalls.length, 1);
+    assert.equal(finalCalls[0].name, 'TaskOutput');
+    assert.deepEqual(finalCalls[0].input, { task_id: '', block: '', timeout: '' });
+    assert.equal(collectText(events), '');
+  }
+});
+
 test('sieve emits tool_calls for extra leading less-than DSML tags without leaking prefix', () => {
   const events = runSieve([
     '<<|DSML|tool_calls>\n',
@@ -847,7 +881,7 @@ test('sieve keeps embedded invalid tool-like json as normal text to avoid stream
   assert.equal(leakedText.toLowerCase().includes('tool_calls'), true);
 });
 
-test('sieve passes malformed executable-looking XML through as text', () => {
+test('sieve releases malformed executable-looking XML wrappers as text', () => {
   const chunk = '<tool_calls><invoke name="read_file"><param>{"path":"README.MD"}</param></invoke></tool_calls>';
   const events = runSieve([chunk], ['read_file']);
   const leakedText = collectText(events);

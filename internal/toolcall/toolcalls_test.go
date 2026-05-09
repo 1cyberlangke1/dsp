@@ -576,14 +576,17 @@ func TestParseToolCallsDetailedMarksToolCallsSyntax(t *testing.T) {
 	}
 }
 
-func TestParseToolCallsRejectsAllEmptyParameterPayload(t *testing.T) {
+func TestParseToolCallsAllowsAllEmptyParameterPayload(t *testing.T) {
 	text := `<tool_calls><invoke name="Bash"><parameter name="command"></parameter><parameter name="description">   </parameter><parameter name="timeout"></parameter></invoke></tool_calls>`
 	res := ParseToolCallsDetailed(text, []string{"Bash"})
 	if !res.SawToolCallSyntax {
 		t.Fatalf("expected tool syntax to be detected, got %#v", res)
 	}
-	if len(res.Calls) != 0 {
-		t.Fatalf("expected all-empty payload to be rejected, got %#v", res.Calls)
+	if len(res.Calls) != 1 {
+		t.Fatalf("expected all-empty payload to be parsed, got %#v", res.Calls)
+	}
+	if res.Calls[0].Input["command"] != "" || res.Calls[0].Input["description"] != "" || res.Calls[0].Input["timeout"] != "" {
+		t.Fatalf("expected empty parameters to be preserved, got %#v", res.Calls[0].Input)
 	}
 }
 

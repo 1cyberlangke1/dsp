@@ -660,9 +660,17 @@ function hasPartialToolMarkupNameAfterArbitraryPrefix(raw, start) {
     if (toolMarkupPrefixAllowsLocalName(raw.slice(start, idx)) && hasToolMarkupNamePrefix(raw, idx)) {
       return true;
     }
+    if (toolMarkupPrefixAllowsLocalName(raw.slice(start, idx)) && hasDSMLNamePrefixOrPartial(raw, idx)) {
+      return true;
+    }
     idx += 1;
   }
-  return false;
+  return toolMarkupPrefixAllowsLocalName(raw.slice(start));
+}
+
+function hasDSMLNamePrefixOrPartial(raw, start) {
+  const tail = normalizedASCIITailAt(raw, start);
+  return tail.startsWith('dsml') || 'dsml'.startsWith(tail);
 }
 
 function toolMarkupPrefixAllowsLocalName(prefix) {
