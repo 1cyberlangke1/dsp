@@ -185,8 +185,8 @@ func redactSensitiveQueryParams(u *url.URL) (string, bool) {
 		return "", false
 	}
 	values, err := url.ParseQuery(u.RawQuery)
-	if err != nil && len(values) == 0 {
-		return "", false
+	if err != nil {
+		return redactSensitiveRawQueryParams(u.RawQuery)
 	}
 	changed := false
 	for name, vals := range values {
@@ -203,6 +203,57 @@ func redactSensitiveQueryParams(u *url.URL) (string, bool) {
 		return "", false
 	}
 	return values.Encode(), true
+}
+
+func redactSensitiveRawQueryParams(rawQuery string) (string, bool) {
+	if rawQuery == "" {
+		return "", false
+	}
+	var b strings.Builder
+	b.Grow(len(rawQuery))
+	changed := false
+	start := 0
+	for i := 0; i <= len(rawQuery); i++ {
+		if i < len(rawQuery) && rawQuery[i] != '&' && rawQuery[i] != ';' {
+			continue
+		}
+		segment := rawQuery[start:i]
+		b.WriteString(redactSensitiveRawQuerySegment(segment, &changed))
+		if i < len(rawQuery) {
+			b.WriteByte(rawQuery[i])
+		}
+		start = i + 1
+	}
+	if !changed {
+		return "", false
+	}
+	return b.String(), true
+}
+
+func redactSensitiveRawQuerySegment(segment string, changed *bool) string {
+	if segment == "" {
+		return segment
+	}
+	name := segment
+	valueStart := -1
+	if eq := strings.IndexByte(segment, '='); eq >= 0 {
+		name = segment[:eq]
+		valueStart = eq + 1
+	}
+	decodedName, err := url.QueryUnescape(name)
+	if err != nil {
+		decodedName = name
+	}
+	if !isSensitiveQueryParam(decodedName) {
+		return segment
+	}
+	if changed != nil {
+		*changed = true
+	}
+	if valueStart < 0 {
+		return name + "=REDACTED"
+	}
+	return segment[:valueStart] + "REDACTED"
 }
 
 func isSensitiveQueryParam(name string) bool {
