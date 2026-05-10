@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -160,6 +161,16 @@ func (f *filteredLogFormatter) NewLogEntry(r *http.Request) middleware.LogEntry 
 			return noopLogEntry{}
 		}
 	}
+	if r != nil && r.URL != nil {
+		if redacted, changed := redactSensitiveQueryParams(r.URL); changed {
+			cloned := *r
+			clonedURL := *r.URL
+			clonedURL.RawQuery = redacted
+			cloned.URL = &clonedURL
+			cloned.RequestURI = clonedURL.RequestURI()
+			return f.base.NewLogEntry(&cloned)
+		}
+	}
 	return f.base.NewLogEntry(r)
 }
 
@@ -168,6 +179,35 @@ type noopLogEntry struct{}
 func (noopLogEntry) Write(_ int, _ int, _ http.Header, _ time.Duration, _ interface{}) {}
 
 func (noopLogEntry) Panic(_ interface{}, _ []byte) {}
+
+func redactSensitiveQueryParams(u *url.URL) (string, bool) {
+	if u == nil || u.RawQuery == "" {
+		return "", false
+	}
+	values, err := url.ParseQuery(u.RawQuery)
+	if err != nil && len(values) == 0 {
+		return "", false
+	}
+	changed := false
+	for name, vals := range values {
+		if !isSensitiveQueryParam(name) {
+			continue
+		}
+		for i := range vals {
+			vals[i] = "REDACTED"
+		}
+		values[name] = vals
+		changed = true
+	}
+	if !changed {
+		return "", false
+	}
+	return values.Encode(), true
+}
+
+func isSensitiveQueryParam(name string) bool {
+	return strings.EqualFold(name, "key") || strings.EqualFold(name, "api_key")
+}
 
 var defaultCORSAllowHeaders = []string{
 	"Content-Type",
