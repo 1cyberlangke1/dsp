@@ -140,7 +140,7 @@ func TestClaudeDirectAppliesCurrentInputFile(t *testing.T) {
 		t.Fatalf("expected uploaded history ref id, got %#v", ds.payload["ref_file_ids"])
 	}
 	prompt, _ := ds.payload["prompt"].(string)
-	if !strings.Contains(prompt, promptcompat.CurrentInputContextFilename + " 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(prompt, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
 		t.Fatalf("expected continuation prompt, got %q", prompt)
 	}
 	snapshot, err := historyStore.Snapshot()
@@ -157,7 +157,7 @@ func TestClaudeDirectAppliesCurrentInputFile(t *testing.T) {
 	if full.HistoryText != string(ds.uploads[0].Data) {
 		t.Fatalf("expected uploaded current input file to be persisted in history text")
 	}
-	if len(full.Messages) != 1 || !strings.Contains(full.Messages[0].Content, promptcompat.CurrentInputContextFilename + " 里是之前的对话记录。接续回答最后一条消息。") {
+	if len(full.Messages) != 1 || !strings.Contains(full.Messages[0].Content, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
 		t.Fatalf("expected persisted message to match upstream continuation prompt, got %#v", full.Messages)
 	}
 }
@@ -190,7 +190,7 @@ func TestClaudeCurrentInputFileUploadsToolsSeparately(t *testing.T) {
 		t.Fatalf("history transcript should not embed tool descriptions, got %q", historyText)
 	}
 	toolsText := string(ds.uploads[1].Data)
-	if !strings.Contains(toolsText, "# " + promptcompat.CurrentToolsContextFilename) || !strings.Contains(toolsText, "Tool: search") || !strings.Contains(toolsText, "Description: Search docs") {
+	if !strings.Contains(toolsText, "# "+promptcompat.CurrentToolsContextFilename) || !strings.Contains(toolsText, "Tool: search") || !strings.Contains(toolsText, "Description: Search docs") {
 		t.Fatalf("expected tools transcript to include tool schema, got %q", toolsText)
 	}
 	refIDs, _ := ds.payload["ref_file_ids"].([]any)

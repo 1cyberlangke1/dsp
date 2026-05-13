@@ -400,7 +400,7 @@ func TestChatCompletionsCurrentInputFilePersistsNeutralPrompt(t *testing.T) {
 	if len(full.Messages) != 1 {
 		t.Fatalf("expected continuation prompt to be the only persisted message, got %#v", full.Messages)
 	}
-	if !strings.Contains(full.Messages[0].Content, promptcompat.CurrentInputContextFilename + " 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(full.Messages[0].Content, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
 		t.Fatalf("expected continuation prompt to be persisted, got %#v", full.Messages[0])
 	}
 }
