@@ -135,7 +135,7 @@ func TestHandleVercelStreamPrepareAppliesCurrentInputFile(t *testing.T) {
 		t.Fatalf("expected payload object, got %#v", body["payload"])
 	}
 	promptText, _ := payload["prompt"].(string)
-	if !strings.Contains(promptText, promptcompat.CurrentInputContextFilename + " 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(promptText, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
 		t.Fatalf("expected continuation prompt, got %s", promptText)
 	}
 	if strings.Contains(promptText, "first user turn") || strings.Contains(promptText, "latest user turn") {

@@ -312,10 +312,10 @@ func TestStartCompletionAppliesCurrentInputFileGlobally(t *testing.T) {
 		t.Fatalf("expected uploaded file id in ref_file_ids, got %#v", ds.payloads[0]["ref_file_ids"])
 	}
 	prompt, _ := ds.payloads[0]["prompt"].(string)
-	if !strings.Contains(prompt, promptcompat.CurrentInputContextFilename + " 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(prompt, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
 		t.Fatalf("expected continuation prompt, got %q", prompt)
 	}
-	if !start.Request.CurrentInputFileApplied || !strings.Contains(start.Request.PromptTokenText, "# " + promptcompat.CurrentInputContextFilename) {
+	if !start.Request.CurrentInputFileApplied || !strings.Contains(start.Request.PromptTokenText, "# "+promptcompat.CurrentInputContextFilename) {
 		t.Fatalf("expected prepared request to carry current input file state, got %#v", start.Request)
 	}
 }
