@@ -31,9 +31,6 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(r.Header.Get("anthropic-version")) == "" {
 		r.Header.Set("anthropic-version", "2023-06-01")
 	}
-	if isClaudeVercelProxyRequest(r) && h.proxyViaOpenAI(w, r, h.Store) {
-		return
-	}
 	if h.Auth == nil || h.DS == nil {
 		if h.OpenAI != nil && h.proxyViaOpenAI(w, r, h.Store) {
 			return
@@ -47,13 +44,6 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 	writeClaudeError(w, http.StatusBadGateway, "Failed to handle Claude request.")
 }
 
-func isClaudeVercelProxyRequest(r *http.Request) bool {
-	if r == nil || r.URL == nil {
-		return false
-	}
-	return strings.TrimSpace(r.URL.Query().Get("__stream_prepare")) == "1" ||
-		strings.TrimSpace(r.URL.Query().Get("__stream_release")) == "1"
-}
 
 func (h *Handler) handleClaudeDirect(w http.ResponseWriter, r *http.Request) bool {
 	raw, err := io.ReadAll(r.Body)
@@ -176,35 +166,14 @@ func (h *Handler) proxyViaOpenAI(w http.ResponseWriter, r *http.Request, store C
 	translatedReq := translatorcliproxy.ToOpenAI(sdktranslator.FormatClaude, translateModel, raw, stream)
 	translatedReq, exposeThinking := applyClaudeThinkingPolicyToOpenAIRequest(translatedReq, req)
 
-	isVercelPrepare := strings.TrimSpace(r.URL.Query().Get("__stream_prepare")) == "1"
-	isVercelRelease := strings.TrimSpace(r.URL.Query().Get("__stream_release")) == "1"
 
-	if isVercelRelease {
-		proxyReq := r.Clone(r.Context())
-		proxyReq.URL.Path = "/v1/chat/completions"
-		proxyReq.Body = io.NopCloser(bytes.NewReader(raw))
-		proxyReq.ContentLength = int64(len(raw))
-		rec := httptest.NewRecorder()
-		h.OpenAI.ChatCompletions(rec, proxyReq)
-		res := rec.Result()
-		defer func() { _ = res.Body.Close() }()
-		body, _ := io.ReadAll(res.Body)
-		for k, vv := range res.Header {
-			for _, v := range vv {
-				w.Header().Add(k, v)
-			}
-		}
-		w.WriteHeader(res.StatusCode)
-		_, _ = w.Write(body)
-		return true
-	}
 
 	proxyReq := r.Clone(r.Context())
 	proxyReq.URL.Path = "/v1/chat/completions"
 	proxyReq.Body = io.NopCloser(bytes.NewReader(translatedReq))
 	proxyReq.ContentLength = int64(len(translatedReq))
 
-	if stream && !isVercelPrepare {
+	if stream {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache, no-transform")
 		w.Header().Set("Connection", "keep-alive")
@@ -228,17 +197,7 @@ func (h *Handler) proxyViaOpenAI(w http.ResponseWriter, r *http.Request, store C
 		w.WriteHeader(res.StatusCode)
 		_, _ = w.Write(body)
 		return true
-	}
-	if isVercelPrepare {
-		for k, vv := range res.Header {
-			for _, v := range vv {
-				w.Header().Add(k, v)
-			}
 		}
-		w.WriteHeader(res.StatusCode)
-		_, _ = w.Write(body)
-		return true
-	}
 	converted := translatorcliproxy.FromOpenAINonStream(sdktranslator.FormatClaude, model, raw, translatedReq, body)
 	if !exposeThinking {
 		converted = stripClaudeThinkingBlocks(converted)

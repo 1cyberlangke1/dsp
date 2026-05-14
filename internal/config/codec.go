@@ -42,20 +42,11 @@ func (c Config) MarshalJSON() ([]byte, error) {
 		m["embeddings"] = c.Embeddings
 	}
 	m["auto_delete"] = c.AutoDelete
-	if c.CurrentInputFile.Enabled != nil || c.CurrentInputFile.MinChars != 0 {
+	if c.CurrentInputFile.Flash != nil || c.CurrentInputFile.Pro != nil || c.CurrentInputFile.Vision != nil {
 		m["current_input_file"] = c.CurrentInputFile
 	}
 	if c.ThinkingInjection.Enabled != nil || strings.TrimSpace(c.ThinkingInjection.Prompt) != "" {
 		m["thinking_injection"] = c.ThinkingInjection
-	}
-	if strings.TrimSpace(c.Vercel.Token) != "" || strings.TrimSpace(c.Vercel.ProjectID) != "" || strings.TrimSpace(c.Vercel.TeamID) != "" {
-		m["vercel"] = NormalizeVercelConfig(c.Vercel)
-	}
-	if c.VercelSyncHash != "" {
-		m["_vercel_sync_hash"] = c.VercelSyncHash
-	}
-	if c.VercelSyncTime != 0 {
-		m["_vercel_sync_time"] = c.VercelSyncTime
 	}
 	return json.Marshal(m)
 }
@@ -128,18 +119,6 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 			if err := json.Unmarshal(v, &c.ThinkingInjection); err != nil {
 				return fmt.Errorf("invalid field %q: %w", k, err)
 			}
-		case "vercel":
-			if err := json.Unmarshal(v, &c.Vercel); err != nil {
-				return fmt.Errorf("invalid field %q: %w", k, err)
-			}
-		case "_vercel_sync_hash":
-			if err := json.Unmarshal(v, &c.VercelSyncHash); err != nil {
-				return fmt.Errorf("invalid field %q: %w", k, err)
-			}
-		case "_vercel_sync_time":
-			if err := json.Unmarshal(v, &c.VercelSyncTime); err != nil {
-				return fmt.Errorf("invalid field %q: %w", k, err)
-			}
 		default:
 			var anyVal any
 			if err := json.Unmarshal(v, &anyVal); err == nil {
@@ -164,16 +143,14 @@ func (c Config) Clone() Config {
 		Embeddings:   c.Embeddings,
 		AutoDelete:   c.AutoDelete,
 		CurrentInputFile: CurrentInputFileConfig{
-			Enabled:  cloneBoolPtr(c.CurrentInputFile.Enabled),
-			MinChars: c.CurrentInputFile.MinChars,
+			Flash:  cloneBoolPtr(c.CurrentInputFile.Flash),
+			Pro:    cloneBoolPtr(c.CurrentInputFile.Pro),
+			Vision: cloneBoolPtr(c.CurrentInputFile.Vision),
 		},
 		ThinkingInjection: ThinkingInjectionConfig{
 			Enabled: cloneBoolPtr(c.ThinkingInjection.Enabled),
 			Prompt:  c.ThinkingInjection.Prompt,
 		},
-		Vercel:           c.Vercel,
-		VercelSyncHash:   c.VercelSyncHash,
-		VercelSyncTime:   c.VercelSyncTime,
 		AdditionalFields: map[string]any{},
 	}
 	for k, v := range c.AdditionalFields {

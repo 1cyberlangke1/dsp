@@ -68,16 +68,7 @@ func Start(params StartParams) *Session {
 }
 
 func shouldCapture(r *http.Request) bool {
-	if r == nil || r.URL == nil {
-		return false
-	}
-	if strings.TrimSpace(r.URL.Query().Get("__stream_prepare")) == "1" {
-		return false
-	}
-	if strings.TrimSpace(r.URL.Query().Get("__stream_release")) == "1" {
-		return false
-	}
-	return true
+	return r != nil && r.URL != nil
 }
 
 func ExtractSingleUserInput(messages []any) string {

@@ -8,14 +8,16 @@ import (
 
 var CurrentInputContextFilename = randomFileName()
 
-var historyTranscriptTitle = "# " + CurrentInputContextFilename
-var historyTranscriptSummary = "Prior conversation history and tool progress."
+func RefreshContextFilename() string {
+	CurrentInputContextFilename = randomFileName()
+	return CurrentInputContextFilename
+}
 
 func randomFileName() string {
 	templates := []string{
-		"chat_log_%d.txt",
-		"conversation_%d.txt",
-		"notes_%d.txt",
+		"CHAT_LOG_%d.TXT",
+		"CONVERSATION_%d.TXT",
+		"NOTES_%d.TXT",
 	}
 	digits := []int{10000, 100000, 1000000}
 	tpl := templates[rand.Intn(len(templates))]
@@ -45,9 +47,10 @@ func buildOpenAIHistoryTranscript(messages []any) string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(historyTranscriptTitle)
+	b.WriteString("# ")
+	b.WriteString(CurrentInputContextFilename)
 	b.WriteString("\n")
-	b.WriteString(historyTranscriptSummary)
+	b.WriteString("Prior conversation history and tool progress.")
 	b.WriteString("\n\n")
 
 	entry := 0

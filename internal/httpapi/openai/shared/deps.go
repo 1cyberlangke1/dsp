@@ -41,8 +41,7 @@ type ConfigReader interface {
 	EmbeddingsProvider() string
 	AutoDeleteMode() string
 	AutoDeleteSessions() bool
-	CurrentInputFileEnabled() bool
-	CurrentInputFileMinChars() int
+	CurrentInputFileEnabledForModel(model string) bool
 	ThinkingInjectionEnabled() bool
 	ThinkingInjectionPrompt() string
 }

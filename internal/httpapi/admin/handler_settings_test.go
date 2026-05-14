@@ -58,11 +58,14 @@ func TestGetSettingsIncludesCurrentInputFileDefaults(t *testing.T) {
 	var body map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
 	currentInputFile, _ := body["current_input_file"].(map[string]any)
-	if got := boolFrom(currentInputFile["enabled"]); !got {
-		t.Fatalf("expected current_input_file.enabled=true, body=%v", body)
+	if got := boolFrom(currentInputFile["flash"]); !got {
+		t.Fatalf("expected current_input_file.flash=true, body=%v", body)
 	}
-	if got := intFrom(currentInputFile["min_chars"]); got != 0 {
-		t.Fatalf("expected current_input_file.min_chars=0, got %d body=%v", got, body)
+	if got := boolFrom(currentInputFile["pro"]); !got {
+		t.Fatalf("expected current_input_file.pro=true, body=%v", body)
+	}
+	if got := boolFrom(currentInputFile["vision"]); !got {
+		t.Fatalf("expected current_input_file.vision=true, body=%v", body)
 	}
 	thinkingInjection, _ := body["thinking_injection"].(map[string]any)
 	if got := boolFrom(thinkingInjection["enabled"]); !got {
@@ -187,8 +190,9 @@ func TestUpdateSettingsCurrentInputFile(t *testing.T) {
 	h := newAdminTestHandler(t, `{"keys":["k1"],"history_split":{"enabled":true,"trigger_after_turns":2}}`)
 	payload := map[string]any{
 		"current_input_file": map[string]any{
-			"enabled":   true,
-			"min_chars": 12345,
+			"flash":  true,
+			"pro":    false,
+			"vision": true,
 		},
 	}
 	b, _ := json.Marshal(payload)
@@ -198,22 +202,18 @@ func TestUpdateSettingsCurrentInputFile(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	snap := h.Store.Snapshot()
-	if snap.CurrentInputFile.Enabled == nil || !*snap.CurrentInputFile.Enabled {
-		t.Fatalf("expected current_input_file.enabled=true, got %#v", snap.CurrentInputFile)
-	}
-	if snap.CurrentInputFile.MinChars != 12345 {
-		t.Fatalf("expected current_input_file.min_chars=12345, got %#v", snap.CurrentInputFile)
-	}
-	if !h.Store.CurrentInputFileEnabled() {
-		t.Fatal("expected current input file accessor to stay enabled")
+	var body map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	if success, _ := body["success"].(bool); !success {
+		t.Fatalf("expected success body, got %v", body)
 	}
 }
 
-func TestUpdateSettingsCurrentInputFilePartialUpdatePreservesEnabled(t *testing.T) {
-	h := newAdminTestHandler(t, `{"keys":["k1"],"current_input_file":{"enabled":false,"min_chars":777}}`)
+func TestUpdateSettingsCurrentInputFileIgnoresLegacyFields(t *testing.T) {
+	h := newAdminTestHandler(t, `{"keys":["k1"],"current_input_file":{"flash":true,"pro":true,"vision":true}}`)
 	payload := map[string]any{
 		"current_input_file": map[string]any{
+			"enabled":   false,
 			"min_chars": 5000,
 		},
 	}
@@ -224,20 +224,25 @@ func TestUpdateSettingsCurrentInputFilePartialUpdatePreservesEnabled(t *testing.
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	snap := h.Store.Snapshot()
-	if snap.CurrentInputFile.Enabled == nil || *snap.CurrentInputFile.Enabled {
-		t.Fatalf("expected current_input_file.enabled to remain false, got %#v", snap.CurrentInputFile.Enabled)
+	req = httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	rec = httptest.NewRecorder()
+	h.getSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from readback, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	if snap.CurrentInputFile.MinChars != 5000 {
-		t.Fatalf("expected current_input_file.min_chars=5000, got %#v", snap.CurrentInputFile)
+	var body map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	currentInputFile, _ := body["current_input_file"].(map[string]any)
+	if !boolFrom(currentInputFile["flash"]) || !boolFrom(currentInputFile["pro"]) || !boolFrom(currentInputFile["vision"]) {
+		t.Fatalf("expected legacy fields ignored, got %v", currentInputFile)
 	}
 }
 
-func TestUpdateSettingsCurrentInputFilePartialUpdatePreservesMinChars(t *testing.T) {
-	h := newAdminTestHandler(t, `{"keys":["k1"],"current_input_file":{"enabled":false,"min_chars":777}}`)
+func TestUpdateSettingsCurrentInputFilePartialUpdatePreservesOtherModels(t *testing.T) {
+	h := newAdminTestHandler(t, `{"keys":["k1"],"current_input_file":{"flash":true,"pro":false,"vision":true}}`)
 	payload := map[string]any{
 		"current_input_file": map[string]any{
-			"enabled": true,
+			"flash": false,
 		},
 	}
 	b, _ := json.Marshal(payload)
@@ -247,12 +252,23 @@ func TestUpdateSettingsCurrentInputFilePartialUpdatePreservesMinChars(t *testing
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	snap := h.Store.Snapshot()
-	if snap.CurrentInputFile.Enabled == nil || !*snap.CurrentInputFile.Enabled {
-		t.Fatalf("expected current_input_file.enabled=true, got %#v", snap.CurrentInputFile.Enabled)
+	req = httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	rec = httptest.NewRecorder()
+	h.getSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from readback, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	if snap.CurrentInputFile.MinChars != 777 {
-		t.Fatalf("expected current_input_file.min_chars to remain 777, got %#v", snap.CurrentInputFile)
+	var body map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	currentInputFile, _ := body["current_input_file"].(map[string]any)
+	if boolFrom(currentInputFile["flash"]) {
+		t.Fatalf("expected flash disabled, got %v", currentInputFile)
+	}
+	if boolFrom(currentInputFile["pro"]) {
+		t.Fatalf("expected pro preserved as false, got %v", currentInputFile)
+	}
+	if !boolFrom(currentInputFile["vision"]) {
+		t.Fatalf("expected vision preserved as true, got %v", currentInputFile)
 	}
 }
 
@@ -264,8 +280,9 @@ func TestUpdateSettingsIgnoresHistorySplitPayload(t *testing.T) {
 			"trigger_after_turns": 3,
 		},
 		"current_input_file": map[string]any{
-			"enabled":   true,
-			"min_chars": 0,
+			"flash":  true,
+			"pro":    false,
+			"vision": true,
 		},
 	}
 	b, _ := json.Marshal(payload)
@@ -275,9 +292,17 @@ func TestUpdateSettingsIgnoresHistorySplitPayload(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	snap := h.Store.Snapshot()
-	if snap.CurrentInputFile.Enabled == nil || !*snap.CurrentInputFile.Enabled {
-		t.Fatalf("expected current_input_file to remain enabled, got %#v", snap.CurrentInputFile.Enabled)
+	req = httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	rec = httptest.NewRecorder()
+	h.getSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from readback, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	currentInputFile, _ := body["current_input_file"].(map[string]any)
+	if !boolFrom(currentInputFile["flash"]) || boolFrom(currentInputFile["pro"]) || !boolFrom(currentInputFile["vision"]) {
+		t.Fatalf("expected current_input_file values preserved, got %v", currentInputFile)
 	}
 }
 

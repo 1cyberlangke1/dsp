@@ -12,14 +12,16 @@ import (
 
 var CurrentToolsContextFilename = randomToolsFileName()
 
-var toolsTranscriptTitle = "# " + CurrentToolsContextFilename
-var toolsTranscriptSummary = "Available tool descriptions and parameter schemas for this request."
+func RefreshToolsFilename() string {
+	CurrentToolsContextFilename = randomToolsFileName()
+	return CurrentToolsContextFilename
+}
 
 func randomToolsFileName() string {
 	templates := []string{
-		"tool_list_%d.txt",
-		"commands_%d.txt",
-		"functions_%d.txt",
+		"TOOL_LIST_%d.TXT",
+		"COMMANDS_%d.TXT",
+		"FUNCTIONS_%d.TXT",
 	}
 	digits := []int{10000, 100000, 1000000}
 	tpl := templates[rand.Intn(len(templates))]
@@ -53,7 +55,7 @@ func injectToolPromptWithDescriptions(messages []map[string]any, tools []any, po
 	if includeDescriptions && parts.Descriptions != "" {
 		toolPrompt = parts.Descriptions + "\n\n" + toolPrompt
 	} else if !includeDescriptions && parts.Descriptions != "" {
-		toolPrompt = CurrentToolsContextFilename + " 里有可用的工具描述，只调用那里列出的工具。\n\n" + toolPrompt
+		toolPrompt = "Available tool descriptions and parameter schemas are attached in " + CurrentToolsContextFilename + ". Treat " + CurrentToolsContextFilename + " as the authoritative list of callable tools and schemas; use only tools and parameters listed there.\n\n" + toolPrompt
 	}
 
 	for i := range messages {
@@ -133,9 +135,10 @@ func BuildOpenAIToolsContextTranscript(toolsRaw any, policy ToolChoicePolicy) (s
 		return "", parts.Names
 	}
 	var b strings.Builder
-	b.WriteString(toolsTranscriptTitle)
+	b.WriteString("# ")
+	b.WriteString(CurrentToolsContextFilename)
 	b.WriteString("\n")
-	b.WriteString(toolsTranscriptSummary)
+	b.WriteString("Available tool descriptions and parameter schemas for this request.")
 	b.WriteString("\n\n")
 	b.WriteString(parts.Descriptions)
 	b.WriteString("\n")

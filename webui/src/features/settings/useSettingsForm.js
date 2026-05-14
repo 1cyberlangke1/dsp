@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import {
     fetchSettings,
@@ -16,7 +16,7 @@ const DEFAULT_FORM = {
     responses: { store_ttl_seconds: 900 },
     embeddings: { provider: '' },
     auto_delete: { mode: 'none' },
-    current_input_file: { enabled: true, min_chars: 0 },
+    current_input_file: { flash: true, pro: true, vision: true },
     thinking_injection: { enabled: true, prompt: '', default_prompt: '' },
     model_aliases_text: '{}',
 }
@@ -50,7 +50,6 @@ function normalizeAutoDeleteMode(raw) {
 }
 
 function fromServerForm(data) {
-    const currentInputFileEnabled = data.current_input_file?.enabled ?? true
     return {
         admin: { jwt_expire_hours: Number(data.admin?.jwt_expire_hours || 24) },
         runtime: {
@@ -69,8 +68,9 @@ function fromServerForm(data) {
             mode: normalizeAutoDeleteMode(data.auto_delete),
         },
         current_input_file: {
-            enabled: currentInputFileEnabled,
-            min_chars: Number(data.current_input_file?.min_chars ?? 0),
+            flash: data.current_input_file?.flash ?? true,
+            pro: data.current_input_file?.pro ?? true,
+            vision: data.current_input_file?.vision ?? true,
         },
         thinking_injection: {
             enabled: data.thinking_injection?.enabled ?? true,
@@ -82,7 +82,6 @@ function fromServerForm(data) {
 }
 
 function toServerPayload(form) {
-    const currentInputFileEnabled = Boolean(form.current_input_file?.enabled)
     return {
         admin: { jwt_expire_hours: Number(form.admin.jwt_expire_hours) },
         runtime: {
@@ -95,8 +94,9 @@ function toServerPayload(form) {
         embeddings: { provider: String(form.embeddings.provider || '').trim() },
         auto_delete: { mode: normalizeAutoDeleteMode(form.auto_delete) },
         current_input_file: {
-            enabled: currentInputFileEnabled,
-            min_chars: Number(form.current_input_file?.min_chars ?? 0),
+            flash: Boolean(form.current_input_file?.flash ?? true),
+            pro: Boolean(form.current_input_file?.pro ?? true),
+            vision: Boolean(form.current_input_file?.vision ?? true),
         },
         thinking_injection: {
             enabled: Boolean(form.thinking_injection?.enabled ?? true),
@@ -105,7 +105,7 @@ function toServerPayload(form) {
     }
 }
 
-export function useSettingsForm({ apiFetch, t, onMessage, onRefresh, onForceLogout, isVercel = false }) {
+export function useSettingsForm({ apiFetch, t, onMessage, onRefresh, onForceLogout }) {
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [changingPassword, setChangingPassword] = useState(false)
@@ -119,23 +119,21 @@ export function useSettingsForm({ apiFetch, t, onMessage, onRefresh, onForceLogo
     const [lastError, setLastError] = useState('')
     const [settingsMeta, setSettingsMeta] = useState({
         default_password_warning: false,
-        env_backed: false,
-        needs_vercel_sync: false,
     })
     const [form, setForm] = useState(DEFAULT_FORM)
 
     const trackLoadFailure = useCallback(() => {
         setConsecutiveFailures((prev) => {
             const next = prev + 1
-            if (isVercel && next >= MAX_AUTO_FETCH_FAILURES) {
+            if (next >= MAX_AUTO_FETCH_FAILURES) {
                 setAutoFetchPaused(true)
             }
             return next
         })
-    }, [isVercel])
+    }, [])
 
     const loadSettings = useCallback(async ({ manual = false } = {}) => {
-        if (isVercel && autoFetchPaused && !manual) {
+        if (autoFetchPaused && !manual) {
             return
         }
         setLoading(true)
@@ -153,8 +151,6 @@ export function useSettingsForm({ apiFetch, t, onMessage, onRefresh, onForceLogo
             setLastError('')
             setSettingsMeta({
                 default_password_warning: Boolean(data.admin?.default_password_warning),
-                env_backed: Boolean(data.env_backed),
-                needs_vercel_sync: Boolean(data.needs_vercel_sync),
             })
             setForm(fromServerForm(data))
         } catch (e) {
@@ -167,7 +163,7 @@ export function useSettingsForm({ apiFetch, t, onMessage, onRefresh, onForceLogo
         } finally {
             setLoading(false)
         }
-    }, [apiFetch, autoFetchPaused, isVercel, onMessage, t, trackLoadFailure])
+    }, [apiFetch, autoFetchPaused, onMessage, t, trackLoadFailure])
 
     useEffect(() => {
         loadSettings()
@@ -327,11 +323,6 @@ export function useSettingsForm({ apiFetch, t, onMessage, onRefresh, onForceLogo
         }
     }, [apiFetch, importMode, importText, loadSettings, onMessage, onRefresh, t])
 
-    const syncHintVisible = useMemo(
-        () => settingsMeta.env_backed || settingsMeta.needs_vercel_sync,
-        [settingsMeta.env_backed, settingsMeta.needs_vercel_sync],
-    )
-
     return {
         form,
         setForm,
@@ -350,7 +341,6 @@ export function useSettingsForm({ apiFetch, t, onMessage, onRefresh, onForceLogo
         autoFetchPaused,
         lastError,
         settingsMeta,
-        syncHintVisible,
         retryLoadSettings,
         saveSettings,
         updatePassword,

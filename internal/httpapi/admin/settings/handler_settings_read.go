@@ -5,14 +5,12 @@ import (
 	"strings"
 
 	authn "ds2api/internal/auth"
-	"ds2api/internal/config"
 	"ds2api/internal/promptcompat"
 )
 
 func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 	snap := h.Store.Snapshot()
 	recommended := defaultRuntimeRecommended(len(snap.Accounts), h.Store.RuntimeAccountMaxInflight())
-	needsSync := config.IsVercel() && snap.VercelSyncHash != "" && snap.VercelSyncHash != h.computeSyncHash()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"success": true,
 		"admin": map[string]any{
@@ -31,8 +29,9 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 		"embeddings":  snap.Embeddings,
 		"auto_delete": snap.AutoDelete,
 		"current_input_file": map[string]any{
-			"enabled":   h.Store.CurrentInputFileEnabled(),
-			"min_chars": h.Store.CurrentInputFileMinChars(),
+			"flash":  h.Store.CurrentInputFileFlashEnabled(),
+			"pro":    h.Store.CurrentInputFileProEnabled(),
+			"vision": h.Store.CurrentInputFileVisionEnabled(),
 		},
 		"thinking_injection": map[string]any{
 			"enabled":        h.Store.ThinkingInjectionEnabled(),
@@ -41,6 +40,5 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 		},
 		"model_aliases":     snap.ModelAliases,
 		"env_backed":        h.Store.IsEnvBacked(),
-		"needs_vercel_sync": needsSync,
 	})
 }

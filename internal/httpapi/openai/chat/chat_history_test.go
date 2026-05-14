@@ -359,7 +359,7 @@ func TestChatCompletionsCurrentInputFilePersistsNeutralPrompt(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &Handler{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
+			currentInputFlash: boolPtr(true),
 		},
 		Auth:        streamStatusAuthStub{},
 		DS:          ds,
@@ -400,7 +400,7 @@ func TestChatCompletionsCurrentInputFilePersistsNeutralPrompt(t *testing.T) {
 	if len(full.Messages) != 1 {
 		t.Fatalf("expected continuation prompt to be the only persisted message, got %#v", full.Messages)
 	}
-	if !strings.Contains(full.Messages[0].Content, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(full.Messages[0].Content, "Continue from the latest state in the attached ") {
 		t.Fatalf("expected continuation prompt to be persisted, got %#v", full.Messages[0])
 	}
 }

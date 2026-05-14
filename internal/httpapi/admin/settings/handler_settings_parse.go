@@ -139,16 +139,17 @@ func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *confi
 
 	if raw, ok := req["current_input_file"].(map[string]any); ok {
 		cfg := &config.CurrentInputFileConfig{}
-		if v, exists := raw["enabled"]; exists {
+		if v, exists := raw["flash"]; exists {
 			enabled := boolFrom(v)
-			cfg.Enabled = &enabled
+			cfg.Flash = &enabled
 		}
-		if v, exists := raw["min_chars"]; exists {
-			n := intFrom(v)
-			if err := config.ValidateIntRange("current_input_file.min_chars", n, 0, 100000000, true); err != nil {
-				return nil, nil, nil, nil, nil, nil, nil, nil, err
-			}
-			cfg.MinChars = n
+		if v, exists := raw["pro"]; exists {
+			enabled := boolFrom(v)
+			cfg.Pro = &enabled
+		}
+		if v, exists := raw["vision"]; exists {
+			enabled := boolFrom(v)
+			cfg.Vision = &enabled
 		}
 		if err := config.ValidateCurrentInputFileConfig(*cfg); err != nil {
 			return nil, nil, nil, nil, nil, nil, nil, nil, err

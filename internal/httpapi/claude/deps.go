@@ -23,8 +23,7 @@ type DeepSeekCaller interface {
 
 type ConfigReader interface {
 	ModelAliases() map[string]string
-	CurrentInputFileEnabled() bool
-	CurrentInputFileMinChars() int
+	CurrentInputFileEnabledForModel(model string) bool
 }
 
 type OpenAIChatRunner interface {

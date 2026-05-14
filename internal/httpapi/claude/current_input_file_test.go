@@ -22,8 +22,7 @@ type claudeHistoryConfig struct {
 }
 
 func (m claudeHistoryConfig) ModelAliases() map[string]string { return m.aliases }
-func (claudeHistoryConfig) CurrentInputFileEnabled() bool     { return false }
-func (claudeHistoryConfig) CurrentInputFileMinChars() int     { return 0 }
+func (claudeHistoryConfig) CurrentInputFileEnabledForModel(string) bool { return false }
 
 func (claudeCurrentInputAuth) Determine(*http.Request) (*auth.RequestAuth, error) {
 	return &auth.RequestAuth{
@@ -140,7 +139,7 @@ func TestClaudeDirectAppliesCurrentInputFile(t *testing.T) {
 		t.Fatalf("expected uploaded history ref id, got %#v", ds.payload["ref_file_ids"])
 	}
 	prompt, _ := ds.payload["prompt"].(string)
-	if !strings.Contains(prompt, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(prompt, "Continue from the latest state in the attached ") {
 		t.Fatalf("expected continuation prompt, got %q", prompt)
 	}
 	snapshot, err := historyStore.Snapshot()
@@ -157,7 +156,7 @@ func TestClaudeDirectAppliesCurrentInputFile(t *testing.T) {
 	if full.HistoryText != string(ds.uploads[0].Data) {
 		t.Fatalf("expected uploaded current input file to be persisted in history text")
 	}
-	if len(full.Messages) != 1 || !strings.Contains(full.Messages[0].Content, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
+	if len(full.Messages) != 1 || !strings.Contains(full.Messages[0].Content, "Continue from the latest state in the attached ") {
 		t.Fatalf("expected persisted message to match upstream continuation prompt, got %#v", full.Messages)
 	}
 }

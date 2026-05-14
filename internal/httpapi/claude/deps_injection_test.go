@@ -7,8 +7,7 @@ type mockClaudeConfig struct {
 }
 
 func (m mockClaudeConfig) ModelAliases() map[string]string { return m.aliases }
-func (mockClaudeConfig) CurrentInputFileEnabled() bool     { return true }
-func (mockClaudeConfig) CurrentInputFileMinChars() int     { return 0 }
+func (mockClaudeConfig) CurrentInputFileEnabledForModel(string) bool { return true }
 
 func TestNormalizeClaudeRequestUsesGlobalAliasMapping(t *testing.T) {
 	req := map[string]any{

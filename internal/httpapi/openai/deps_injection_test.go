@@ -14,8 +14,9 @@ type mockOpenAIConfig struct {
 	earlyEmit           string
 	responsesTTL        int
 	embedProv           string
-	currentInputEnabled bool
-	currentInputMin     int
+	currentInputFlash   *bool
+	currentInputPro     *bool
+	currentInputVision  *bool
 	thinkingInjection   *bool
 	thinkingPrompt      string
 }
@@ -31,10 +32,24 @@ func (m mockOpenAIConfig) AutoDeleteMode() string {
 	}
 	return m.autoDeleteMode
 }
-func (m mockOpenAIConfig) AutoDeleteSessions() bool      { return false }
-func (m mockOpenAIConfig) CurrentInputFileEnabled() bool { return m.currentInputEnabled }
-func (m mockOpenAIConfig) CurrentInputFileMinChars() int {
-	return m.currentInputMin
+func currentInputEnabled(ptr *bool) bool {
+	if ptr == nil {
+		return true
+	}
+	return *ptr
+}
+func (m mockOpenAIConfig) AutoDeleteSessions() bool { return false }
+func (m mockOpenAIConfig) CurrentInputFileEnabledForModel(model string) bool {
+	switch model {
+	case "deepseek-v4-flash", "deepseek-v4-flash-search", "deepseek-v4-flash-nothinking":
+		return currentInputEnabled(m.currentInputFlash)
+	case "deepseek-v4-pro", "deepseek-v4-pro-search", "deepseek-v4-pro-nothinking":
+		return currentInputEnabled(m.currentInputPro)
+	case "deepseek-v4-vision", "deepseek-v4-vision-nothinking":
+		return currentInputEnabled(m.currentInputVision)
+	default:
+		return true
+	}
 }
 func (m mockOpenAIConfig) ThinkingInjectionEnabled() bool {
 	if m.thinkingInjection == nil {

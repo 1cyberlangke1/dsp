@@ -16,8 +16,6 @@ opencode.json
 logs/
 artifacts/
 
-# Vercel
-.vercel
 
 # Node.js / Frontend
 node_modules/
@@ -68,3 +66,5 @@ CLAUDE.local.md
 data/
 .codex
 .roomodes
+docs/
+deepseek-内部安全红队方案.md

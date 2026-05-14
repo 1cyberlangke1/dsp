@@ -266,7 +266,6 @@ var defaultCORSAllowHeaders = []string{
 	"X-API-Key",
 	"X-Ds2-Target-Account",
 	"X-Ds2-Source",
-	"X-Vercel-Protection-Bypass",
 	"X-Goog-Api-Key",
 	"Anthropic-Version",
 	"Anthropic-Beta",

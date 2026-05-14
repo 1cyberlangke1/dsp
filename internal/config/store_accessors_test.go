@@ -4,26 +4,36 @@ import "testing"
 
 func TestStoreCurrentInputFileAccessors(t *testing.T) {
 	store := &Store{cfg: Config{}}
-	if !store.CurrentInputFileEnabled() {
-		t.Fatal("expected current input file enabled by default")
+	if !store.CurrentInputFileFlashEnabled() || !store.CurrentInputFileProEnabled() || !store.CurrentInputFileVisionEnabled() {
+		t.Fatal("expected current input file enabled for all model families by default")
 	}
-	if got := store.CurrentInputFileMinChars(); got != 0 {
-		t.Fatalf("default current input file min_chars=%d want=0", got)
-	}
-
-	enabled := false
-	store.cfg.CurrentInputFile = CurrentInputFileConfig{Enabled: &enabled, MinChars: 12345}
-	if store.CurrentInputFileEnabled() {
-		t.Fatal("expected current input file disabled")
+	for _, model := range []string{"deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-vision"} {
+		if !store.CurrentInputFileEnabledForModel(model) {
+			t.Fatalf("expected current input file enabled for model %s by default", model)
+		}
 	}
 
-	enabled = true
-	store.cfg.CurrentInputFile.Enabled = &enabled
-	if !store.CurrentInputFileEnabled() {
-		t.Fatal("expected current input file enabled")
+	flash := false
+	pro := true
+	vision := false
+	store.cfg.CurrentInputFile = CurrentInputFileConfig{Flash: &flash, Pro: &pro, Vision: &vision}
+	if store.CurrentInputFileFlashEnabled() {
+		t.Fatal("expected flash current input file disabled")
 	}
-	if got := store.CurrentInputFileMinChars(); got != 12345 {
-		t.Fatalf("current input file min_chars=%d want=12345", got)
+	if !store.CurrentInputFileProEnabled() {
+		t.Fatal("expected pro current input file enabled")
+	}
+	if store.CurrentInputFileVisionEnabled() {
+		t.Fatal("expected vision current input file disabled")
+	}
+	if store.CurrentInputFileEnabledForModel("deepseek-v4-flash-search") {
+		t.Fatal("expected flash-search to inherit flash toggle")
+	}
+	if !store.CurrentInputFileEnabledForModel("deepseek-v4-pro-nothinking") {
+		t.Fatal("expected pro-nothinking to inherit pro toggle")
+	}
+	if store.CurrentInputFileEnabledForModel("deepseek-v4-vision") {
+		t.Fatal("expected vision to inherit disabled toggle")
 	}
 }
 

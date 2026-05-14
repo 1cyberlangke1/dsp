@@ -24,7 +24,6 @@ type ConfigStore interface {
 	IsEnvWritebackEnabled() bool
 	HasEnvConfigSource() bool
 	ConfigPath() string
-	SetVercelSync(hash string, ts int64) error
 	AdminPasswordHash() string
 	AdminJWTExpireHours() int
 	AdminJWTValidAfterUnix() int64
@@ -33,8 +32,9 @@ type ConfigStore interface {
 	RuntimeGlobalMaxInflight(defaultSize int) int
 	RuntimeTokenRefreshIntervalHours() int
 	AutoDeleteMode() string
-	CurrentInputFileEnabled() bool
-	CurrentInputFileMinChars() int
+	CurrentInputFileFlashEnabled() bool
+	CurrentInputFileProEnabled() bool
+	CurrentInputFileVisionEnabled() bool
 	ThinkingInjectionEnabled() bool
 	ThinkingInjectionPrompt() string
 	AutoDeleteSessions() bool

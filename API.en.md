@@ -32,7 +32,6 @@ Docs: [Overview](README.en.md) / [Architecture](docs/ARCHITECTURE.en.md) / [Depl
 | Base URL | `http://localhost:5001` or your deployment domain |
 | Default Content-Type | `application/json` |
 | Health probes | `GET /healthz`, `GET /readyz` |
-| CORS | Enabled (uniformly covers `/v1/*`, `/anthropic/*`, `/v1beta/models/*`, `/api/*`, and `/admin/*`; echoes the browser `Origin` when present, otherwise `*`; default allow-list includes `Content-Type`, `Authorization`, `X-API-Key`, `X-Ds2-Target-Account`, `X-Ds2-Source`, `X-Vercel-Protection-Bypass`, `X-Goog-Api-Key`, `Anthropic-Version`, `Anthropic-Beta`, and also accepts third-party preflight-requested headers such as `x-stainless-*`; `/v1/chat/completions` on Vercel Node Runtime matches the same behavior; internal-only `X-Ds2-Internal-Token` remains blocked) |
 
 - All JSON request bodies must be valid UTF-8; malformed byte sequences are rejected on ingress with `400 invalid json`.
 
@@ -42,7 +41,6 @@ Docs: [Overview](README.en.md) / [Architecture](docs/ARCHITECTURE.en.md) / [Depl
 - Adapter responsibilities are streamlined to: **request normalization → DeepSeek invocation → protocol-shaped rendering**, reducing legacy split-logic paths.
 - Tool-calling semantics are aligned between Go and Node runtime: models should output the halfwidth-pipe DSML shell `<|DSML|tool_calls>` → `<|DSML|invoke name="...">` → `<|DSML|parameter name="...">`; DS2API also accepts DSML wrapper aliases such as `<dsml|tool_calls>` and `<|tool_calls>`, common DSML separator drift such as `<|DSML tool_calls>`, collapsed DSML local names such as `<DSMLtool_calls>`, control-separator drift such as `<DSML␂tool_calls>` / raw STX `\x02`, CJK angle bracket, fullwidth-bang / ideographic-comma separator drift, PascalCase local-name drift, and trailing attribute separator drift such as `<DSM|parameter name="command"|>...〈/DSM|parameter〉`, `<！DSML！invoke name=“Bash”>`, `<、DSML、tool_calls>`, `<DSmartToolCalls>`, or `<DSMLtool_calls※>`, arbitrary protocol prefixes such as `<proto💥tool_calls>`, and legacy canonical XML `<tool_calls>` → `<invoke name="...">` → `<parameter name="...">`. The scanner normalizes fixed local names (`tool_calls` / `invoke` / `parameter`) with non-structural separators before or after them back to XML before parsing, and also tolerates CDATA opener drift such as `<！[CDATA[` / `<、[CDATA[`; only wrapped tool blocks or the narrow missing-opening-wrapper repair path enter the tool path, while bare `<invoke>` does not count as supported syntax. JSON literal parameter bodies are preserved as structured values, explicit empty or whitespace-only parameters are preserved as empty strings, malformed complete wrappers are released as plain text, and loose CDATA is narrowly repaired at final parse/flush when it can preserve a complete outer tool call.
 - `Admin API` separates static config from runtime policy: `/admin/config*` for configuration state, `/admin/settings*` for runtime behavior.
-- When upstream returns a thinking-only response with no visible text, the Go main path and the Vercel Node streaming path retry once in the same DeepSeek session: it appends the prompt suffix `"Previous reply had no visible output. Please regenerate the visible final answer or tool call now."` and sets `parent_message_id`. If that same-account retry would still end as `429 upstream_empty_output`, managed-account mode switches to the next available account, creates a fresh session, and retries the original payload once before returning 429.
 - Citation/reference marker boundary: streaming output hides upstream `[citation:N]` / `[reference:N]` placeholders by default; non-stream output converts DeepSeek search reference markers into Markdown links.
 
 ---
@@ -59,13 +57,11 @@ cp config.example.json config.json
 Use it per deployment mode:
 
 - Local run: read `config.json` directly
-- Docker / Vercel: generate Base64 from `config.json`, then set `DS2API_CONFIG_JSON`, or paste raw JSON directly
 
 ```bash
 DS2API_CONFIG_JSON="$(base64 < config.json | tr -d '\n')"
 ```
 
-For Vercel one-click bootstrap, you can set only `DS2API_ADMIN_KEY` first, then import config at `/admin` and sync env vars from the "Vercel Sync" page.
 
 ---
 
@@ -131,7 +127,6 @@ Gemini-compatible clients can also send `x-goog-api-key`, `?key=`, or `?api_key=
 | POST | `/api/show` | None | Ollama model capability query (returns `id` + `capabilities`) |
 | POST | `/admin/login` | None | Admin login |
 | GET | `/admin/verify` | JWT | Verify admin JWT |
-| GET | `/admin/vercel/config` | Admin | Read preconfigured Vercel creds |
 | GET | `/admin/config` | Admin | Read sanitized config |
 | POST | `/admin/config` | Admin | Update config |
 | GET | `/admin/settings` | Admin | Read runtime settings |
@@ -161,9 +156,6 @@ Gemini-compatible clients can also send `x-goog-api-key`, `?key=`, or `?api_key=
 | POST | `/admin/dev/raw-samples/capture` | Admin | Fire one request and persist it as a raw sample |
 | GET | `/admin/dev/raw-samples/query` | Admin | Search current in-memory capture chains by prompt keyword |
 | POST | `/admin/dev/raw-samples/save` | Admin | Persist a selected in-memory capture chain as a raw sample |
-| POST | `/admin/vercel/sync` | Admin | Sync config to Vercel |
-| GET | `/admin/vercel/status` | Admin | Vercel sync status |
-| POST | `/admin/vercel/status` | Admin | Vercel sync status / draft compare |
 | GET | `/admin/export` | Admin | Export config JSON/Base64 |
 | GET | `/admin/dev/captures` | Admin | Read local packet-capture entries |
 | DELETE | `/admin/dev/captures` | Admin | Clear local packet-capture entries |
@@ -247,7 +239,6 @@ Retired historical families such as `claude-1.*`, `claude-2.*`, `claude-instant-
 
 ### `POST /v1/chat/completions`
 
-> Path note: besides the canonical `/v1/chat/completions`, DS2API also accepts the root shortcut `/chat/completions`. On Vercel Runtime, `vercel.json` rewrites only the canonical `/v1/chat/completions` path to the Node streaming bridge; the root shortcut stays on the Go primary path. Use `/v1/chat/completions` on Vercel when real-time streaming is required.
 
 **Headers**:
 
@@ -683,9 +674,7 @@ Requires JWT: `Authorization: Bearer <jwt>`
 }
 ```
 
-### `GET /admin/vercel/config`
 
-Returns Vercel preconfiguration status. Environment variables are preferred, then the saved `vercel` config block is used as a fallback.
 
 ```json
 {
@@ -712,7 +701,6 @@ Returns sanitized config, including both `keys` and `api_keys`.
   "env_source_present": true,
   "env_writeback_enabled": true,
   "config_path": "/data/config.json",
-  "vercel": {
     "has_token": true,
     "token_preview": "vc****en",
     "project_id": "prj_xxx",
@@ -771,7 +759,6 @@ Reads runtime settings and status, including:
 - `current_input_file` (`enabled` defaults to `true`, plus `min_chars`)
 - `thinking_injection` (`enabled` defaults to `true`, `prompt`, and `default_prompt`)
 - `model_aliases`
-- `env_backed`, `needs_vercel_sync`
 - `toolcall` policy is fixed to `feature_match + high` and is no longer returned or editable via settings
 
 ### `PUT /admin/settings`
@@ -809,7 +796,6 @@ Imports full config with:
 
 The request can send config directly, or wrapped as `{"config": {...}, "mode":"merge"}`.
 Query params `?mode=merge` / `?mode=replace` are also supported.
-`replace` mode replaces the full config shape while preserving Vercel sync metadata. `merge` mode merges `keys`, `api_keys`, `accounts`, and `model_aliases`, and overwrites non-empty fields under `admin`, `runtime`, `responses`, and `embeddings`. Manage `auto_delete` and `current_input_file` via `/admin/settings` or the config file; legacy `compat` and `toolcall` fields are ignored.
 
 > Note: `merge` mode does not update `auto_delete` or `current_input_file`.
 
@@ -1127,15 +1113,10 @@ Any one of these selectors is accepted:
 
 The success payload includes `sample_id`, `dir`, `meta_path`, and `upstream_path`.
 
-### `POST /admin/vercel/sync`
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| `vercel_token` | ❌ | If empty or `__USE_PRECONFIG__`, read env, then saved config |
-| `project_id` | ❌ | Fallback: `VERCEL_PROJECT_ID`, then saved config |
-| `team_id` | ❌ | Fallback: `VERCEL_TEAM_ID`, then saved config |
 | `auto_validate` | ❌ | Default `true` |
-| `save_credentials` | ❌ | Default `true`; saves explicitly supplied Vercel credentials for the next sync |
 
 **Success response**:
 
@@ -1154,14 +1135,11 @@ Or manual deploy required:
 {
   "success": true,
   "validated_accounts": 3,
-  "message": "Config synced to Vercel, please trigger redeploy manually",
   "manual_deploy_required": true
 }
 ```
 
-Failed account checks are returned in `failed_accounts`, and any saved Vercel credentials are returned in `saved_credentials`.
 
-### `GET /admin/vercel/status`
 
 ```json
 {
@@ -1176,7 +1154,6 @@ Failed account checks are returned in `failed_accounts`, and any saved Vercel cr
 }
 ```
 
-`POST /admin/vercel/status` can also accept `config_override` to compare a draft config against the current synced config.
 
 ### `GET /admin/export`
 

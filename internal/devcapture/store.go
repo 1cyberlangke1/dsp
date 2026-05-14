@@ -60,6 +60,8 @@ type captureBody struct {
 	finalized  bool
 }
 
+var enabled = true
+
 var (
 	globalOnce sync.Once
 	globalInst *Store
@@ -73,7 +75,6 @@ func Global() *Store {
 }
 
 func NewFromEnv() *Store {
-	enabled := !isVercelRuntime()
 	if raw, ok := os.LookupEnv("DS2API_DEV_PACKET_CAPTURE"); ok {
 		enabled = parseBool(raw)
 	}
@@ -96,9 +97,6 @@ func NewFromEnv() *Store {
 	}
 }
 
-func isVercelRuntime() bool {
-	return strings.TrimSpace(os.Getenv("VERCEL")) != "" || strings.TrimSpace(os.Getenv("NOW_REGION")) != ""
-}
 
 func (s *Store) Enabled() bool {
 	if s == nil {

@@ -14,7 +14,6 @@ import (
 	"ds2api/internal/auth"
 	"ds2api/internal/chathistory"
 	dsclient "ds2api/internal/deepseek/client"
-	"ds2api/internal/promptcompat"
 )
 
 type responsesHistoryDS struct {
@@ -89,7 +88,7 @@ func TestResponsesRecordsResponseHistory(t *testing.T) {
 	if item.Surface != "openai.responses" {
 		t.Fatalf("unexpected surface: %q", item.Surface)
 	}
-	if !strings.Contains(item.UserInput, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(item.UserInput, "Continue from the latest state in the attached ") {
 		t.Fatalf("unexpected user input: %q", item.UserInput)
 	}
 	if !strings.Contains(item.HistoryText, "hello responses") {

@@ -13,17 +13,13 @@ import (
 	"ds2api/internal/promptcompat"
 )
 
-var currentInputFilename = promptcompat.CurrentInputContextFilename
-var currentToolsFilename = promptcompat.CurrentToolsContextFilename
-
 const (
 	currentInputContentType = "text/plain; charset=utf-8"
 	currentInputPurpose     = "assistants"
 )
 
 type CurrentInputConfigReader interface {
-	CurrentInputFileEnabled() bool
-	CurrentInputFileMinChars() int
+	CurrentInputFileEnabledForModel(model string) bool
 }
 
 type CurrentInputUploader interface {
@@ -36,18 +32,15 @@ type Service struct {
 }
 
 func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth, stdReq promptcompat.StandardRequest) (promptcompat.StandardRequest, error) {
-	if stdReq.CurrentInputFileApplied || s.DS == nil || s.Store == nil || a == nil || !s.Store.CurrentInputFileEnabled() {
+	if stdReq.CurrentInputFileApplied || s.DS == nil || s.Store == nil || a == nil || !s.Store.CurrentInputFileEnabledForModel(stdReq.ResolvedModel) {
 		return stdReq, nil
 	}
-	threshold := s.Store.CurrentInputFileMinChars()
-
-	index, text := latestUserInputForFile(stdReq.Messages)
+	index, _ := latestUserInputForFile(stdReq.Messages)
 	if index < 0 {
 		return stdReq, nil
 	}
-	if len([]rune(text)) < threshold {
-		return stdReq, nil
-	}
+	promptcompat.RefreshContextFilename()
+	promptcompat.RefreshToolsFilename()
 	fileText := promptcompat.BuildOpenAICurrentInputContextTranscript(stdReq.Messages)
 	if strings.TrimSpace(fileText) == "" {
 		return stdReq, errors.New("current user input file produced empty transcript")
@@ -58,7 +51,7 @@ func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth,
 		modelType = resolvedType
 	}
 	result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
-		Filename:    currentInputFilename,
+		Filename:    promptcompat.CurrentInputContextFilename,
 		ContentType: currentInputContentType,
 		Purpose:     currentInputPurpose,
 		ModelType:   modelType,
@@ -75,7 +68,7 @@ func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth,
 	toolFileID := ""
 	if strings.TrimSpace(toolsText) != "" {
 		result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
-			Filename:    currentToolsFilename,
+			Filename:    promptcompat.CurrentToolsContextFilename,
 			ContentType: currentInputContentType,
 			Purpose:     currentInputPurpose,
 			ModelType:   modelType,
@@ -128,7 +121,7 @@ func (s Service) ReuploadAppliedCurrentInputFile(ctx context.Context, a *auth.Re
 		modelType = resolvedType
 	}
 	result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
-		Filename:    currentInputFilename,
+		Filename:    promptcompat.CurrentInputContextFilename,
 		ContentType: currentInputContentType,
 		Purpose:     currentInputPurpose,
 		ModelType:   modelType,
@@ -146,7 +139,7 @@ func (s Service) ReuploadAppliedCurrentInputFile(ctx context.Context, a *auth.Re
 	toolFileID := ""
 	if strings.TrimSpace(toolsText) != "" {
 		result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
-			Filename:    currentToolsFilename,
+			Filename:    promptcompat.CurrentToolsContextFilename,
 			ContentType: currentInputContentType,
 			Purpose:     currentInputPurpose,
 			ModelType:   modelType,
@@ -187,9 +180,9 @@ func latestUserInputForFile(messages []any) (int, string) {
 }
 
 func currentInputFilePrompt(hasToolsFile bool) string {
-	prompt := currentInputFilename + " 里是之前的对话记录。接续回答最后一条消息。"
+	prompt := "Continue from the latest state in the attached " + promptcompat.CurrentInputContextFilename + " context. Treat it as the current working state and answer the latest user request directly."
 	if hasToolsFile {
-		prompt += " 工具用法写在 " + currentToolsFilename + " 里，按那里的格式调用。"
+		prompt += " Available tool descriptions and parameter schemas are attached in " + promptcompat.CurrentToolsContextFilename + "; use only those tools and follow the tool-call format rules in this prompt."
 	}
 	return prompt
 }

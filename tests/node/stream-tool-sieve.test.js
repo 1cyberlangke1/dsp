@@ -112,7 +112,7 @@ EOF
   assert.equal(calls[0].input.command.includes('Co-Authored-By: Claude Opus 4.7'), true);
 });
 
-test('parseToolCalls parses underscored DSML shell (Vercel parity)', () => {
+test('parseToolCalls parses underscored DSML shell (parity check)', () => {
   const payload = `<dsml_tool_calls>
 <dsml_invoke name="search_web">
 <dsml_parameter name="query"><![CDATA[2026年5月 热点事件]]></dsml_parameter>

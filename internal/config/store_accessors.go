@@ -145,19 +145,43 @@ func (s *Store) AutoDeleteSessions() bool {
 	return s.AutoDeleteMode() != "none"
 }
 
-func (s *Store) CurrentInputFileEnabled() bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.cfg.CurrentInputFile.Enabled == nil {
+func currentInputEnabled(ptr *bool) bool {
+	if ptr == nil {
 		return true
 	}
-	return *s.cfg.CurrentInputFile.Enabled
+	return *ptr
 }
 
-func (s *Store) CurrentInputFileMinChars() int {
+func (s *Store) CurrentInputFileFlashEnabled() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.cfg.CurrentInputFile.MinChars
+	return currentInputEnabled(s.cfg.CurrentInputFile.Flash)
+}
+
+func (s *Store) CurrentInputFileProEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return currentInputEnabled(s.cfg.CurrentInputFile.Pro)
+}
+
+func (s *Store) CurrentInputFileVisionEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return currentInputEnabled(s.cfg.CurrentInputFile.Vision)
+}
+
+func (s *Store) CurrentInputFileEnabledForModel(model string) bool {
+	baseModel, _ := splitNoThinkingModel(model)
+	switch baseModel {
+	case "deepseek-v4-flash", "deepseek-v4-flash-search":
+		return s.CurrentInputFileFlashEnabled()
+	case "deepseek-v4-pro", "deepseek-v4-pro-search":
+		return s.CurrentInputFileProEnabled()
+	case "deepseek-v4-vision":
+		return s.CurrentInputFileVisionEnabled()
+	default:
+		return true
+	}
 }
 
 func (s *Store) ThinkingInjectionEnabled() bool {

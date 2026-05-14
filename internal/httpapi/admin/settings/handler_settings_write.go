@@ -28,8 +28,9 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	currentInputEnabledSet := hasNestedSettingsKey(req, "current_input_file", "enabled")
-	currentInputMinCharsSet := hasNestedSettingsKey(req, "current_input_file", "min_chars")
+	currentInputFlashSet := hasNestedSettingsKey(req, "current_input_file", "flash")
+	currentInputProSet := hasNestedSettingsKey(req, "current_input_file", "pro")
+	currentInputVisionSet := hasNestedSettingsKey(req, "current_input_file", "vision")
 	thinkingInjectionEnabledSet := hasNestedSettingsKey(req, "thinking_injection", "enabled")
 	thinkingInjectionPromptSet := hasNestedSettingsKey(req, "thinking_injection", "prompt")
 
@@ -64,11 +65,14 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 			c.AutoDelete.Sessions = autoDeleteCfg.Sessions
 		}
 		if currentInputCfg != nil {
-			if currentInputEnabledSet {
-				c.CurrentInputFile.Enabled = currentInputCfg.Enabled
+			if currentInputFlashSet {
+				c.CurrentInputFile.Flash = currentInputCfg.Flash
 			}
-			if currentInputMinCharsSet {
-				c.CurrentInputFile.MinChars = currentInputCfg.MinChars
+			if currentInputProSet {
+				c.CurrentInputFile.Pro = currentInputCfg.Pro
+			}
+			if currentInputVisionSet {
+				c.CurrentInputFile.Vision = currentInputCfg.Vision
 			}
 		}
 		if thinkingInjCfg != nil {
@@ -89,13 +93,10 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.applyRuntimeSettings()
-	needsSync := config.IsVercel() || h.Store.IsEnvBacked()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"success":             true,
 		"message":             "settings updated and hot reloaded",
 		"env_backed":          h.Store.IsEnvBacked(),
-		"needs_vercel_sync":   needsSync,
-		"manual_sync_message": "配置已保存。Vercel 部署请在 Vercel Sync 页面手动同步。",
 	})
 }
 

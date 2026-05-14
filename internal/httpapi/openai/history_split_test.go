@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"ds2api/internal/auth"
+	"ds2api/internal/config"
 	dsclient "ds2api/internal/deepseek/client"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/util"
@@ -92,12 +95,11 @@ func TestBuildOpenAICurrentInputContextTranscriptUsesNumberedHistorySections(t *
 	}
 }
 
-func TestApplyCurrentInputFileSkipsShortInputWhenThresholdNotReached(t *testing.T) {
+func TestApplyCurrentInputFileUploadsWhenFlashEnabled(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
-			currentInputMin:     10,
+			currentInputFlash: boolPtr(true),
 		},
 		DS: ds,
 	}
@@ -116,11 +118,14 @@ func TestApplyCurrentInputFileSkipsShortInputWhenThresholdNotReached(t *testing.
 	if err != nil {
 		t.Fatalf("apply current input file failed: %v", err)
 	}
-	if len(ds.uploadCalls) != 0 {
-		t.Fatalf("expected no upload on first turn, got %d", len(ds.uploadCalls))
+	if len(ds.uploadCalls) != 1 {
+		t.Fatalf("expected upload on first turn, got %d", len(ds.uploadCalls))
 	}
-	if out.FinalPrompt != stdReq.FinalPrompt {
-		t.Fatalf("expected prompt unchanged on first turn")
+	if !out.CurrentInputFileApplied {
+		t.Fatal("expected current input file applied")
+	}
+	if out.FinalPrompt == stdReq.FinalPrompt {
+		t.Fatalf("expected prompt to switch to continuation prompt")
 	}
 }
 
@@ -128,6 +133,7 @@ func TestApplyThinkingInjectionAppendsLatestUserPrompt(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
+			currentInputFlash:  boolPtr(false),
 			thinkingInjection: boolPtr(true),
 		},
 		DS: ds,
@@ -148,7 +154,7 @@ func TestApplyThinkingInjectionAppendsLatestUserPrompt(t *testing.T) {
 		t.Fatalf("apply thinking injection failed: %v", err)
 	}
 	if len(ds.uploadCalls) != 0 {
-		t.Fatalf("expected no upload for first short turn, got %d", len(ds.uploadCalls))
+		t.Fatalf("expected no upload when flash current input is disabled, got %d", len(ds.uploadCalls))
 	}
 	if !strings.Contains(out.FinalPrompt, "hello\n\n"+promptcompat.ThinkingInjectionMarker) {
 		t.Fatalf("expected thinking injection after latest user message, got %s", out.FinalPrompt)
@@ -159,6 +165,7 @@ func TestApplyThinkingInjectionUsesCustomPrompt(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
+			currentInputFlash: boolPtr(false),
 			thinkingInjection: boolPtr(true),
 			thinkingPrompt:    "custom thinking format",
 		},
@@ -188,12 +195,14 @@ func TestApplyCurrentInputFileDisabledPassThrough(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: false,
+			currentInputFlash: boolPtr(true),
+			currentInputPro:   boolPtr(false),
+			currentInputVision: boolPtr(true),
 		},
 		DS: ds,
 	}
 	req := map[string]any{
-		"model":    "deepseek-v4-vision",
+		"model":    "deepseek-v4-pro",
 		"messages": historySplitTestMessages(),
 	}
 	stdReq, err := promptcompat.NormalizeOpenAIChatRequest(h.Store, req, "")
@@ -206,7 +215,7 @@ func TestApplyCurrentInputFileDisabledPassThrough(t *testing.T) {
 		t.Fatalf("apply current input file failed: %v", err)
 	}
 	if len(ds.uploadCalls) != 0 {
-		t.Fatalf("expected no uploads when both split modes are disabled, got %d", len(ds.uploadCalls))
+		t.Fatalf("expected no uploads when pro current input is disabled, got %d", len(ds.uploadCalls))
 	}
 	if out.CurrentInputFileApplied || out.HistoryText != "" {
 		t.Fatalf("expected direct pass-through, got current_input=%v history=%q", out.CurrentInputFileApplied, out.HistoryText)
@@ -220,9 +229,8 @@ func TestApplyCurrentInputFileUploadsFirstTurnWithNumberedHistoryTranscript(t *t
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
-			currentInputMin:     10,
-			thinkingInjection:   boolPtr(true),
+			currentInputFlash: boolPtr(true),
+			thinkingInjection: boolPtr(true),
 		},
 		DS: ds,
 	}
@@ -271,7 +279,7 @@ func TestApplyCurrentInputFileUploadsFirstTurnWithNumberedHistoryTranscript(t *t
 	if strings.Contains(out.FinalPrompt, "CURRENT_USER_INPUT.txt") || strings.Contains(out.FinalPrompt, "Read that file") {
 		t.Fatalf("expected live prompt not to instruct file reads, got %s", out.FinalPrompt)
 	}
-	if !strings.Contains(out.FinalPrompt, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(out.FinalPrompt, "Continue from the latest state in the attached ") {
 		t.Fatalf("expected continuation-oriented prompt in live prompt, got %s", out.FinalPrompt)
 	}
 	if len(out.RefFileIDs) != 1 || out.RefFileIDs[0] != "file-inline-1" {
@@ -289,9 +297,8 @@ func TestApplyCurrentInputFilePreservesFullContextPromptForTokenCounting(t *test
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
-			currentInputMin:     0,
-			thinkingInjection:   boolPtr(true),
+			currentInputVision: boolPtr(true),
+			thinkingInjection:  boolPtr(true),
 		},
 		DS: ds,
 	}
@@ -322,7 +329,7 @@ func TestApplyCurrentInputFilePreservesFullContextPromptForTokenCounting(t *test
 	if !strings.Contains(out.PromptTokenText, "# "+promptcompat.CurrentInputContextFilename) || !strings.Contains(out.PromptTokenText, "=== 1. SYSTEM ===") {
 		t.Fatalf("expected prompt token text to include numbered history transcript, got %q", out.PromptTokenText)
 	}
-	if !strings.Contains(out.PromptTokenText, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(out.PromptTokenText, "Continue from the latest state in the attached ") {
 		t.Fatalf("expected prompt token text to also include continuation prompt, got %q", out.PromptTokenText)
 	}
 	if strings.Contains(out.FinalPrompt, "first user turn") || strings.Contains(out.FinalPrompt, "latest user turn") {
@@ -334,9 +341,8 @@ func TestApplyCurrentInputFileUploadsFullContextFile(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
-			currentInputMin:     0,
-			thinkingInjection:   boolPtr(true),
+			currentInputVision: boolPtr(true),
+			thinkingInjection:  boolPtr(true),
 		},
 		DS: ds,
 	}
@@ -375,7 +381,7 @@ func TestApplyCurrentInputFileUploadsFullContextFile(t *testing.T) {
 	if strings.Contains(out.FinalPrompt, "first user turn") || strings.Contains(out.FinalPrompt, "latest user turn") || strings.Contains(out.FinalPrompt, "CURRENT_USER_INPUT.txt") || strings.Contains(out.FinalPrompt, "Read that file") {
 		t.Fatalf("expected live prompt to use only a continuation instruction, got %s", out.FinalPrompt)
 	}
-	if !strings.Contains(out.FinalPrompt, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(out.FinalPrompt, "Continue from the latest state in the attached ") {
 		t.Fatalf("expected continuation-oriented prompt in live prompt, got %s", out.FinalPrompt)
 	}
 }
@@ -384,8 +390,7 @@ func TestApplyCurrentInputFileUploadsToolsContextSeparately(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
-			currentInputMin:     0,
+			currentInputFlash: boolPtr(true),
 		},
 		DS: ds,
 	}
@@ -436,7 +441,7 @@ func TestApplyCurrentInputFileUploadsToolsContextSeparately(t *testing.T) {
 	if strings.Contains(toolsText, "TOOL CALL FORMAT") {
 		t.Fatalf("tools transcript should not duplicate tool format instructions, got %q", toolsText)
 	}
-	if !strings.Contains(out.FinalPrompt, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") || !strings.Contains(out.FinalPrompt, promptcompat.CurrentToolsContextFilename) {
+	if !strings.Contains(out.FinalPrompt, "Continue from the latest state in the attached ") || !strings.Contains(out.FinalPrompt, promptcompat.CurrentToolsContextFilename) {
 		t.Fatalf("expected live prompt to reference both context files, got %q", out.FinalPrompt)
 	}
 	if !strings.Contains(out.FinalPrompt, "TOOL CALL FORMAT") || !strings.Contains(out.FinalPrompt, "Remember: The ONLY valid way to use tools") {
@@ -457,7 +462,7 @@ func TestApplyCurrentInputFileCarriesHistoryText(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
+			currentInputFlash: boolPtr(true),
 		},
 		DS: ds,
 	}
@@ -489,7 +494,7 @@ func TestChatCompletionsCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *t
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
+			currentInputFlash: boolPtr(true),
 		},
 		Auth: streamStatusAuthStub{},
 		DS:   ds,
@@ -533,7 +538,7 @@ func TestChatCompletionsCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *t
 		t.Fatal("expected completion payload to be captured")
 	}
 	promptText, _ := ds.completionReq["prompt"].(string)
-	if !strings.Contains(promptText, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(promptText, "Continue from the latest state in the attached ") {
 		t.Fatalf("expected continuation-oriented prompt, got %s", promptText)
 	}
 	if strings.Contains(promptText, "first user turn") || strings.Contains(promptText, "latest user turn") {
@@ -559,7 +564,7 @@ func TestResponsesCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *testing
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
+			currentInputFlash: boolPtr(true),
 		},
 		Auth: streamStatusAuthStub{},
 		DS:   ds,
@@ -592,7 +597,7 @@ func TestResponsesCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *testing
 		t.Fatal("expected completion payload to be captured")
 	}
 	promptText, _ := ds.completionReq["prompt"].(string)
-	if !strings.Contains(promptText, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(promptText, "Continue from the latest state in the attached ") {
 		t.Fatalf("expected continuation-oriented prompt, got %s", promptText)
 	}
 	if strings.Contains(promptText, "first user turn") || strings.Contains(promptText, "latest user turn") {
@@ -614,7 +619,7 @@ func TestResponsesCurrentInputFileUploadsToolsSeparately(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
+			currentInputFlash: boolPtr(true),
 		},
 		Auth: streamStatusAuthStub{},
 		DS:   ds,
@@ -679,7 +684,7 @@ func TestChatCompletionsCurrentInputFileMapsManagedAuthFailureTo401(t *testing.T
 	}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
+			currentInputFlash: boolPtr(true),
 		},
 		Auth: streamStatusManagedAuthStub{},
 		DS:   ds,
@@ -710,7 +715,7 @@ func TestResponsesCurrentInputFileMapsDirectAuthFailureTo401(t *testing.T) {
 	}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
+			currentInputFlash: boolPtr(true),
 		},
 		Auth: streamStatusAuthStub{},
 		DS:   ds,
@@ -741,7 +746,7 @@ func TestChatCompletionsCurrentInputFileUploadFailureReturnsInternalServerError(
 	ds := &inlineUploadDSStub{uploadErr: errors.New("boom")}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputEnabled: true,
+			currentInputFlash: boolPtr(true),
 		},
 		Auth: streamStatusAuthStub{},
 		DS:   ds,
@@ -770,7 +775,7 @@ func TestCurrentInputFileWorksAcrossAutoDeleteModes(t *testing.T) {
 			h := &openAITestSurface{
 				Store: mockOpenAIConfig{
 					autoDeleteMode:      mode,
-					currentInputEnabled: true,
+					currentInputFlash:   boolPtr(true),
 				},
 				Auth: streamStatusAuthStub{},
 				DS:   ds,
@@ -801,7 +806,7 @@ func TestCurrentInputFileWorksAcrossAutoDeleteModes(t *testing.T) {
 				t.Fatalf("expected completion payload for mode=%s", mode)
 			}
 			promptText, _ := ds.completionReq["prompt"].(string)
-			if !strings.Contains(promptText, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") || strings.Contains(promptText, "first user turn") || strings.Contains(promptText, "latest user turn") {
+			if !strings.Contains(promptText, "Continue from the latest state in the attached ") || strings.Contains(promptText, "first user turn") || strings.Contains(promptText, "latest user turn") {
 				t.Fatalf("unexpected prompt for mode=%s: %s", mode, promptText)
 			}
 		})
@@ -810,4 +815,59 @@ func TestCurrentInputFileWorksAcrossAutoDeleteModes(t *testing.T) {
 
 func boolPtr(v bool) *bool {
 	return &v
+}
+
+type inlineUploadDSStub struct {
+	uploadCalls    []dsclient.UploadFileRequest
+	completionReq  map[string]any
+	uploadErr      error
+	createSession  string
+}
+
+func (m *inlineUploadDSStub) CreateSession(_ context.Context, _ *auth.RequestAuth, _ int) (string, error) {
+	if strings.TrimSpace(m.createSession) == "" {
+		return "session-id", nil
+	}
+	return m.createSession, nil
+}
+
+func (m *inlineUploadDSStub) GetPow(_ context.Context, _ *auth.RequestAuth, _ int) (string, error) {
+	return "pow", nil
+}
+
+func (m *inlineUploadDSStub) UploadFile(_ context.Context, _ *auth.RequestAuth, req dsclient.UploadFileRequest, _ int) (*dsclient.UploadFileResult, error) {
+	m.uploadCalls = append(m.uploadCalls, req)
+	if m.uploadErr != nil {
+		return nil, m.uploadErr
+	}
+	id := "file-inline-1"
+	if len(m.uploadCalls) > 1 {
+		id = "file-inline-" + fmt.Sprint(len(m.uploadCalls))
+	}
+	return &dsclient.UploadFileResult{ID: id}, nil
+}
+
+func (m *inlineUploadDSStub) Login(_ context.Context, _ config.Account) (string, error) {
+	return "", nil
+}
+
+func (m *inlineUploadDSStub) GetSessionCountForToken(_ context.Context, _ string) (*dsclient.SessionStats, error) {
+	return &dsclient.SessionStats{}, nil
+}
+
+func (m *inlineUploadDSStub) DeleteAllSessionsForToken(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *inlineUploadDSStub) DeleteSessionForToken(_ context.Context, _, _ string) (*dsclient.DeleteSessionResult, error) {
+	return &dsclient.DeleteSessionResult{}, nil
+}
+
+func (m *inlineUploadDSStub) CallCompletion(_ context.Context, _ *auth.RequestAuth, payload map[string]any, _ string, _ int) (*http.Response, error) {
+	m.completionReq = payload
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(strings.NewReader("data: {\"p\":\"response/content\",\"v\":\"ok\"}\n")),
+	}, nil
 }

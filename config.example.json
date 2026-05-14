@@ -47,8 +47,9 @@
     "store_ttl_seconds": 900
   },
   "current_input_file": {
-    "enabled": true,
-    "min_chars": 0
+    "flash": true,
+    "pro": true,
+    "vision": true
   },
   "thinking_injection": {
     "enabled": true,

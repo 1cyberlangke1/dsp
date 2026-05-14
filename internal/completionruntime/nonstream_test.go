@@ -24,8 +24,7 @@ type fakeDeepSeekCaller struct {
 
 type currentInputRuntimeConfig struct{}
 
-func (currentInputRuntimeConfig) CurrentInputFileEnabled() bool { return true }
-func (currentInputRuntimeConfig) CurrentInputFileMinChars() int { return 0 }
+func (currentInputRuntimeConfig) CurrentInputFileEnabledForModel(string) bool { return true }
 
 func (f *fakeDeepSeekCaller) CreateSession(_ context.Context, a *auth.RequestAuth, _ int) (string, error) {
 	if f.sessionByAccount && a != nil && a.AccountID != "" {
@@ -312,7 +311,7 @@ func TestStartCompletionAppliesCurrentInputFileGlobally(t *testing.T) {
 		t.Fatalf("expected uploaded file id in ref_file_ids, got %#v", ds.payloads[0]["ref_file_ids"])
 	}
 	prompt, _ := ds.payloads[0]["prompt"].(string)
-	if !strings.Contains(prompt, promptcompat.CurrentInputContextFilename+" 里是之前的对话记录。接续回答最后一条消息。") {
+	if !strings.Contains(prompt, "Continue from the latest state in the attached ") {
 		t.Fatalf("expected continuation prompt, got %q", prompt)
 	}
 	if !start.Request.CurrentInputFileApplied || !strings.Contains(start.Request.PromptTokenText, "# "+promptcompat.CurrentInputContextFilename) {

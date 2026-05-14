@@ -115,9 +115,6 @@ func ValidateAutoDeleteConfig(autoDelete AutoDeleteConfig) error {
 }
 
 func ValidateCurrentInputFileConfig(currentInputFile CurrentInputFileConfig) error {
-	if currentInputFile.MinChars != 0 {
-		return ValidateIntRange("current_input_file.min_chars", currentInputFile.MinChars, 1, 100000000, true)
-	}
 	return nil
 }
 

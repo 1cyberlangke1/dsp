@@ -53,10 +53,12 @@ func loadStore() (*Store, error) {
 func loadConfig() (Config, bool, error) {
 	rawCfg := strings.TrimSpace(os.Getenv("DS2API_CONFIG_JSON"))
 	path := ConfigPath()
+	var cfg Config
+	var err error
 	if rawCfg != "" {
-		cfg, err := parseConfigString(rawCfg)
+		cfg, err = parseConfigString(rawCfg)
 		if err != nil {
-			if !IsVercel() && envWritebackEnabled() {
+			if envWritebackEnabled() {
 				if fileCfg, fileErr := loadConfigFromFile(path); fileErr == nil {
 					return fileCfg, false, nil
 				}
@@ -65,7 +67,7 @@ func loadConfig() (Config, bool, error) {
 		}
 		cfg.ClearAccountTokens()
 		cfg.DropInvalidAccounts()
-		if IsVercel() || !envWritebackEnabled() {
+		if !envWritebackEnabled() {
 			return cfg, true, err
 		}
 		content, fileErr := os.ReadFile(path)
@@ -88,7 +90,7 @@ func loadConfig() (Config, bool, error) {
 		}
 		return cfg, true, err
 	}
-	cfg, err := loadConfigFromFile(path)
+	cfg, err = loadConfigFromFile(path)
 	if err != nil {
 		if shouldTryLegacyContainerConfigPath() {
 			legacyPath := legacyContainerConfigPath()
@@ -97,19 +99,11 @@ func loadConfig() (Config, bool, error) {
 				return legacyCfg, false, nil
 			}
 		}
-		if IsVercel() {
-			// Vercel may start without writable/present config; keep in-memory bootstrap config.
-			return Config{}, true, nil
-		}
 		if shouldBootstrapMissingConfigFile(err) {
 			Logger.Warn("[config] config file missing; starting with empty file-backed config", "path", path)
 			return Config{}, false, nil
 		}
 		return Config{}, false, err
-	}
-	if IsVercel() {
-		// Vercel filesystem is ephemeral/read-only for runtime writes; avoid save errors.
-		return cfg, true, nil
 	}
 	return cfg, false, nil
 }
@@ -129,7 +123,7 @@ func loadConfigFromFile(path string) (Config, error) {
 	}
 	cfg.NormalizeCredentials()
 	cfg.DropInvalidAccounts()
-	if strings.Contains(string(content), `"test_status"`) && !IsVercel() {
+	if strings.Contains(string(content), `"test_status"`)  {
 		if b, err := json.MarshalIndent(cfg, "", "  "); err == nil {
 			_ = os.WriteFile(path, b, 0o644)
 		}
@@ -247,7 +241,7 @@ func (s *Store) Update(mutator func(*Config) error) error {
 func (s *Store) Save() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.fromEnv && (IsVercel() || !envWritebackEnabled()) {
+	if s.fromEnv && (!envWritebackEnabled()) {
 		Logger.Info("[save_config] source from env, skip write")
 		return nil
 	}
@@ -265,7 +259,7 @@ func (s *Store) Save() error {
 }
 
 func (s *Store) saveLocked() error {
-	if s.fromEnv && (IsVercel() || !envWritebackEnabled()) {
+	if s.fromEnv && (!envWritebackEnabled()) {
 		Logger.Info("[save_config] source from env, skip write")
 		return nil
 	}
@@ -288,13 +282,6 @@ func (s *Store) IsEnvBacked() bool {
 	return s.fromEnv
 }
 
-func (s *Store) SetVercelSync(hash string, ts int64) error {
-	return s.Update(func(c *Config) error {
-		c.VercelSyncHash = hash
-		c.VercelSyncTime = ts
-		return nil
-	})
-}
 
 func (s *Store) ExportJSONAndBase64() (string, string, error) {
 	s.mu.RLock()
