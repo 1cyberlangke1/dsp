@@ -1,12 +1,13 @@
 package protocol
 
 import (
+	"crypto/sha1"
 	_ "embed"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"os"
 	"strconv"
-	"time"
 )
 
 const (
@@ -72,12 +73,7 @@ type sharedConstants struct {
 var sharedConstantsJSON []byte
 
 func init() {
-	// 进程级 x-rangers-id（模拟 ByteDance SDK 的 bd_did，每个进程生成一次）
-	id := fmt.Sprintf("%019d", rand.Uint64()%10000000000000000000)
-	RangersID = id
-	for len(RangersID) > 1 && RangersID[0] == '0' {
-		RangersID = RangersID[1:]
-	}
+	RangersID = stableRangersID()
 
 	cfg := sharedConstants{}
 	if err := json.Unmarshal(sharedConstantsJSON, &cfg); err != nil {
@@ -108,7 +104,7 @@ func normalizeClientConstants(in clientConstants) clientConstants {
 		in.Platform = "android"
 	}
 	if in.AndroidAPILevel == "" {
-		in.AndroidAPILevel = "35"
+		in.AndroidAPILevel = "28"
 	}
 	if in.Locale == "" {
 		in.Locale = "zh_CN"
@@ -140,12 +136,26 @@ func buildBaseHeaders(client clientConstants, overrides map[string]string) map[s
 	if client.Locale != "" {
 		out["x-client-locale"] = client.Locale
 	}
-	_, offset := time.Now().Zone()
-	out["x-client-timezone-offset"] = strconv.Itoa(offset)
+	out["x-client-timezone-offset"] = strconv.Itoa(28800)
 	if RangersID != "" {
 		out["x-rangers-id"] = RangersID
 	}
 	return out
+}
+
+func stableRangersID() string {
+	hostname, err := os.Hostname()
+	if err != nil || hostname == "" {
+		hostname = "deepseek-device"
+	}
+	return RangersIDForSeed(hostname)
+}
+
+func RangersIDForSeed(seed string) string {
+	seed = "deepseek:" + seed
+	sum := sha1.Sum([]byte(seed))
+	value := binary.BigEndian.Uint64(sum[:8]) % uint64(10000000000000000000)
+	return fmt.Sprintf("%019d", value)
 }
 
 func cloneStringMap(in map[string]string) map[string]string {

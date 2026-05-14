@@ -4,16 +4,15 @@ import "testing"
 
 func TestStandardRequestCompletionPayloadSetsModelTypeFromResolvedModel(t *testing.T) {
 	tests := []struct {
-		name      string
-		model     string
-		thinking  bool
-		search    bool
-		modelType string
+		name     string
+		model    string
+		thinking bool
+		search   bool
 	}{
-		{name: "default", model: "deepseek-v4-flash", thinking: false, search: false, modelType: "default"},
-		{name: "default_nothinking", model: "deepseek-v4-flash-nothinking", thinking: false, search: false, modelType: "default"},
-		{name: "expert", model: "deepseek-v4-pro", thinking: true, search: false, modelType: "expert"},
-		{name: "vision", model: "deepseek-v4-vision", thinking: true, search: false, modelType: "vision"},
+		{name: "default", model: "deepseek-v4-flash", thinking: false, search: false},
+		{name: "default_nothinking", model: "deepseek-v4-flash-nothinking", thinking: false, search: false},
+		{name: "expert", model: "deepseek-v4-pro", thinking: true, search: false},
+		{name: "vision", model: "deepseek-v4-vision", thinking: true, search: false},
 	}
 
 	for _, tc := range tests {
@@ -31,11 +30,14 @@ func TestStandardRequestCompletionPayloadSetsModelTypeFromResolvedModel(t *testi
 
 			payload := req.CompletionPayload("session-123")
 
-			if got := payload["model_type"]; got != tc.modelType {
-				t.Fatalf("expected model_type %s, got %#v", tc.modelType, got)
+			if got := payload["model_type"]; got != "default" {
+				t.Fatalf("expected model_type default, got %#v", got)
 			}
 			if got := payload["chat_session_id"]; got != "session-123" {
 				t.Fatalf("unexpected chat_session_id: %#v", got)
+			}
+			if got := payload["preempt"]; got != false {
+				t.Fatalf("expected preempt=false, got %#v", got)
 			}
 			if got := payload["thinking_enabled"]; got != tc.thinking {
 				t.Fatalf("unexpected thinking_enabled: %#v", got)

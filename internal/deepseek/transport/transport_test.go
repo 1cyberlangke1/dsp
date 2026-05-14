@@ -1,20 +1,31 @@
 package transport
 
 import (
+	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"golang.org/x/net/http2"
 )
 
-func TestOkHttpTransportAddsPreemptiveHeader(t *testing.T) {
+func newHTTP2TLSServer(handler http.Handler) *httptest.Server {
+	srv := httptest.NewUnstartedServer(handler)
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	return srv
+}
+
+func TestClientDoesNotAddPreemptiveHeader(t *testing.T) {
 	var captured *http.Request
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := newHTTP2TLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 
 	client := New(0)
+	client.http.Transport.(*http2.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	resp, err := client.Do(req)
 	if err != nil {
@@ -27,20 +38,21 @@ func TestOkHttpTransportAddsPreemptiveHeader(t *testing.T) {
 	if captured == nil {
 		t.Fatal("expected request to be captured")
 	}
-	if captured.Header.Get("OkHttp-Preemptive") != "1" {
-		t.Fatalf("expected OkHttp-Preemptive: 1, got %q", captured.Header.Get("OkHttp-Preemptive"))
+	if captured.Header.Get("OkHttp-Preemptive") != "" {
+		t.Fatalf("expected OkHttp-Preemptive to be absent, got %q", captured.Header.Get("OkHttp-Preemptive"))
 	}
 }
 
-func TestOkHttpTransportPreservesExistingHeader(t *testing.T) {
+func TestClientPreservesExplicitPreemptiveHeader(t *testing.T) {
 	var capturedHeaders http.Header
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := newHTTP2TLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedHeaders = r.Header
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 
 	client := New(0)
+	client.http.Transport.(*http2.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	req.Header.Set("OkHttp-Preemptive", "0")
 	resp, err := client.Do(req)
@@ -57,7 +69,7 @@ func TestOkHttpTransportPreservesExistingHeader(t *testing.T) {
 	}
 }
 
-func TestNewFallbackClientHasOkHttpHeader(t *testing.T) {
+func TestNewFallbackClientDoesNotAddPreemptiveHeader(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r
@@ -78,15 +90,29 @@ func TestNewFallbackClientHasOkHttpHeader(t *testing.T) {
 	if captured == nil {
 		t.Fatal("expected request to be captured")
 	}
-	if captured.Header.Get("OkHttp-Preemptive") != "1" {
-		t.Fatalf("expected OkHttp-Preemptive: 1 on fallback client, got %q", captured.Header.Get("OkHttp-Preemptive"))
+	if captured.Header.Get("OkHttp-Preemptive") != "" {
+		t.Fatalf("expected no OkHttp-Preemptive on fallback client, got %q", captured.Header.Get("OkHttp-Preemptive"))
+	}
+}
+
+func TestClientUsesFingerprintHTTP2Transport(t *testing.T) {
+	client := New(0)
+	if _, ok := client.http.Transport.(*http2.Transport); !ok {
+		t.Fatalf("expected *http2.Transport, got %T", client.http.Transport)
+	}
+}
+
+func TestFallbackClientUsesPlainHTTPTransport(t *testing.T) {
+	client := NewFallbackClient(0, nil)
+	if _, ok := client.Transport.(*http.Transport); !ok {
+		t.Fatalf("expected *http.Transport, got %T", client.Transport)
 	}
 }
 
 func TestClientReusesCookieJar(t *testing.T) {
 	requestCount := 0
 	var cookieHeader string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := newHTTP2TLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
 		cookieHeader = r.Header.Get("Cookie")
 		if requestCount == 1 {
@@ -98,17 +124,24 @@ func TestClientReusesCookieJar(t *testing.T) {
 	defer srv.Close()
 
 	client := New(0)
+	client.http.Transport.(*http2.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
 	// First request — should get the cookie
 	req1, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
-	resp1, _ := client.Do(req1)
+	resp1, err := client.Do(req1)
+	if err != nil {
+		t.Fatalf("first request failed: %v", err)
+	}
 	if err := resp1.Body.Close(); err != nil {
 		t.Fatalf("close first body failed: %v", err)
 	}
 
 	// Second request — should carry the cookie from jar
 	req2, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
-	resp2, _ := client.Do(req2)
+	resp2, err := client.Do(req2)
+	if err != nil {
+		t.Fatalf("second request failed: %v", err)
+	}
 	if err := resp2.Body.Close(); err != nil {
 		t.Fatalf("close second body failed: %v", err)
 	}

@@ -56,8 +56,8 @@ func TestLoginPayloadStructureForEmail(t *testing.T) {
 	if payload["password"] != "secret123" {
 		t.Fatalf("expected password=secret123, got %#v", payload["password"])
 	}
-	if payload["os"] != "Android" {
-		t.Fatalf("expected os=Android, got %#v", payload["os"])
+	if payload["os"] != "android" {
+		t.Fatalf("expected os=android, got %#v", payload["os"])
 	}
 	deviceID, _ := payload["device_id"].(string)
 	if deviceID == "" || len(deviceID) != 88 {
@@ -92,8 +92,8 @@ func TestLoginPayloadStructureForMobile(t *testing.T) {
 	if payload["password"] != "secret123" {
 		t.Fatalf("expected password=secret123, got %#v", payload["password"])
 	}
-	if payload["os"] != "Android" {
-		t.Fatalf("expected os=Android, got %#v", payload["os"])
+	if payload["os"] != "android" {
+		t.Fatalf("expected os=android, got %#v", payload["os"])
 	}
 	// Mobile login: email should be nil
 	if payload["email"] != nil {
@@ -134,6 +134,14 @@ func TestLoginSendsHeaders(t *testing.T) {
 	// Login should not send Authorization (token not yet acquired)
 	if capturedHeaders.Get("authorization") != "" {
 		t.Fatalf("expected no authorization header on login, got %q", capturedHeaders.Get("authorization"))
+	}
+	gotRangersID := capturedHeaders.Get("x-rangers-id")
+	if gotRangersID == "" {
+		t.Fatal("expected x-rangers-id on login")
+	}
+	wantRangersID := protocol.RangersIDForSeed("user@example.com")
+	if gotRangersID != wantRangersID {
+		t.Fatalf("expected login x-rangers-id %q, got %q", wantRangersID, gotRangersID)
 	}
 }
 
@@ -212,7 +220,7 @@ func TestAuthHeadersIncludeBearerAndBaseHeaders(t *testing.T) {
 	}
 
 	client := &Client{}
-	headers := client.authHeaders("my-token")
+	headers := client.authHeaders("my-token", "acct-a")
 
 	if headers["authorization"] != "Bearer my-token" {
 		t.Fatalf("expected authorization=Bearer my-token, got %q", headers["authorization"])
@@ -222,6 +230,24 @@ func TestAuthHeadersIncludeBearerAndBaseHeaders(t *testing.T) {
 	}
 	if headers["x-client-version"] != "2.1.0" {
 		t.Fatalf("expected x-client-version=2.1.0, got %q", headers["x-client-version"])
+	}
+	wantRangersID := protocol.RangersIDForSeed("acct-a")
+	if headers["x-rangers-id"] != wantRangersID {
+		t.Fatalf("expected x-rangers-id=%q, got %q", wantRangersID, headers["x-rangers-id"])
+	}
+}
+
+func TestAuthHeadersUseDistinctRangersIDsPerAccount(t *testing.T) {
+	client := &Client{}
+	headersA1 := client.authHeaders("token-a", "acct-a")
+	headersA2 := client.authHeaders("token-b", "acct-a")
+	headersB := client.authHeaders("token-c", "acct-b")
+
+	if headersA1["x-rangers-id"] != headersA2["x-rangers-id"] {
+		t.Fatalf("expected same x-rangers-id for same account, got %q vs %q", headersA1["x-rangers-id"], headersA2["x-rangers-id"])
+	}
+	if headersA1["x-rangers-id"] == headersB["x-rangers-id"] {
+		t.Fatalf("expected different x-rangers-id for different accounts, both were %q", headersA1["x-rangers-id"])
 	}
 }
 

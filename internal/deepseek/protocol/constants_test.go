@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestSharedConstantsLoaded(t *testing.T) {
@@ -43,14 +42,14 @@ func TestClientHeadersDerivedFromSharedVersion(t *testing.T) {
 		Name:            "DeepSeek",
 		Platform:        "android",
 		Version:         "9.8.7",
-		AndroidAPILevel: "35",
+		AndroidAPILevel: "28",
 		Locale:          "zh_CN",
 	})
 	headers := buildBaseHeaders(client, map[string]string{
 		"User-Agent":       "stale",
 		"x-client-version": "stale",
 	})
-	if headers["User-Agent"] != "DeepSeek/9.8.7 Android/35" {
+	if headers["User-Agent"] != "DeepSeek/9.8.7 Android/28" {
 		t.Fatalf("unexpected derived user agent=%q", headers["User-Agent"])
 	}
 	if headers["x-client-version"] != "9.8.7" {
@@ -74,12 +73,8 @@ func TestRangersIDIs19Digits(t *testing.T) {
 	if RangersID == "" {
 		t.Fatal("expected RangersID to be non-empty")
 	}
-	if len(RangersID) > 19 {
-		t.Fatalf("expected RangersID <= 19 digits, got %d: %q", len(RangersID), RangersID)
-	}
-	// Allow leading zeros stripped (1-19 chars after strip)
-	if len(RangersID) < 1 || len(RangersID) > 19 {
-		t.Fatalf("expected RangersID 1-19 chars, got %d: %q", len(RangersID), RangersID)
+	if len(RangersID) != 19 {
+		t.Fatalf("expected RangersID to be exactly 19 digits, got %d: %q", len(RangersID), RangersID)
 	}
 	for _, r := range RangersID {
 		if r < '0' || r > '9' {
@@ -103,9 +98,8 @@ func TestTimezoneOffsetInBaseHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("x-client-timezone-offset must be integer, got %q: %v", v, err)
 	}
-	// Valid timezone offsets are in [-43200, 50400] (UTC-12 to UTC+14)
-	if offset < -43200 || offset > 50400 {
-		t.Fatalf("unlikely timezone offset: %d", offset)
+	if offset != 28800 {
+		t.Fatalf("expected fixed timezone offset 28800, got %d", offset)
 	}
 }
 
@@ -141,16 +135,29 @@ func TestStaticBaseHeaders(t *testing.T) {
 	}
 }
 
-func TestRangersIDIsProcessScoped(t *testing.T) {
-	// Within the same process, RangersID should remain constant
+func TestRangersIDRemainsStableDuringProcess(t *testing.T) {
 	if RangersID == "" {
 		t.Fatal("RangersID should be set during init")
 	}
-	// Verify it doesn't change on repeated access
 	id1 := RangersID
 	id2 := RangersID
 	if id1 != id2 {
 		t.Fatal("RangersID changed between reads")
+	}
+}
+
+func TestRangersIDForSeedIsStableAndDistinct(t *testing.T) {
+	id1 := RangersIDForSeed("acct-a")
+	id2 := RangersIDForSeed("acct-a")
+	id3 := RangersIDForSeed("acct-b")
+	if id1 != id2 {
+		t.Fatalf("expected stable rangers id, got %q vs %q", id1, id2)
+	}
+	if id1 == id3 {
+		t.Fatalf("expected distinct rangers ids for different seeds, both were %q", id1)
+	}
+	if len(id1) != 19 || len(id3) != 19 {
+		t.Fatalf("expected 19-digit ids, got %q and %q", id1, id3)
 	}
 }
 
@@ -177,11 +184,8 @@ func TestUserAgentContainsAppNameVersionAndOS(t *testing.T) {
 	}
 }
 
-func TestTimezoneOffsetMatchesActualTimezone(t *testing.T) {
-	v := BaseHeaders["x-client-timezone-offset"]
-	offset, _ := strconv.Atoi(v)
-	_, actualZoneOffset := time.Now().Zone()
-	if offset != actualZoneOffset {
-		t.Fatalf("x-client-timezone-offset %d does not match system zone offset %d", offset, actualZoneOffset)
+func TestUserAgentUsesAndroid28(t *testing.T) {
+	if got := BaseHeaders["User-Agent"]; !strings.Contains(got, "Android/28") {
+		t.Fatalf("expected Android/28 in User-Agent, got %q", got)
 	}
 }

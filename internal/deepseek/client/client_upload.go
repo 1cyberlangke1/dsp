@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/textproto"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"ds2api/internal/auth"
@@ -84,14 +83,9 @@ func (c *Client) UploadFile(ctx context.Context, a *auth.RequestAuth, req Upload
 			}
 			clients = c.requestClientsForAuth(ctx, a)
 		}
-		headers := c.authHeaders(a.DeepSeekToken)
+		headers := c.authHeaders(a.DeepSeekToken, a.AccountID)
 		headers["Content-Type"] = contentTypeHeader
-		if modelType != "" {
-			headers["x-model-type"] = modelType
-		}
 		headers["x-ds-pow-response"] = powHeader
-		headers["x-file-size"] = strconv.Itoa(len(req.Data))
-		headers["x-thinking-enabled"] = "1"
 		resp, err := c.doUpload(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekUploadFileURL, headers, body)
 		if err != nil {
 			config.Logger.Warn("[upload_file] request error", "error", err, "account", a.AccountID, "filename", filename)

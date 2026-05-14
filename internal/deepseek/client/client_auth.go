@@ -24,7 +24,7 @@ func (c *Client) Login(ctx context.Context, acc config.Account) (string, error) 
 	payload := map[string]any{
 		"password":  strings.TrimSpace(acc.Password),
 		"device_id": DeviceID(accountID),
-		"os":        "Android",
+		"os":        "android",
 	}
 	if email := strings.TrimSpace(acc.Email); email != "" {
 		payload["email"] = email
@@ -38,7 +38,7 @@ func (c *Client) Login(ctx context.Context, acc config.Account) (string, error) 
 	} else {
 		return "", errors.New("missing email/mobile")
 	}
-	resp, err := c.postJSON(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekLoginURL, dsprotocol.BaseHeaders, payload)
+	resp, err := c.postJSON(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekLoginURL, c.loginHeaders(accountID), payload)
 	if err != nil {
 		return "", err
 	}
@@ -67,7 +67,7 @@ func (c *Client) CreateSession(ctx context.Context, a *auth.RequestAuth, maxAtte
 	attempts := 0
 	refreshed := false
 	for attempts < maxAttempts {
-		headers := c.authHeaders(a.DeepSeekToken)
+		headers := c.authHeaders(a.DeepSeekToken, a.AccountID)
 		resp, status, err := c.postJSONWithStatus(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekCreateSessionURL, headers, map[string]any{"agent": "chat"})
 		if err != nil {
 			config.Logger.Warn("[create_session] request error", "error", err, "account", a.AccountID)
@@ -118,7 +118,7 @@ func (c *Client) GetPowForTarget(ctx context.Context, a *auth.RequestAuth, targe
 	lastFailureKind := FailureUnknown
 	lastFailureMessage := ""
 	for attempts < maxAttempts {
-		headers := c.authHeaders(a.DeepSeekToken)
+		headers := c.authHeaders(a.DeepSeekToken, a.AccountID)
 		resp, status, err := c.postJSONWithStatus(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekCreatePowURL, headers, map[string]any{"target_path": targetPath})
 		if err != nil {
 			config.Logger.Warn("[get_pow] request error", "error", err, "account", a.AccountID, "target_path", targetPath)
@@ -167,13 +167,33 @@ func (c *Client) GetPowForTarget(ctx context.Context, a *auth.RequestAuth, targe
 	return "", errors.New("get pow failed")
 }
 
-func (c *Client) authHeaders(token string) map[string]string {
+func (c *Client) authHeaders(token string, accountSeed string) map[string]string {
 	headers := make(map[string]string, len(dsprotocol.BaseHeaders)+1)
 	for k, v := range dsprotocol.BaseHeaders {
 		headers[k] = v
 	}
+	headers["x-rangers-id"] = dsprotocol.RangersIDForSeed(headerSeed(accountSeed, token))
 	headers["authorization"] = "Bearer " + token
 	return headers
+}
+
+func (c *Client) loginHeaders(accountSeed string) map[string]string {
+	headers := make(map[string]string, len(dsprotocol.BaseHeaders))
+	for k, v := range dsprotocol.BaseHeaders {
+		headers[k] = v
+	}
+	headers["x-rangers-id"] = dsprotocol.RangersIDForSeed(headerSeed(accountSeed, ""))
+	return headers
+}
+
+func headerSeed(accountSeed, fallback string) string {
+	if trimmed := strings.TrimSpace(accountSeed); trimmed != "" {
+		return trimmed
+	}
+	if trimmed := strings.TrimSpace(fallback); trimmed != "" {
+		return trimmed
+	}
+	return dsprotocol.RangersID
 }
 
 func isTokenInvalid(status int, code int, bizCode int, msg string, bizMsg string) bool {

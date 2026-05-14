@@ -1,7 +1,5 @@
 package promptcompat
 
-import "ds2api/internal/config"
-
 type StandardRequest struct {
 	Surface                 string
 	RequestedModel          string
@@ -62,14 +60,6 @@ func (p ToolChoicePolicy) Allows(name string) bool {
 }
 
 func (r StandardRequest) CompletionPayload(sessionID string) map[string]any {
-	modelID := r.ResolvedModel
-	if modelID == "" {
-		modelID = r.RequestedModel
-	}
-	modelType := "default"
-	if resolvedType, ok := config.GetModelType(modelID); ok {
-		modelType = resolvedType
-	}
 	refFileIDs := make([]any, 0, len(r.RefFileIDs))
 	for _, fileID := range r.RefFileIDs {
 		if fileID == "" {
@@ -79,8 +69,9 @@ func (r StandardRequest) CompletionPayload(sessionID string) map[string]any {
 	}
 	payload := map[string]any{
 		"chat_session_id":   sessionID,
-		"model_type":        modelType,
+		"model_type":        "default",
 		"parent_message_id": nil,
+		"preempt":           false,
 		"prompt":            r.FinalPrompt,
 		"ref_file_ids":      refFileIDs,
 		"thinking_enabled":  r.Thinking,

@@ -100,7 +100,7 @@ func TestExtractUploadFileResultSupportsNestedShapes(t *testing.T) {
 	}
 }
 
-func TestUploadFileUsesUploadTargetPowAndMultipartHeaders(t *testing.T) {
+func TestUploadFileUsesPowAndOmitsOtherUploadOnlyHeaders(t *testing.T) {
 	challengeHash := powpkg.DeepSeekHashV1([]byte(powpkg.BuildPrefix("salt", 1712345678) + "42"))
 	powResponse := `{"code":0,"msg":"ok","data":{"biz_code":0,"biz_data":{"challenge":{"algorithm":"DeepSeekHashV1","challenge":"` + hex.EncodeToString(challengeHash[:]) + `","salt":"salt","expire_at":1712345678,"difficulty":1000,"signature":"sig","target_path":"` + dsprotocol.DeepSeekUploadTargetPath + `"}}}}`
 	uploadResponse := `{"code":0,"msg":"ok","data":{"biz_code":0,"biz_data":{"file":{"file_id":"file_789","filename":"demo.txt","bytes":5,"status":"processed","purpose":"assistants","is_image":false}}}}`
@@ -109,6 +109,7 @@ func TestUploadFileUsesUploadTargetPowAndMultipartHeaders(t *testing.T) {
 	var seenContentType string
 	var seenFileSize string
 	var seenModelType string
+	var seenThinkingEnabled string
 	var seenBody string
 	call := 0
 	client := &Client{
@@ -124,6 +125,7 @@ func TestUploadFileUsesUploadTargetPowAndMultipartHeaders(t *testing.T) {
 				seenContentType = req.Header.Get("Content-Type")
 				seenFileSize = req.Header.Get("x-file-size")
 				seenModelType = req.Header.Get("x-model-type")
+				seenThinkingEnabled = req.Header.Get("x-thinking-enabled")
 				seenBody = string(bodyBytes)
 				return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(uploadResponse)), Request: req}, nil
 			default:
@@ -166,11 +168,14 @@ func TestUploadFileUsesUploadTargetPowAndMultipartHeaders(t *testing.T) {
 	if powHeader["target_path"] != dsprotocol.DeepSeekUploadTargetPath {
 		t.Fatalf("expected pow target_path %q, got %#v", dsprotocol.DeepSeekUploadTargetPath, powHeader["target_path"])
 	}
-	if seenFileSize != "5" {
-		t.Fatalf("expected x-file-size=5, got %q", seenFileSize)
+	if seenFileSize != "" {
+		t.Fatalf("expected no x-file-size, got %q", seenFileSize)
 	}
-	if seenModelType != "vision" {
-		t.Fatalf("expected x-model-type=vision, got %q", seenModelType)
+	if seenModelType != "" {
+		t.Fatalf("expected no x-model-type, got %q", seenModelType)
+	}
+	if seenThinkingEnabled != "" {
+		t.Fatalf("expected no x-thinking-enabled, got %q", seenThinkingEnabled)
 	}
 	if !strings.HasPrefix(seenContentType, "multipart/form-data; boundary=") {
 		t.Fatalf("expected multipart content type, got %q", seenContentType)
