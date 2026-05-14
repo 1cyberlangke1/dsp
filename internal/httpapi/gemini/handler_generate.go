@@ -41,7 +41,6 @@ func (h *Handler) handleGenerateContent(w http.ResponseWriter, r *http.Request, 
 	writeGeminiError(w, http.StatusBadGateway, "Failed to handle Gemini request.")
 }
 
-
 func (h *Handler) handleGeminiDirect(w http.ResponseWriter, r *http.Request, stream bool) bool {
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -157,8 +156,6 @@ func (h *Handler) proxyViaOpenAI(w http.ResponseWriter, r *http.Request, stream 
 		}
 	}
 	translatedReq = applyGeminiThinkingPolicyToOpenAIRequest(translatedReq, req)
-
-
 
 	proxyReq := r.Clone(r.Context())
 	proxyReq.URL.Path = "/v1/chat/completions"

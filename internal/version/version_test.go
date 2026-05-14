@@ -28,4 +28,3 @@ func TestTagKeepsPreviewStyle(t *testing.T) {
 		t.Fatalf("expected preview tag unchanged, got %q", got)
 	}
 }
-

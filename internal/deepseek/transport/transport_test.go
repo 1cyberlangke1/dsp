@@ -20,7 +20,9 @@ func TestOkHttpTransportAddsPreemptiveHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Fatalf("close body failed: %v", err)
+	}
 
 	if captured == nil {
 		t.Fatal("expected request to be captured")
@@ -45,7 +47,9 @@ func TestOkHttpTransportPreservesExistingHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Fatalf("close body failed: %v", err)
+	}
 
 	// okhttpTransport should not override if already set
 	if capturedHeaders.Get("OkHttp-Preemptive") != "0" {
@@ -67,7 +71,9 @@ func TestNewFallbackClientHasOkHttpHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Fatalf("close body failed: %v", err)
+	}
 
 	if captured == nil {
 		t.Fatal("expected request to be captured")
@@ -96,12 +102,16 @@ func TestClientReusesCookieJar(t *testing.T) {
 	// First request — should get the cookie
 	req1, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	resp1, _ := client.Do(req1)
-	resp1.Body.Close()
+	if err := resp1.Body.Close(); err != nil {
+		t.Fatalf("close first body failed: %v", err)
+	}
 
 	// Second request — should carry the cookie from jar
 	req2, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	resp2, _ := client.Do(req2)
-	resp2.Body.Close()
+	if err := resp2.Body.Close(); err != nil {
+		t.Fatalf("close second body failed: %v", err)
+	}
 
 	if requestCount < 2 {
 		t.Fatal("expected two requests to be made")

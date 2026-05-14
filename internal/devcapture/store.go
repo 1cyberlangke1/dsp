@@ -97,7 +97,6 @@ func NewFromEnv() *Store {
 	}
 }
 
-
 func (s *Store) Enabled() bool {
 	if s == nil {
 		return false

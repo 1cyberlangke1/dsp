@@ -18,9 +18,13 @@ type bodyCaptureRoundTripper struct {
 
 func (t *bodyCaptureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	buf := new(bytes.Buffer)
-	buf.ReadFrom(req.Body)
+	if _, err := buf.ReadFrom(req.Body); err != nil {
+		return nil, err
+	}
 	t.capturedBody = buf.Bytes()
-	req.Body.Close()
+	if err := req.Body.Close(); err != nil {
+		return nil, err
+	}
 	// Return a valid login response
 	return &http.Response{
 		StatusCode: http.StatusOK,
@@ -32,8 +36,8 @@ func (t *bodyCaptureRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 func TestLoginPayloadStructureForEmail(t *testing.T) {
 	rt := &bodyCaptureRoundTripper{}
 	client := &Client{
-		regular:   doerFunc(func(r *http.Request) (*http.Response, error) { return rt.RoundTrip(r) }),
-		fallback:  &http.Client{Transport: rt},
+		regular:    doerFunc(func(r *http.Request) (*http.Response, error) { return rt.RoundTrip(r) }),
+		fallback:   &http.Client{Transport: rt},
 		maxRetries: 3,
 	}
 	_, _ = client.Login(context.Background(), config.Account{
@@ -71,8 +75,8 @@ func TestLoginPayloadStructureForEmail(t *testing.T) {
 func TestLoginPayloadStructureForMobile(t *testing.T) {
 	rt := &bodyCaptureRoundTripper{}
 	client := &Client{
-		regular:   doerFunc(func(r *http.Request) (*http.Response, error) { return rt.RoundTrip(r) }),
-		fallback:  &http.Client{Transport: rt},
+		regular:    doerFunc(func(r *http.Request) (*http.Response, error) { return rt.RoundTrip(r) }),
+		fallback:   &http.Client{Transport: rt},
 		maxRetries: 3,
 	}
 	_, _ = client.Login(context.Background(), config.Account{
@@ -116,7 +120,7 @@ func TestLoginSendsHeaders(t *testing.T) {
 				Body:       http.NoBody,
 			}, nil
 		}),
-		fallback:  &http.Client{},
+		fallback:   &http.Client{},
 		maxRetries: 3,
 	}
 	_, _ = client.Login(context.Background(), config.Account{
@@ -138,9 +142,13 @@ func TestCreateSessionSendsPayload(t *testing.T) {
 	client := &Client{
 		regular: doerFunc(func(r *http.Request) (*http.Response, error) {
 			buf := new(bytes.Buffer)
-			buf.ReadFrom(r.Body)
+			if _, err := buf.ReadFrom(r.Body); err != nil {
+				return nil, err
+			}
 			capturedBody = buf.Bytes()
-			r.Body.Close()
+			if err := r.Body.Close(); err != nil {
+				return nil, err
+			}
 			// Return a valid session response
 			return &http.Response{
 				StatusCode: http.StatusOK,
@@ -148,7 +156,7 @@ func TestCreateSessionSendsPayload(t *testing.T) {
 				Body:       http.NoBody,
 			}, nil
 		}),
-		fallback:  &http.Client{},
+		fallback:   &http.Client{},
 		maxRetries: 3,
 	}
 	_, _ = client.CreateSession(context.Background(), &auth.RequestAuth{DeepSeekToken: "test-token"}, 3)
@@ -222,8 +230,8 @@ func TestLoginDeviceIDIsDeterministicPerAccount(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		rt := &bodyCaptureRoundTripper{}
 		client := &Client{
-			regular:   doerFunc(func(r *http.Request) (*http.Response, error) { return rt.RoundTrip(r) }),
-			fallback:  &http.Client{Transport: rt},
+			regular:    doerFunc(func(r *http.Request) (*http.Response, error) { return rt.RoundTrip(r) }),
+			fallback:   &http.Client{Transport: rt},
 			maxRetries: 3,
 		}
 		_, _ = client.Login(context.Background(), config.Account{
@@ -231,7 +239,9 @@ func TestLoginDeviceIDIsDeterministicPerAccount(t *testing.T) {
 			Password: "secret123",
 		})
 		var p map[string]any
-		json.Unmarshal(rt.capturedBody, &p)
+		if err := json.Unmarshal(rt.capturedBody, &p); err != nil {
+			t.Fatalf("failed to decode login payload: %v", err)
+		}
 		emailPayloads[i] = p
 	}
 	id1, _ := emailPayloads[0]["device_id"].(string)

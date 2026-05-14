@@ -21,7 +21,7 @@ type claudeHistoryConfig struct {
 	aliases map[string]string
 }
 
-func (m claudeHistoryConfig) ModelAliases() map[string]string { return m.aliases }
+func (m claudeHistoryConfig) ModelAliases() map[string]string           { return m.aliases }
 func (claudeHistoryConfig) CurrentInputFileEnabledForModel(string) bool { return false }
 
 func (claudeCurrentInputAuth) Determine(*http.Request) (*auth.RequestAuth, error) {

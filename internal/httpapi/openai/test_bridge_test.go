@@ -93,10 +93,6 @@ func (h *openAITestSurface) applyCurrentInputFile(ctx context.Context, a *auth.R
 	return out, nil
 }
 
-func (h *openAITestSurface) preprocessInlineFileInputs(ctx context.Context, a *auth.RequestAuth, req map[string]any) error {
-	return h.filesHandler().PreprocessInlineFileInputs(ctx, a, req)
-}
-
 func registerOpenAITestRoutes(r chi.Router, h *openAITestSurface) {
 	r.Get("/v1/models", h.modelsHandler().ListModels)
 	r.Get("/v1/models/{model_id}", h.modelsHandler().GetModel)

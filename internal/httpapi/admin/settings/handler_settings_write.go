@@ -94,9 +94,9 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 
 	h.applyRuntimeSettings()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"success":             true,
-		"message":             "settings updated and hot reloaded",
-		"env_backed":          h.Store.IsEnvBacked(),
+		"success":    true,
+		"message":    "settings updated and hot reloaded",
+		"env_backed": h.Store.IsEnvBacked(),
 	})
 }
 

@@ -21,7 +21,7 @@ import (
 
 type testGeminiConfig struct{}
 
-func (testGeminiConfig) ModelAliases() map[string]string { return nil }
+func (testGeminiConfig) ModelAliases() map[string]string             { return nil }
 func (testGeminiConfig) CurrentInputFileEnabledForModel(string) bool { return true }
 
 type testGeminiAuth struct {

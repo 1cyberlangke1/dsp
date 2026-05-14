@@ -86,30 +86,6 @@ func Tag(v string) string {
 	return "v" + v
 }
 
-func sanitizeVersionLabel(in string) string {
-	in = strings.TrimSpace(strings.ToLower(in))
-	if in == "" {
-		return ""
-	}
-	var b strings.Builder
-	b.Grow(len(in))
-	prevDash := false
-	for i := 0; i < len(in); i++ {
-		c := in[i]
-		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') {
-			b.WriteByte(c)
-			prevDash = false
-			continue
-		}
-		if !prevDash {
-			b.WriteByte('-')
-			prevDash = true
-		}
-	}
-	out := strings.Trim(b.String(), "-")
-	return out
-}
-
 func Compare(a, b string) int {
 	pa := parse(normalize(a))
 	pb := parse(normalize(b))

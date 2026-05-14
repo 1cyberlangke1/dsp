@@ -133,7 +133,7 @@ func TestApplyThinkingInjectionAppendsLatestUserPrompt(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputFlash:  boolPtr(false),
+			currentInputFlash: boolPtr(false),
 			thinkingInjection: boolPtr(true),
 		},
 		DS: ds,
@@ -195,8 +195,8 @@ func TestApplyCurrentInputFileDisabledPassThrough(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
 		Store: mockOpenAIConfig{
-			currentInputFlash: boolPtr(true),
-			currentInputPro:   boolPtr(false),
+			currentInputFlash:  boolPtr(true),
+			currentInputPro:    boolPtr(false),
 			currentInputVision: boolPtr(true),
 		},
 		DS: ds,
@@ -774,8 +774,8 @@ func TestCurrentInputFileWorksAcrossAutoDeleteModes(t *testing.T) {
 			ds := &inlineUploadDSStub{}
 			h := &openAITestSurface{
 				Store: mockOpenAIConfig{
-					autoDeleteMode:      mode,
-					currentInputFlash:   boolPtr(true),
+					autoDeleteMode:    mode,
+					currentInputFlash: boolPtr(true),
 				},
 				Auth: streamStatusAuthStub{},
 				DS:   ds,
@@ -818,10 +818,10 @@ func boolPtr(v bool) *bool {
 }
 
 type inlineUploadDSStub struct {
-	uploadCalls    []dsclient.UploadFileRequest
-	completionReq  map[string]any
-	uploadErr      error
-	createSession  string
+	uploadCalls   []dsclient.UploadFileRequest
+	completionReq map[string]any
+	uploadErr     error
+	createSession string
 }
 
 func (m *inlineUploadDSStub) CreateSession(_ context.Context, _ *auth.RequestAuth, _ int) (string, error) {

@@ -411,7 +411,6 @@ func TestParseConfigStringSupportsRawURLBase64(t *testing.T) {
 	}
 }
 
-
 func TestAccountTestStatusIsRuntimeOnlyAndNotPersisted(t *testing.T) {
 	tmp, err := os.CreateTemp(t.TempDir(), "config-*.json")
 	if err != nil {

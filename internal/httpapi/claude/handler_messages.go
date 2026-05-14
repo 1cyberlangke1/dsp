@@ -44,7 +44,6 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 	writeClaudeError(w, http.StatusBadGateway, "Failed to handle Claude request.")
 }
 
-
 func (h *Handler) handleClaudeDirect(w http.ResponseWriter, r *http.Request) bool {
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -166,8 +165,6 @@ func (h *Handler) proxyViaOpenAI(w http.ResponseWriter, r *http.Request, store C
 	translatedReq := translatorcliproxy.ToOpenAI(sdktranslator.FormatClaude, translateModel, raw, stream)
 	translatedReq, exposeThinking := applyClaudeThinkingPolicyToOpenAIRequest(translatedReq, req)
 
-
-
 	proxyReq := r.Clone(r.Context())
 	proxyReq.URL.Path = "/v1/chat/completions"
 	proxyReq.Body = io.NopCloser(bytes.NewReader(translatedReq))
@@ -197,7 +194,7 @@ func (h *Handler) proxyViaOpenAI(w http.ResponseWriter, r *http.Request, store C
 		w.WriteHeader(res.StatusCode)
 		_, _ = w.Write(body)
 		return true
-		}
+	}
 	converted := translatorcliproxy.FromOpenAINonStream(sdktranslator.FormatClaude, model, raw, translatedReq, body)
 	if !exposeThinking {
 		converted = stripClaudeThinkingBlocks(converted)

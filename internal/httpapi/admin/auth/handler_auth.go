@@ -58,14 +58,3 @@ func (h *Handler) verify(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"valid": true, "expires_at": int64(exp), "remaining_seconds": remaining})
 }
-
-
-func firstConfiguredValue(values ...[2]string) (string, string) {
-	for _, pair := range values {
-		value := strings.TrimSpace(pair[1])
-		if value != "" {
-			return value, strings.TrimSpace(pair[0])
-		}
-	}
-	return "", ""
-}

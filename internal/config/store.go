@@ -123,7 +123,7 @@ func loadConfigFromFile(path string) (Config, error) {
 	}
 	cfg.NormalizeCredentials()
 	cfg.DropInvalidAccounts()
-	if strings.Contains(string(content), `"test_status"`)  {
+	if strings.Contains(string(content), `"test_status"`) {
 		if b, err := json.MarshalIndent(cfg, "", "  "); err == nil {
 			_ = os.WriteFile(path, b, 0o644)
 		}
@@ -281,7 +281,6 @@ func (s *Store) IsEnvBacked() bool {
 	defer s.mu.RUnlock()
 	return s.fromEnv
 }
-
 
 func (s *Store) ExportJSONAndBase64() (string, string, error) {
 	s.mu.RLock()
