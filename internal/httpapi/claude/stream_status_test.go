@@ -8,6 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+
+	"ds2api/internal/config"
 )
 
 type streamStatusClaudeOpenAIStub struct{}
@@ -24,6 +26,10 @@ type streamStatusClaudeStoreStub struct{}
 func (streamStatusClaudeStoreStub) ModelAliases() map[string]string { return nil }
 
 func (streamStatusClaudeStoreStub) CurrentInputFileEnabledForModel(string) bool { return true }
+func (streamStatusClaudeStoreStub) ModelFamilyPolicy() config.ModelFamilyPolicyConfig {
+	return config.ModelFamilyPolicyConfig{}
+}
+func (streamStatusClaudeStoreStub) ToolCallsEnabledForModel(string) bool { return true }
 
 func captureClaudeStatusMiddleware(statuses *[]int) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

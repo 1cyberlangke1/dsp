@@ -35,6 +35,7 @@ type DeepSeekCaller interface {
 
 type ConfigReader interface {
 	ModelAliases() map[string]string
+	ModelFamilyPolicy() config.ModelFamilyPolicyConfig
 	ToolcallMode() string
 	ToolcallEarlyEmitConfidence() string
 	ResponsesStoreTTLSeconds() int
@@ -42,6 +43,7 @@ type ConfigReader interface {
 	AutoDeleteMode() string
 	AutoDeleteSessions() bool
 	CurrentInputFileEnabledForModel(model string) bool
+	ToolCallsEnabledForModel(model string) bool
 	ThinkingInjectionEnabled() bool
 	ThinkingInjectionPrompt() string
 }

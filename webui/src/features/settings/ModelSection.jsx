@@ -1,5 +1,25 @@
 export default function ModelSection({ t, form, setForm }) {
     const families = ['flash', 'pro', 'vision']
+    const updateFamilyRule = (family, patch) => setForm((prev) => ({
+        ...prev,
+        model_family_policy: {
+            ...prev.model_family_policy,
+            [family]: {
+                ...prev.model_family_policy[family],
+                ...patch,
+            },
+        },
+    }))
+    const updateToolRule = (family, enabled) => setForm((prev) => ({
+        ...prev,
+        model_tool_policy: {
+            ...prev.model_tool_policy,
+            [family]: {
+                ...prev.model_tool_policy[family],
+                enabled,
+            },
+        },
+    }))
     const routeTargets = [
         { value: '', label: t('settings.modelPolicyTargetUnset') },
         { value: 'flash', label: t('settings.currentInputFileFlash') },
@@ -22,19 +42,12 @@ export default function ModelSection({ t, form, setForm }) {
                                     <span className="text-muted-foreground">{t('settings.modelPolicyMode')}</span>
                                     <select
                                         value={rule.mode}
-                                        onChange={(e) => setForm((prev) => ({
-                                            ...prev,
-                                            model_family_policy: {
-                                                ...prev.model_family_policy,
-                                                [family]: {
-                                                    ...prev.model_family_policy[family],
-                                                    mode: e.target.value,
-                                                    target: e.target.value === 'route'
-                                                        ? (prev.model_family_policy[family]?.target || 'flash')
-                                                        : '',
-                                                },
-                                            },
-                                        }))}
+                                        onChange={(e) => updateFamilyRule(family, {
+                                            mode: e.target.value,
+                                            target: e.target.value === 'route'
+                                                ? (form.model_family_policy?.[family]?.target || 'flash')
+                                                : '',
+                                        })}
                                         className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
                                     >
                                         <option value="allow">{t('settings.modelPolicyModeAllow')}</option>
@@ -47,21 +60,23 @@ export default function ModelSection({ t, form, setForm }) {
                                     <select
                                         value={rule.target}
                                         disabled={rule.mode !== 'route'}
-                                        onChange={(e) => setForm((prev) => ({
-                                            ...prev,
-                                            model_family_policy: {
-                                                ...prev.model_family_policy,
-                                                [family]: {
-                                                    ...prev.model_family_policy[family],
-                                                    target: e.target.value,
-                                                },
-                                            },
-                                        }))}
+                                        onChange={(e) => updateFamilyRule(family, { target: e.target.value })}
                                         className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-50"
                                     >
                                         {routeTargets.map((target) => (
                                             <option key={target.value || 'unset'} value={target.value}>{target.label}</option>
                                         ))}
+                                    </select>
+                                </label>
+                                <label className="text-xs space-y-1 block">
+                                    <span className="text-muted-foreground">{t('settings.modelToolPolicyEnabled')}</span>
+                                    <select
+                                        value={form.model_tool_policy?.[family]?.enabled === false ? 'false' : 'true'}
+                                        onChange={(e) => updateToolRule(family, e.target.value === 'true')}
+                                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                                    >
+                                        <option value="true">{t('settings.modelToolPolicyOn')}</option>
+                                        <option value="false">{t('settings.modelToolPolicyOff')}</option>
                                     </select>
                                 </label>
                             </div>

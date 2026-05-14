@@ -31,10 +31,14 @@ type ConfigStore interface {
 	RuntimeAccountMaxQueue(defaultSize int) int
 	RuntimeGlobalMaxInflight(defaultSize int) int
 	RuntimeTokenRefreshIntervalHours() int
+	RuntimeAccountScheduleMode() string
+	RuntimeAccountStickyReuseCount() int
 	AutoDeleteMode() string
 	CurrentInputFileFlashEnabled() bool
 	CurrentInputFileProEnabled() bool
 	CurrentInputFileVisionEnabled() bool
+	ModelFamilyPolicy() config.ModelFamilyPolicyConfig
+	ToolCallsEnabledForModel(model string) bool
 	ThinkingInjectionEnabled() bool
 	ThinkingInjectionPrompt() string
 	AutoDeleteSessions() bool
@@ -43,7 +47,7 @@ type ConfigStore interface {
 type PoolController interface {
 	Reset()
 	Status() map[string]any
-	ApplyRuntimeLimits(maxInflightPerAccount, maxQueueSize, globalMaxInflight int)
+	ApplyRuntimeLimits(maxInflightPerAccount, maxQueueSize, globalMaxInflight int, accountScheduleMode string, accountStickyReuseCount int)
 }
 
 type OpenAIChatCaller interface {

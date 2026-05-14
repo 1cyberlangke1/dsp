@@ -1,6 +1,10 @@
 package settings
 
-import "ds2api/internal/config"
+import (
+	"strings"
+
+	"ds2api/internal/config"
+)
 
 func validateMergedRuntimeSettings(current config.RuntimeConfig, incoming *config.RuntimeConfig) error {
 	merged := current
@@ -17,6 +21,12 @@ func validateMergedRuntimeSettings(current config.RuntimeConfig, incoming *confi
 		if incoming.TokenRefreshIntervalHours > 0 {
 			merged.TokenRefreshIntervalHours = incoming.TokenRefreshIntervalHours
 		}
+		if strings.TrimSpace(incoming.AccountScheduleMode) != "" {
+			merged.AccountScheduleMode = incoming.AccountScheduleMode
+		}
+		if incoming.AccountStickyReuseCount > 0 {
+			merged.AccountStickyReuseCount = incoming.AccountStickyReuseCount
+		}
 	}
 	return validateRuntimeSettings(merged)
 }
@@ -30,7 +40,7 @@ func (h *Handler) applyRuntimeSettings() {
 	recommended := defaultRuntimeRecommended(accountCount, maxPer)
 	maxQueue := h.Store.RuntimeAccountMaxQueue(recommended)
 	global := h.Store.RuntimeGlobalMaxInflight(recommended)
-	h.Pool.ApplyRuntimeLimits(maxPer, maxQueue, global)
+	h.Pool.ApplyRuntimeLimits(maxPer, maxQueue, global, h.Store.RuntimeAccountScheduleMode(), h.Store.RuntimeAccountStickyReuseCount())
 }
 
 func defaultRuntimeRecommended(accountCount, maxPer int) int {

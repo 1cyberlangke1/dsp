@@ -522,6 +522,32 @@ func TestHandleResponsesNonStreamPromotesHiddenThinkingDSMLToolCallsWhenTextEmpt
 	}
 }
 
+func TestHandleResponsesNonStreamDropsToolCallsWhenDisabled(t *testing.T) {
+	h := &Handler{}
+	rec := httptest.NewRecorder()
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body: io.NopCloser(strings.NewReader(
+			`data: {"p":"response/thinking_content","v":"<tool_calls><invoke name=\"read_file\"><parameter name=\"path\">README.MD</parameter></invoke></tool_calls>"}` + "\n" +
+				`data: [DONE]` + "\n",
+		)),
+	}
+
+	h.handleResponsesNonStream(rec, resp, "owner-a", "resp_disabled", "deepseek-v4-pro", "prompt", 0, true, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 when tool calls are disabled, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	out := decodeJSONBody(t, rec.Body.String())
+	output, _ := out["output"].([]any)
+	if len(output) != 1 {
+		t.Fatalf("expected one message output item, got %#v", out["output"])
+	}
+	first, _ := output[0].(map[string]any)
+	if got := asString(first["type"]); got != "message" {
+		t.Fatalf("expected message output item, got %#v", first)
+	}
+}
+
 func TestHandleResponsesStreamCoercesSchemaDeclaredStringArguments(t *testing.T) {
 	h := &Handler{}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
@@ -566,6 +592,36 @@ func TestHandleResponsesStreamCoercesSchemaDeclaredStringArguments(t *testing.T)
 	}
 	if args["taskId"] != "1" {
 		t.Fatalf("expected response taskId stringified by schema, got %#v", args["taskId"])
+	}
+}
+
+func TestHandleResponsesStreamDropsToolCallsWhenDisabled(t *testing.T) {
+	h := &Handler{}
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	rec := httptest.NewRecorder()
+
+	sseLine := func(path, value string) string {
+		b, _ := json.Marshal(map[string]any{
+			"p": path,
+			"v": value,
+		})
+		return "data: " + string(b) + "\n"
+	}
+
+	streamBody := sseLine("response/thinking_content", `<tool_calls><invoke name="read_file"><parameter name="path">README.MD</parameter></invoke></tool_calls>`) + "data: [DONE]\n"
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(streamBody)),
+	}
+
+	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_disabled", "deepseek-v4-pro", "prompt", 0, true, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "")
+
+	body := rec.Body.String()
+	if strings.Contains(body, "event: response.function_call_arguments.done") {
+		t.Fatalf("expected no function_call events when tool calls are disabled, got %s", body)
+	}
+	if !strings.Contains(body, "event: response.completed") {
+		t.Fatalf("expected completed event, got %s", body)
 	}
 }
 

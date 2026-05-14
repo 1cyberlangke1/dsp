@@ -14,6 +14,7 @@ type StandardRequest struct {
 	CurrentInputFileID      string
 	CurrentToolsFileID      string
 	ToolsRaw                any
+	ToolCallsEnabled        bool
 	FinalPrompt             string
 	ToolNames               []string
 	ToolChoice              ToolChoicePolicy

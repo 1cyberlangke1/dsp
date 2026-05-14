@@ -236,6 +236,66 @@ func TestPoolAcquireRotatesIntoTokenlessAccounts(t *testing.T) {
 	}
 }
 
+func TestPoolStickyRoundRobinReusesAccountBeforeRotate(t *testing.T) {
+	t.Setenv("DS2API_CONFIG_JSON", `{
+		"keys":["k1"],
+		"runtime":{
+			"account_max_inflight":1,
+			"account_schedule_mode":"sticky_round_robin",
+			"account_sticky_reuse_count":2
+		},
+		"accounts":[
+			{"email":"acc1@example.com","token":"token1"},
+			{"email":"acc2@example.com","token":"token2"}
+		]
+	}`)
+	pool := NewPool(config.LoadStore())
+
+	got := make([]string, 0, 4)
+	for i := 0; i < 4; i++ {
+		acc, ok := pool.Acquire("", nil)
+		if !ok {
+			t.Fatalf("expected acquire success at step %d", i+1)
+		}
+		got = append(got, acc.Identifier())
+		pool.Release(acc.Identifier())
+	}
+	want := []string{"acc1@example.com", "acc1@example.com", "acc2@example.com", "acc2@example.com"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected sticky order at %d: got %q want %q full=%v", i, got[i], want[i], got)
+		}
+	}
+}
+
+func TestPoolApplyRuntimeLimitsUpdatesStickyScheduling(t *testing.T) {
+	t.Setenv("DS2API_CONFIG_JSON", `{
+		"keys":["k1"],
+		"accounts":[
+			{"email":"acc1@example.com","token":"token1"},
+			{"email":"acc2@example.com","token":"token2"}
+		]
+	}`)
+	pool := NewPool(config.LoadStore())
+	pool.ApplyRuntimeLimits(1, 2, 2, "sticky_round_robin", 3)
+
+	got := make([]string, 0, 4)
+	for i := 0; i < 4; i++ {
+		acc, ok := pool.Acquire("", nil)
+		if !ok {
+			t.Fatalf("expected acquire success at step %d", i+1)
+		}
+		got = append(got, acc.Identifier())
+		pool.Release(acc.Identifier())
+	}
+	want := []string{"acc1@example.com", "acc1@example.com", "acc1@example.com", "acc2@example.com"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected sticky runtime order at %d: got %q want %q full=%v", i, got[i], want[i], got)
+		}
+	}
+}
+
 func TestPoolAcquireWaitQueuesAndSucceedsAfterRelease(t *testing.T) {
 	pool := newSingleAccountPoolForTest(t, "1")
 	first, ok := pool.Acquire("", nil)

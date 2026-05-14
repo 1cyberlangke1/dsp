@@ -82,6 +82,11 @@ func TestGetSettingsIncludesCurrentInputFileDefaults(t *testing.T) {
 	if got, _ := flashPolicy["mode"].(string); got != "allow" {
 		t.Fatalf("expected flash mode allow, got %v", modelFamilyPolicy)
 	}
+	modelToolPolicy, _ := body["model_tool_policy"].(map[string]any)
+	flashToolPolicy, _ := modelToolPolicy["flash"].(map[string]any)
+	if got, ok := flashToolPolicy["enabled"].(bool); !ok || !got {
+		t.Fatalf("expected flash tool policy enabled by default, got %v", modelToolPolicy)
+	}
 }
 
 func TestUpdateSettingsValidation(t *testing.T) {
@@ -271,6 +276,79 @@ func TestUpdateSettingsModelFamilyPolicyRejectsCycles(t *testing.T) {
 	}
 	if !bytes.Contains(rec.Body.Bytes(), []byte("cycle")) {
 		t.Fatalf("expected cycle detail, got %s", rec.Body.String())
+	}
+}
+
+func TestUpdateSettingsRuntimeSchedule(t *testing.T) {
+	h := newAdminTestHandler(t, `{"keys":["k1"]}`)
+	payload := map[string]any{
+		"runtime": map[string]any{
+			"account_schedule_mode":      "sticky_round_robin",
+			"account_sticky_reuse_count": 7,
+		},
+	}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings", bytes.NewReader(b))
+	rec := httptest.NewRecorder()
+	h.updateSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	rec = httptest.NewRecorder()
+	h.getSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from readback, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	runtime, _ := body["runtime"].(map[string]any)
+	if got, _ := runtime["account_schedule_mode"].(string); got != "sticky_round_robin" {
+		t.Fatalf("expected sticky_round_robin, got %#v", runtime)
+	}
+	if got := intFrom(runtime["account_sticky_reuse_count"]); got != 7 {
+		t.Fatalf("expected account_sticky_reuse_count=7, got %#v", runtime)
+	}
+}
+
+func TestUpdateSettingsModelToolPolicy(t *testing.T) {
+	h := newAdminTestHandler(t, `{"keys":["k1"]}`)
+	payload := map[string]any{
+		"model_tool_policy": map[string]any{
+			"flash":  map[string]any{"enabled": false},
+			"pro":    map[string]any{"enabled": true},
+			"vision": map[string]any{"enabled": false},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings", bytes.NewReader(b))
+	rec := httptest.NewRecorder()
+	h.updateSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	rec = httptest.NewRecorder()
+	h.getSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from readback, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	modelToolPolicy, _ := body["model_tool_policy"].(map[string]any)
+	flashPolicy, _ := modelToolPolicy["flash"].(map[string]any)
+	if got, _ := flashPolicy["enabled"].(bool); got {
+		t.Fatalf("expected flash tool calls disabled, got %v", modelToolPolicy)
+	}
+	proPolicy, _ := modelToolPolicy["pro"].(map[string]any)
+	if got, _ := proPolicy["enabled"].(bool); !got {
+		t.Fatalf("expected pro tool calls enabled, got %v", modelToolPolicy)
+	}
+	visionPolicy, _ := modelToolPolicy["vision"].(map[string]any)
+	if got, _ := visionPolicy["enabled"].(bool); got {
+		t.Fatalf("expected vision tool calls disabled, got %v", modelToolPolicy)
 	}
 }
 

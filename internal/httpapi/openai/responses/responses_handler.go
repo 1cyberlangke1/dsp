@@ -151,13 +151,14 @@ func (h *Handler) handleResponsesNonStream(w http.ResponseWriter, resp *http.Res
 	result := sse.CollectStream(resp, thinkingEnabled, true)
 
 	turn := assistantturn.BuildTurnFromCollected(result, assistantturn.BuildOptions{
-		Model:         model,
-		Prompt:        finalPrompt,
-		RefFileTokens: refFileTokens,
-		SearchEnabled: searchEnabled,
-		ToolNames:     toolNames,
-		ToolsRaw:      toolsRaw,
-		ToolChoice:    toolChoice,
+		Model:            model,
+		Prompt:           finalPrompt,
+		RefFileTokens:    refFileTokens,
+		SearchEnabled:    searchEnabled,
+		ToolCallsEnabled: len(toolNames) > 0,
+		ToolNames:        toolNames,
+		ToolsRaw:         toolsRaw,
+		ToolChoice:       toolChoice,
 	})
 	logResponsesToolPolicyRejection(traceID, toolChoice, turn.ParsedToolCalls, "text")
 	outcome := assistantturn.FinalizeTurn(turn, assistantturn.FinalizeOptions{})
@@ -190,6 +191,7 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 	if thinkingEnabled {
 		initialType = "thinking"
 	}
+	toolCallsEnabled := len(toolNames) > 0
 	bufferToolContent := len(toolNames) > 0
 	emitEarlyToolDeltas := h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence()
 	stripReferenceMarkers := stripReferenceMarkersEnabled()
@@ -204,6 +206,7 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 		thinkingEnabled,
 		searchEnabled,
 		stripReferenceMarkers,
+		toolCallsEnabled,
 		toolNames,
 		toolsRaw,
 		bufferToolContent,

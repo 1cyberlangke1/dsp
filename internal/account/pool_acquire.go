@@ -56,7 +56,7 @@ func (p *Pool) acquireLocked(target string, exclude map[string]bool) (config.Acc
 			return config.Account{}, false
 		}
 		p.inUse[target]++
-		p.bumpQueue(target)
+		p.recordAcquire(target)
 		return acc, true
 	}
 
@@ -74,10 +74,30 @@ func (p *Pool) tryAcquire(exclude map[string]bool) (config.Account, bool) {
 			continue
 		}
 		p.inUse[id]++
-		p.bumpQueue(id)
+		p.recordAcquire(id)
 		return acc, true
 	}
 	return config.Account{}, false
+}
+
+func (p *Pool) recordAcquire(accountID string) {
+	if accountID == "" {
+		return
+	}
+	if p.accountScheduleMode != "sticky_round_robin" {
+		p.bumpQueue(accountID)
+		return
+	}
+	p.stickyReuse[accountID]++
+	limit := p.accountStickyReuseCount
+	if limit <= 0 {
+		limit = 1
+	}
+	if p.stickyReuse[accountID] < limit {
+		return
+	}
+	p.stickyReuse[accountID] = 0
+	p.bumpQueue(accountID)
 }
 
 func (p *Pool) bumpQueue(accountID string) {

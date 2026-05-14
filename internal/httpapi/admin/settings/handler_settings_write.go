@@ -17,7 +17,7 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	adminCfg, runtimeCfg, responsesCfg, embeddingsCfg, autoDeleteCfg, currentInputCfg, modelFamilyCfg, thinkingInjCfg, aliasMap, err := parseSettingsUpdateRequest(req)
+	adminCfg, runtimeCfg, responsesCfg, embeddingsCfg, autoDeleteCfg, currentInputCfg, modelFamilyCfg, modelToolCfg, thinkingInjCfg, aliasMap, err := parseSettingsUpdateRequest(req)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
@@ -34,6 +34,9 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 	modelFamilyFlashSet := hasNestedSettingsKey(req, "model_family_policy", "flash")
 	modelFamilyProSet := hasNestedSettingsKey(req, "model_family_policy", "pro")
 	modelFamilyVisionSet := hasNestedSettingsKey(req, "model_family_policy", "vision")
+	modelToolFlashSet := hasNestedSettingsKey(req, "model_tool_policy", "flash")
+	modelToolProSet := hasNestedSettingsKey(req, "model_tool_policy", "pro")
+	modelToolVisionSet := hasNestedSettingsKey(req, "model_tool_policy", "vision")
 	thinkingInjectionEnabledSet := hasNestedSettingsKey(req, "thinking_injection", "enabled")
 	thinkingInjectionPromptSet := hasNestedSettingsKey(req, "thinking_injection", "prompt")
 
@@ -55,6 +58,12 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 			}
 			if runtimeCfg.TokenRefreshIntervalHours > 0 {
 				c.Runtime.TokenRefreshIntervalHours = runtimeCfg.TokenRefreshIntervalHours
+			}
+			if strings.TrimSpace(runtimeCfg.AccountScheduleMode) != "" {
+				c.Runtime.AccountScheduleMode = runtimeCfg.AccountScheduleMode
+			}
+			if runtimeCfg.AccountStickyReuseCount > 0 {
+				c.Runtime.AccountStickyReuseCount = runtimeCfg.AccountStickyReuseCount
 			}
 		}
 		if responsesCfg != nil && responsesCfg.StoreTTLSeconds > 0 {
@@ -87,6 +96,17 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 			}
 			if modelFamilyVisionSet {
 				c.ModelFamilyPolicy.Vision = modelFamilyCfg.Vision
+			}
+		}
+		if modelToolCfg != nil {
+			if modelToolFlashSet {
+				c.ModelToolPolicy.Flash = modelToolCfg.Flash
+			}
+			if modelToolProSet {
+				c.ModelToolPolicy.Pro = modelToolCfg.Pro
+			}
+			if modelToolVisionSet {
+				c.ModelToolPolicy.Vision = modelToolCfg.Vision
 			}
 		}
 		if thinkingInjCfg != nil {

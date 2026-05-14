@@ -10,6 +10,8 @@ import (
 
 type ConfigReader interface {
 	ModelAliases() map[string]string
+	ModelFamilyPolicy() config.ModelFamilyPolicyConfig
+	ToolCallsEnabledForModel(model string) bool
 }
 
 func NormalizeOpenAIChatRequest(store ConfigReader, req map[string]any, traceID string) (StandardRequest, error) {
@@ -27,33 +29,44 @@ func NormalizeOpenAIChatRequest(store ConfigReader, req map[string]any, traceID 
 	if config.IsNoThinkingModel(resolvedModel) {
 		thinkingEnabled = false
 	}
+	toolCallsEnabled := true
+	if store != nil {
+		toolCallsEnabled = store.ToolCallsEnabledForModel(resolvedModel)
+	}
 	responseModel := strings.TrimSpace(model)
 	if responseModel == "" {
 		responseModel = resolvedModel
 	}
+	toolsRaw := req["tools"]
+	promptToolsRaw := toolsRaw
 	toolPolicy := DefaultToolChoicePolicy()
-	finalPrompt, toolNames := BuildOpenAIPrompt(messagesRaw, req["tools"], traceID, toolPolicy, thinkingEnabled)
-	toolNames = ensureToolDetectionEnabled(toolNames, req["tools"])
+	if !toolCallsEnabled {
+		promptToolsRaw = nil
+		toolPolicy.Mode = ToolChoiceNone
+	}
+	finalPrompt, toolNames := BuildOpenAIPrompt(messagesRaw, promptToolsRaw, traceID, toolPolicy, thinkingEnabled)
+	toolNames = ensureToolDetectionEnabled(toolNames, toolsRaw)
 	passThrough := collectOpenAIChatPassThrough(req)
 	refFileIDs := CollectOpenAIRefFileIDs(req)
 
 	return StandardRequest{
-		Surface:         "openai_chat",
-		RequestedModel:  strings.TrimSpace(model),
-		ResolvedModel:   resolvedModel,
-		ResponseModel:   responseModel,
-		Messages:        messagesRaw,
-		PromptTokenText: finalPrompt,
-		ToolsRaw:        req["tools"],
-		FinalPrompt:     finalPrompt,
-		ToolNames:       toolNames,
-		ToolChoice:      toolPolicy,
-		Stream:          util.ToBool(req["stream"]),
-		Thinking:        thinkingEnabled,
-		Search:          searchEnabled,
-		RefFileIDs:      refFileIDs,
-		RefFileTokens:   estimateInlineFileTokens(req),
-		PassThrough:     passThrough,
+		Surface:          "openai_chat",
+		RequestedModel:   strings.TrimSpace(model),
+		ResolvedModel:    resolvedModel,
+		ResponseModel:    responseModel,
+		Messages:         messagesRaw,
+		PromptTokenText:  finalPrompt,
+		ToolsRaw:         toolsRaw,
+		ToolCallsEnabled: toolCallsEnabled,
+		FinalPrompt:      finalPrompt,
+		ToolNames:        toolNames,
+		ToolChoice:       toolPolicy,
+		Stream:           util.ToBool(req["stream"]),
+		Thinking:         thinkingEnabled,
+		Search:           searchEnabled,
+		RefFileIDs:       refFileIDs,
+		RefFileTokens:    estimateInlineFileTokens(req),
+		PassThrough:      passThrough,
 	}, nil
 }
 
@@ -72,17 +85,30 @@ func NormalizeOpenAIResponsesRequest(store ConfigReader, req map[string]any, tra
 	if config.IsNoThinkingModel(resolvedModel) {
 		thinkingEnabled = false
 	}
+	toolCallsEnabled := true
+	if store != nil {
+		toolCallsEnabled = store.ToolCallsEnabledForModel(resolvedModel)
+	}
 
 	messagesRaw := ResponsesMessagesFromRequest(req)
 	if len(messagesRaw) == 0 {
 		return StandardRequest{}, fmt.Errorf("request must include 'input' or 'messages'")
 	}
-	toolPolicy, err := parseToolChoicePolicy(req["tool_choice"], req["tools"])
-	if err != nil {
-		return StandardRequest{}, err
+	toolsRaw := req["tools"]
+	promptToolsRaw := toolsRaw
+	toolPolicy := DefaultToolChoicePolicy()
+	if toolCallsEnabled {
+		var err error
+		toolPolicy, err = parseToolChoicePolicy(req["tool_choice"], toolsRaw)
+		if err != nil {
+			return StandardRequest{}, err
+		}
+	} else {
+		promptToolsRaw = nil
+		toolPolicy.Mode = ToolChoiceNone
 	}
-	finalPrompt, toolNames := BuildOpenAIPrompt(messagesRaw, req["tools"], traceID, toolPolicy, thinkingEnabled)
-	toolNames = ensureToolDetectionEnabled(toolNames, req["tools"])
+	finalPrompt, toolNames := BuildOpenAIPrompt(messagesRaw, promptToolsRaw, traceID, toolPolicy, thinkingEnabled)
+	toolNames = ensureToolDetectionEnabled(toolNames, toolsRaw)
 	if !toolPolicy.IsNone() {
 		toolPolicy.Allowed = namesToSet(toolNames)
 	}
@@ -90,22 +116,23 @@ func NormalizeOpenAIResponsesRequest(store ConfigReader, req map[string]any, tra
 	refFileIDs := CollectOpenAIRefFileIDs(req)
 
 	return StandardRequest{
-		Surface:         "openai_responses",
-		RequestedModel:  model,
-		ResolvedModel:   resolvedModel,
-		ResponseModel:   model,
-		Messages:        messagesRaw,
-		PromptTokenText: finalPrompt,
-		ToolsRaw:        req["tools"],
-		FinalPrompt:     finalPrompt,
-		ToolNames:       toolNames,
-		ToolChoice:      toolPolicy,
-		Stream:          util.ToBool(req["stream"]),
-		Thinking:        thinkingEnabled,
-		Search:          searchEnabled,
-		RefFileIDs:      refFileIDs,
-		RefFileTokens:   estimateInlineFileTokens(req),
-		PassThrough:     passThrough,
+		Surface:          "openai_responses",
+		RequestedModel:   model,
+		ResolvedModel:    resolvedModel,
+		ResponseModel:    model,
+		Messages:         messagesRaw,
+		PromptTokenText:  finalPrompt,
+		ToolsRaw:         toolsRaw,
+		ToolCallsEnabled: toolCallsEnabled,
+		FinalPrompt:      finalPrompt,
+		ToolNames:        toolNames,
+		ToolChoice:       toolPolicy,
+		Stream:           util.ToBool(req["stream"]),
+		Thinking:         thinkingEnabled,
+		Search:           searchEnabled,
+		RefFileIDs:       refFileIDs,
+		RefFileTokens:    estimateInlineFileTokens(req),
+		PassThrough:      passThrough,
 	}, nil
 }
 

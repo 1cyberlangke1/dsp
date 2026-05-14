@@ -26,6 +26,8 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 			"account_max_queue":            h.Store.RuntimeAccountMaxQueue(recommended),
 			"global_max_inflight":          h.Store.RuntimeGlobalMaxInflight(recommended),
 			"token_refresh_interval_hours": h.Store.RuntimeTokenRefreshIntervalHours(),
+			"account_schedule_mode":        h.Store.RuntimeAccountScheduleMode(),
+			"account_sticky_reuse_count":   h.Store.RuntimeAccountStickyReuseCount(),
 		},
 		"responses":   snap.Responses,
 		"embeddings":  snap.Embeddings,
@@ -39,6 +41,11 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 			"flash":  familyPolicy.Flash,
 			"pro":    familyPolicy.Pro,
 			"vision": familyPolicy.Vision,
+		},
+		"model_tool_policy": map[string]any{
+			"flash":  map[string]any{"enabled": h.Store.ToolCallsEnabledForModel("deepseek-v4-flash")},
+			"pro":    map[string]any{"enabled": h.Store.ToolCallsEnabledForModel("deepseek-v4-pro")},
+			"vision": map[string]any{"enabled": h.Store.ToolCallsEnabledForModel("deepseek-v4-vision")},
 		},
 		"thinking_injection": map[string]any{
 			"enabled":        h.Store.ThinkingInjectionEnabled(),

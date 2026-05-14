@@ -19,6 +19,7 @@ type mockOpenAIConfig struct {
 	currentInputPro    *bool
 	currentInputVision *bool
 	familyPolicy       *config.ModelFamilyPolicyConfig
+	toolCallsEnabled   *bool
 	thinkingInjection  *bool
 	thinkingPrompt     string
 }
@@ -66,6 +67,12 @@ func (m mockOpenAIConfig) ThinkingInjectionEnabled() bool {
 	return *m.thinkingInjection
 }
 func (m mockOpenAIConfig) ThinkingInjectionPrompt() string { return m.thinkingPrompt }
+func (m mockOpenAIConfig) ToolCallsEnabledForModel(model string) bool {
+	if m.toolCallsEnabled == nil {
+		return true
+	}
+	return *m.toolCallsEnabled
+}
 
 func TestNormalizeOpenAIChatRequestWithConfigInterface(t *testing.T) {
 	cfg := mockOpenAIConfig{
@@ -150,5 +157,66 @@ func TestNormalizeOpenAIResponsesRequestAlwaysAcceptsWideInput(t *testing.T) {
 	}
 	if !strings.Contains(out.FinalPrompt, "<|User|>hi") {
 		t.Fatalf("unexpected final prompt: %q", out.FinalPrompt)
+	}
+}
+
+func TestNormalizeOpenAIChatRequestDropsToolsWhenToolPolicyDisabled(t *testing.T) {
+	disabled := false
+	req := map[string]any{
+		"model": "deepseek-v4-flash",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "hello"},
+		},
+		"tools": []any{
+			map[string]any{
+				"type":     "function",
+				"function": map[string]any{"name": "search"},
+			},
+		},
+	}
+
+	out, err := promptcompat.NormalizeOpenAIChatRequest(mockOpenAIConfig{toolCallsEnabled: &disabled}, req, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.ToolCallsEnabled {
+		t.Fatal("expected tool calls to be disabled")
+	}
+	if out.ToolsRaw == nil {
+		t.Fatal("expected original tools preserved for suppression")
+	}
+	if len(out.ToolNames) == 0 {
+		t.Fatal("expected tool names preserved for suppression")
+	}
+}
+
+func TestNormalizeOpenAIResponsesRequestDropsToolsWhenToolPolicyDisabled(t *testing.T) {
+	disabled := false
+	req := map[string]any{
+		"model": "deepseek-v4-flash",
+		"input": "hi",
+		"tools": []any{
+			map[string]any{
+				"type":     "function",
+				"function": map[string]any{"name": "search"},
+			},
+		},
+	}
+
+	out, err := promptcompat.NormalizeOpenAIResponsesRequest(mockOpenAIConfig{toolCallsEnabled: &disabled}, req, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.ToolCallsEnabled {
+		t.Fatal("expected tool calls to be disabled")
+	}
+	if out.ToolsRaw == nil {
+		t.Fatal("expected original tools preserved for suppression")
+	}
+	if len(out.ToolNames) == 0 {
+		t.Fatal("expected tool names preserved for suppression")
+	}
+	if out.ToolChoice.Mode != promptcompat.ToolChoiceNone {
+		t.Fatalf("expected tool_choice none, got %#v", out.ToolChoice)
 	}
 }

@@ -50,6 +50,9 @@ func (s *responsesStreamRuntime) processToolStreamEvents(events []toolstream.Eve
 			}
 		}
 		if len(evt.ToolCallDeltas) > 0 {
+			if !s.toolCallsEnabled {
+				continue
+			}
 			if !s.emitEarlyToolDeltas {
 				continue
 			}
@@ -60,6 +63,9 @@ func (s *responsesStreamRuntime) processToolStreamEvents(events []toolstream.Eve
 			s.emitFunctionCallDeltaEvents(filtered)
 		}
 		if len(evt.ToolCalls) > 0 {
+			if !s.toolCallsEnabled {
+				continue
+			}
 			s.emitFunctionCallDoneEvents(evt.ToolCalls)
 			if resetAfterToolCalls {
 				s.resetStreamToolCallState()

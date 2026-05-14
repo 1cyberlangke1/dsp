@@ -11,6 +11,7 @@ import (
 
 	"ds2api/internal/auth"
 	"ds2api/internal/chathistory"
+	"ds2api/internal/config"
 	dsclient "ds2api/internal/deepseek/client"
 	"ds2api/internal/promptcompat"
 )
@@ -23,6 +24,10 @@ type claudeHistoryConfig struct {
 
 func (m claudeHistoryConfig) ModelAliases() map[string]string           { return m.aliases }
 func (claudeHistoryConfig) CurrentInputFileEnabledForModel(string) bool { return false }
+func (claudeHistoryConfig) ModelFamilyPolicy() config.ModelFamilyPolicyConfig {
+	return config.ModelFamilyPolicyConfig{}
+}
+func (claudeHistoryConfig) ToolCallsEnabledForModel(string) bool { return true }
 
 func (claudeCurrentInputAuth) Determine(*http.Request) (*auth.RequestAuth, error) {
 	return &auth.RequestAuth{

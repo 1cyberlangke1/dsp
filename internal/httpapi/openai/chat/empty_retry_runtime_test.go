@@ -47,6 +47,7 @@ func TestConsumeChatStreamAttemptMarksContextCancelledState(t *testing.T) {
 		false,
 		false,
 		true,
+		false,
 		nil,
 		nil,
 		promptcompat.DefaultToolChoicePolicy(),

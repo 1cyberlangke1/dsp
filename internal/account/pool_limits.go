@@ -4,9 +4,11 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"ds2api/internal/config"
 )
 
-func (p *Pool) ApplyRuntimeLimits(maxInflightPerAccount, maxQueueSize, globalMaxInflight int) {
+func (p *Pool) ApplyRuntimeLimits(maxInflightPerAccount, maxQueueSize, globalMaxInflight int, accountScheduleMode string, accountStickyReuseCount int) {
 	if maxInflightPerAccount <= 0 {
 		maxInflightPerAccount = 1
 	}
@@ -19,11 +21,22 @@ func (p *Pool) ApplyRuntimeLimits(maxInflightPerAccount, maxQueueSize, globalMax
 			globalMaxInflight = maxInflightPerAccount
 		}
 	}
+	if normalized := config.NormalizeAccountScheduleMode(accountScheduleMode); normalized != "" {
+		accountScheduleMode = normalized
+	} else {
+		accountScheduleMode = "fast_round_robin"
+	}
+	if accountStickyReuseCount <= 0 {
+		accountStickyReuseCount = 5
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.maxInflightPerAccount = maxInflightPerAccount
 	p.maxQueueSize = maxQueueSize
 	p.globalMaxInflight = globalMaxInflight
+	p.accountScheduleMode = accountScheduleMode
+	p.accountStickyReuseCount = accountStickyReuseCount
+	p.stickyReuse = map[string]int{}
 	p.recommendedConcurrency = defaultRecommendedConcurrency(len(p.queue), p.maxInflightPerAccount)
 	p.notifyWaiterLocked()
 }

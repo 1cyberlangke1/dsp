@@ -264,6 +264,7 @@ func buildOptions(stdReq promptcompat.StandardRequest, prompt string, opts Optio
 		RefFileTokens:         stdReq.RefFileTokens,
 		SearchEnabled:         stdReq.Search,
 		StripReferenceMarkers: opts.StripReferenceMarkers,
+		ToolCallsEnabled:      stdReq.ToolCallsEnabled,
 		ToolNames:             stdReq.ToolNames,
 		ToolsRaw:              stdReq.ToolsRaw,
 		ToolChoice:            stdReq.ToolChoice,

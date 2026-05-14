@@ -1,6 +1,10 @@
 package claude
 
-import "testing"
+import (
+	"testing"
+
+	"ds2api/internal/config"
+)
 
 type mockClaudeConfig struct {
 	aliases map[string]string
@@ -8,6 +12,10 @@ type mockClaudeConfig struct {
 
 func (m mockClaudeConfig) ModelAliases() map[string]string           { return m.aliases }
 func (mockClaudeConfig) CurrentInputFileEnabledForModel(string) bool { return true }
+func (mockClaudeConfig) ModelFamilyPolicy() config.ModelFamilyPolicyConfig {
+	return config.ModelFamilyPolicyConfig{}
+}
+func (mockClaudeConfig) ToolCallsEnabledForModel(string) bool { return true }
 
 func TestNormalizeClaudeRequestUsesGlobalAliasMapping(t *testing.T) {
 	req := map[string]any{

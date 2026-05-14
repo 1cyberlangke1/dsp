@@ -14,6 +14,7 @@ type Config struct {
 	Proxies           []Proxy                 `json:"proxies,omitempty"`
 	ModelAliases      map[string]string       `json:"model_aliases,omitempty"`
 	ModelFamilyPolicy ModelFamilyPolicyConfig `json:"model_family_policy,omitempty"`
+	ModelToolPolicy   ModelToolPolicyConfig   `json:"model_tool_policy,omitempty"`
 	Admin             AdminConfig             `json:"admin,omitempty"`
 	Runtime           RuntimeConfig           `json:"runtime,omitempty"`
 	Responses         ResponsesConfig         `json:"responses,omitempty"`
@@ -146,10 +147,12 @@ type AdminConfig struct {
 }
 
 type RuntimeConfig struct {
-	AccountMaxInflight        int `json:"account_max_inflight,omitempty"`
-	AccountMaxQueue           int `json:"account_max_queue,omitempty"`
-	GlobalMaxInflight         int `json:"global_max_inflight,omitempty"`
-	TokenRefreshIntervalHours int `json:"token_refresh_interval_hours,omitempty"`
+	AccountMaxInflight        int    `json:"account_max_inflight,omitempty"`
+	AccountMaxQueue           int    `json:"account_max_queue,omitempty"`
+	GlobalMaxInflight         int    `json:"global_max_inflight,omitempty"`
+	TokenRefreshIntervalHours int    `json:"token_refresh_interval_hours,omitempty"`
+	AccountScheduleMode       string `json:"account_schedule_mode,omitempty"`
+	AccountStickyReuseCount   int    `json:"account_sticky_reuse_count,omitempty"`
 }
 
 type ResponsesConfig struct {
@@ -180,6 +183,16 @@ type ModelFamilyPolicyConfig struct {
 	Flash  ModelFamilyPolicyRule `json:"flash,omitempty"`
 	Pro    ModelFamilyPolicyRule `json:"pro,omitempty"`
 	Vision ModelFamilyPolicyRule `json:"vision,omitempty"`
+}
+
+type ModelToolPolicyRule struct {
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+type ModelToolPolicyConfig struct {
+	Flash  ModelToolPolicyRule `json:"flash,omitempty"`
+	Pro    ModelToolPolicyRule `json:"pro,omitempty"`
+	Vision ModelToolPolicyRule `json:"vision,omitempty"`
 }
 
 type ThinkingInjectionConfig struct {

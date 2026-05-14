@@ -150,13 +150,14 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, resp *http.Response, co
 	result := sse.CollectStream(resp, thinkingEnabled, true)
 
 	turn := assistantturn.BuildTurnFromCollected(result, assistantturn.BuildOptions{
-		Model:         model,
-		Prompt:        finalPrompt,
-		RefFileTokens: refFileTokens,
-		SearchEnabled: searchEnabled,
-		ToolNames:     toolNames,
-		ToolsRaw:      toolsRaw,
-		ToolChoice:    promptcompat.DefaultToolChoicePolicy(),
+		Model:            model,
+		Prompt:           finalPrompt,
+		RefFileTokens:    refFileTokens,
+		SearchEnabled:    searchEnabled,
+		ToolCallsEnabled: len(toolNames) > 0,
+		ToolNames:        toolNames,
+		ToolsRaw:         toolsRaw,
+		ToolChoice:       promptcompat.DefaultToolChoicePolicy(),
 	})
 	outcome := assistantturn.FinalizeTurn(turn, assistantturn.FinalizeOptions{})
 	if outcome.ShouldFail {
@@ -196,6 +197,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 	}
 
 	created := time.Now().Unix()
+	toolCallsEnabled := len(toolNames) > 0
 	bufferToolContent := len(toolNames) > 0
 	emitEarlyToolDeltas := h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence()
 	stripReferenceMarkers := stripReferenceMarkersEnabled()
@@ -215,6 +217,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 		thinkingEnabled,
 		searchEnabled,
 		stripReferenceMarkers,
+		toolCallsEnabled,
 		toolNames,
 		toolsRaw,
 		promptcompat.DefaultToolChoicePolicy(),

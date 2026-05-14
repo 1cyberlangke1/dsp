@@ -42,7 +42,8 @@ func TestBuildTurnFromCollectedToolCall(t *testing.T) {
 	turn := BuildTurnFromCollected(sse.CollectResult{
 		Text: `<tool_calls><invoke name="Write"><parameter name="content">{"x":1}</parameter></invoke></tool_calls>`,
 	}, BuildOptions{
-		ToolNames: []string{"Write"},
+		ToolCallsEnabled: true,
+		ToolNames:        []string{"Write"},
 		ToolsRaw: []any{map[string]any{
 			"name": "Write",
 			"input_schema": map[string]any{
@@ -92,7 +93,8 @@ func TestBuildTurnFromStreamSnapshotUsesVisibleTextAndRawToolDetection(t *testin
 		RawText:     `<tool_calls><invoke name="Write"><parameter name="content">{"x":1}</parameter></invoke></tool_calls>`,
 		VisibleText: "",
 	}, BuildOptions{
-		ToolNames: []string{"Write"},
+		ToolCallsEnabled: true,
+		ToolNames:        []string{"Write"},
 		ToolsRaw: []any{map[string]any{
 			"name": "Write",
 			"schema": map[string]any{
@@ -112,7 +114,7 @@ func TestBuildTurnFromStreamSnapshotUsesVisibleTextAndRawToolDetection(t *testin
 }
 
 func TestBuildTurnFromStreamSnapshotAlreadyEmittedToolAvoidsEmptyError(t *testing.T) {
-	turn := BuildTurnFromStreamSnapshot(StreamSnapshot{AlreadyEmittedCalls: true}, BuildOptions{})
+	turn := BuildTurnFromStreamSnapshot(StreamSnapshot{AlreadyEmittedCalls: true}, BuildOptions{ToolCallsEnabled: true})
 	if turn.Error != nil {
 		t.Fatalf("unexpected empty-output error after emitted tool call: %#v", turn.Error)
 	}
@@ -133,10 +135,34 @@ func TestFinalizeTurnStopOutcome(t *testing.T) {
 }
 
 func TestFinalizeTurnToolCallsOutcome(t *testing.T) {
-	turn := BuildTurnFromStreamSnapshot(StreamSnapshot{AlreadyEmittedCalls: true}, BuildOptions{})
+	turn := BuildTurnFromStreamSnapshot(StreamSnapshot{AlreadyEmittedCalls: true}, BuildOptions{ToolCallsEnabled: true})
 	outcome := FinalizeTurn(turn, FinalizeOptions{AlreadyEmittedToolCalls: true})
 	if outcome.ShouldFail || outcome.FinishReason != "tool_calls" || !outcome.HasToolCalls {
 		t.Fatalf("unexpected tool outcome: %#v", outcome)
+	}
+}
+
+func TestBuildTurnFromCollectedDropsToolCallsWhenDisabled(t *testing.T) {
+	turn := BuildTurnFromCollected(sse.CollectResult{
+		Text: `<tool_calls><invoke name="Write"><parameter name="content">{"x":1}</parameter></invoke></tool_calls>`,
+	}, BuildOptions{
+		ToolCallsEnabled: false,
+		ToolNames:        []string{"Write"},
+	})
+	if len(turn.ToolCalls) != 0 {
+		t.Fatalf("expected tool calls to be dropped, got %#v", turn.ToolCalls)
+	}
+	if turn.StopReason != StopReasonStop {
+		t.Fatalf("expected stop finish reason when tool calls are disabled, got %q", turn.StopReason)
+	}
+}
+
+func TestBuildTurnFromStreamSnapshotIgnoresAlreadyEmittedToolCallWhenDisabled(t *testing.T) {
+	turn := BuildTurnFromStreamSnapshot(StreamSnapshot{AlreadyEmittedCalls: true}, BuildOptions{
+		ToolCallsEnabled: false,
+	})
+	if turn.StopReason != StopReasonStop {
+		t.Fatalf("expected stop finish reason when tool calls are disabled, got %q", turn.StopReason)
 	}
 }
 

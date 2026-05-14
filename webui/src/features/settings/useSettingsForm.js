@@ -12,7 +12,14 @@ const MAX_AUTO_FETCH_FAILURES = 3
 
 const DEFAULT_FORM = {
     admin: { jwt_expire_hours: 24 },
-    runtime: { account_max_inflight: 2, account_max_queue: 10, global_max_inflight: 10, token_refresh_interval_hours: 6 },
+    runtime: {
+        account_max_inflight: 2,
+        account_max_queue: 10,
+        global_max_inflight: 10,
+        token_refresh_interval_hours: 6,
+        account_schedule_mode: 'fast_round_robin',
+        account_sticky_reuse_count: 5,
+    },
     responses: { store_ttl_seconds: 900 },
     embeddings: { provider: '' },
     auto_delete: { mode: 'none' },
@@ -21,6 +28,11 @@ const DEFAULT_FORM = {
         flash: { mode: 'allow', target: '' },
         pro: { mode: 'allow', target: '' },
         vision: { mode: 'allow', target: '' },
+    },
+    model_tool_policy: {
+        flash: { enabled: true },
+        pro: { enabled: true },
+        vision: { enabled: true },
     },
     thinking_injection: { enabled: true, prompt: '', default_prompt: '' },
     model_aliases_text: '{}',
@@ -62,6 +74,8 @@ function fromServerForm(data) {
             account_max_queue: Number(data.runtime?.account_max_queue || 10),
             global_max_inflight: Number(data.runtime?.global_max_inflight || 10),
             token_refresh_interval_hours: Number(data.runtime?.token_refresh_interval_hours || 6),
+            account_schedule_mode: data.runtime?.account_schedule_mode || 'fast_round_robin',
+            account_sticky_reuse_count: Number(data.runtime?.account_sticky_reuse_count || 5),
         },
         responses: {
             store_ttl_seconds: Number(data.responses?.store_ttl_seconds || 900),
@@ -91,6 +105,17 @@ function fromServerForm(data) {
                 target: data.model_family_policy?.vision?.target || '',
             },
         },
+        model_tool_policy: {
+            flash: {
+                enabled: data.model_tool_policy?.flash?.enabled ?? true,
+            },
+            pro: {
+                enabled: data.model_tool_policy?.pro?.enabled ?? true,
+            },
+            vision: {
+                enabled: data.model_tool_policy?.vision?.enabled ?? true,
+            },
+        },
         thinking_injection: {
             enabled: data.thinking_injection?.enabled ?? true,
             prompt: data.thinking_injection?.prompt || '',
@@ -108,6 +133,8 @@ function toServerPayload(form) {
             account_max_queue: Number(form.runtime.account_max_queue),
             global_max_inflight: Number(form.runtime.global_max_inflight),
             token_refresh_interval_hours: Number(form.runtime.token_refresh_interval_hours),
+            account_schedule_mode: String(form.runtime.account_schedule_mode || 'fast_round_robin').trim(),
+            account_sticky_reuse_count: Number(form.runtime.account_sticky_reuse_count || 1),
         },
         responses: { store_ttl_seconds: Number(form.responses.store_ttl_seconds) },
         embeddings: { provider: String(form.embeddings.provider || '').trim() },
@@ -129,6 +156,17 @@ function toServerPayload(form) {
             vision: {
                 mode: String(form.model_family_policy?.vision?.mode || 'allow').trim(),
                 target: String(form.model_family_policy?.vision?.target || '').trim(),
+            },
+        },
+        model_tool_policy: {
+            flash: {
+                enabled: Boolean(form.model_tool_policy?.flash?.enabled ?? true),
+            },
+            pro: {
+                enabled: Boolean(form.model_tool_policy?.pro?.enabled ?? true),
+            },
+            vision: {
+                enabled: Boolean(form.model_tool_policy?.vision?.enabled ?? true),
             },
         },
         thinking_injection: {

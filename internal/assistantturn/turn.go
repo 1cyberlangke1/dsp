@@ -8,6 +8,7 @@ import (
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/sse"
 	"ds2api/internal/toolcall"
+	"ds2api/internal/toolstream"
 	"ds2api/internal/util"
 )
 
@@ -71,6 +72,7 @@ type BuildOptions struct {
 	RefFileTokens         int
 	SearchEnabled         bool
 	StripReferenceMarkers bool
+	ToolCallsEnabled      bool
 	ToolNames             []string
 	ToolsRaw              any
 	ToolChoice            promptcompat.ToolChoicePolicy
@@ -91,15 +93,28 @@ type StreamSnapshot struct {
 }
 
 func BuildTurnFromCollected(result sse.CollectResult, opts BuildOptions) Turn {
-	thinking := shared.CleanVisibleOutput(result.Thinking, opts.StripReferenceMarkers)
-	text := shared.CleanVisibleOutput(result.Text, opts.StripReferenceMarkers)
+	thinkingSource := result.Thinking
+	textSource := result.Text
+	if !opts.ToolCallsEnabled && len(opts.ToolNames) > 0 {
+		thinkingSource = stripToolCallOutput(thinkingSource, opts.ToolNames)
+		textSource = stripToolCallOutput(textSource, opts.ToolNames)
+	}
+	thinking := shared.CleanVisibleOutput(thinkingSource, opts.StripReferenceMarkers)
+	text := shared.CleanVisibleOutput(textSource, opts.StripReferenceMarkers)
 	if opts.SearchEnabled {
 		text = shared.ReplaceCitationMarkersWithLinks(text, result.CitationLinks)
 	}
 
-	parsed := shared.DetectAssistantToolCalls(result.Text, text, result.Thinking, result.ToolDetectionThinking, opts.ToolNames)
-	calls := toolcall.NormalizeParsedToolCallsForSchemas(parsed.Calls, opts.ToolsRaw)
-	parsed.Calls = calls
+	parsed := toolcall.ToolCallParseResult{}
+	calls := []toolcall.ParsedToolCall(nil)
+	suppressedToolOutput := false
+	if opts.ToolCallsEnabled {
+		parsed = shared.DetectAssistantToolCalls(result.Text, text, result.Thinking, result.ToolDetectionThinking, opts.ToolNames)
+		calls = toolcall.NormalizeParsedToolCallsForSchemas(parsed.Calls, opts.ToolsRaw)
+		parsed.Calls = calls
+	} else {
+		suppressedToolOutput = hasSuppressedToolOutput(result.Text, result.Thinking, result.ToolDetectionThinking, text, opts.ToolNames)
+	}
 
 	stopReason := StopReasonStop
 	if result.ContentFilter {
@@ -126,6 +141,9 @@ func BuildTurnFromCollected(result sse.CollectResult, opts BuildOptions) Turn {
 	}
 	turn.Usage = BuildUsage(opts.Model, opts.Prompt, thinking, text, opts.RefFileTokens)
 	turn.Error = ValidateTurn(turn, opts.ToolChoice)
+	if suppressedToolOutput && turn.Error != nil && !opts.ToolChoice.IsRequired() {
+		turn.Error = nil
+	}
 	if turn.Error != nil {
 		turn.StopReason = StopReasonError
 	}
@@ -133,25 +151,38 @@ func BuildTurnFromCollected(result sse.CollectResult, opts BuildOptions) Turn {
 }
 
 func BuildTurnFromStreamSnapshot(snapshot StreamSnapshot, opts BuildOptions) Turn {
-	thinking := shared.CleanVisibleOutput(snapshot.VisibleThinking, opts.StripReferenceMarkers)
-	text := shared.CleanVisibleOutput(snapshot.VisibleText, opts.StripReferenceMarkers)
+	thinkingSource := snapshot.VisibleThinking
+	textSource := snapshot.VisibleText
+	if !opts.ToolCallsEnabled && len(opts.ToolNames) > 0 {
+		thinkingSource = stripToolCallOutput(thinkingSource, opts.ToolNames)
+		textSource = stripToolCallOutput(textSource, opts.ToolNames)
+	}
+	thinking := shared.CleanVisibleOutput(thinkingSource, opts.StripReferenceMarkers)
+	text := shared.CleanVisibleOutput(textSource, opts.StripReferenceMarkers)
 	if opts.SearchEnabled {
 		text = shared.ReplaceCitationMarkersWithLinks(text, snapshot.CitationLinks)
 	}
 
-	parsed := shared.DetectAssistantToolCalls(snapshot.RawText, text, snapshot.RawThinking, snapshot.DetectionThinking, opts.ToolNames)
-	calls := parsed.Calls
-	if len(calls) == 0 && len(snapshot.AdditionalToolCalls) > 0 {
-		calls = snapshot.AdditionalToolCalls
+	parsed := toolcall.ToolCallParseResult{}
+	calls := []toolcall.ParsedToolCall(nil)
+	suppressedToolOutput := false
+	if opts.ToolCallsEnabled {
+		parsed = shared.DetectAssistantToolCalls(snapshot.RawText, text, snapshot.RawThinking, snapshot.DetectionThinking, opts.ToolNames)
+		calls = parsed.Calls
+		if len(calls) == 0 && len(snapshot.AdditionalToolCalls) > 0 {
+			calls = snapshot.AdditionalToolCalls
+		}
+		calls = toolcall.NormalizeParsedToolCallsForSchemas(calls, opts.ToolsRaw)
+		parsed.Calls = calls
+	} else {
+		suppressedToolOutput = hasSuppressedToolOutput(snapshot.RawText, snapshot.RawThinking, snapshot.DetectionThinking, text, opts.ToolNames)
 	}
-	calls = toolcall.NormalizeParsedToolCallsForSchemas(calls, opts.ToolsRaw)
-	parsed.Calls = calls
 
 	stopReason := StopReasonStop
 	if snapshot.ContentFilter {
 		stopReason = StopReasonContentFilter
 	}
-	if len(calls) > 0 || snapshot.AlreadyEmittedCalls || snapshot.AlreadyEmittedToolRaw {
+	if opts.ToolCallsEnabled && (len(calls) > 0 || snapshot.AlreadyEmittedCalls || snapshot.AlreadyEmittedToolRaw) {
 		stopReason = StopReasonToolCalls
 	}
 
@@ -174,10 +205,33 @@ func BuildTurnFromStreamSnapshot(snapshot StreamSnapshot, opts BuildOptions) Tur
 	if !snapshot.AlreadyEmittedCalls && !snapshot.AlreadyEmittedToolRaw {
 		turn.Error = ValidateTurn(turn, opts.ToolChoice)
 	}
+	if suppressedToolOutput && turn.Error != nil && !opts.ToolChoice.IsRequired() {
+		turn.Error = nil
+	}
 	if turn.Error != nil && len(calls) == 0 {
 		turn.StopReason = StopReasonError
 	}
 	return turn
+}
+
+func stripToolCallOutput(raw string, toolNames []string) string {
+	if strings.TrimSpace(raw) == "" || len(toolNames) == 0 {
+		return raw
+	}
+	var state toolstream.State
+	var b strings.Builder
+	for _, evt := range toolstream.ProcessChunk(&state, raw, toolNames) {
+		b.WriteString(evt.Content)
+	}
+	for _, evt := range toolstream.Flush(&state, toolNames) {
+		b.WriteString(evt.Content)
+	}
+	return b.String()
+}
+
+func hasSuppressedToolOutput(rawText, rawThinking, detectionThinking, visibleText string, toolNames []string) bool {
+	parsed := shared.DetectAssistantToolCalls(rawText, visibleText, rawThinking, detectionThinking, toolNames)
+	return len(parsed.Calls) > 0
 }
 
 func BuildUsage(model, prompt, thinking, text string, refFileTokens int) Usage {

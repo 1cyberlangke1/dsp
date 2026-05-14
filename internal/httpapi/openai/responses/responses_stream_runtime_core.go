@@ -21,14 +21,15 @@ type responsesStreamRuntime struct {
 	rc       *http.ResponseController
 	canFlush bool
 
-	responseID    string
-	model         string
-	finalPrompt   string
-	refFileTokens int
-	toolNames     []string
-	toolsRaw      any
-	traceID       string
-	toolChoice    promptcompat.ToolChoicePolicy
+	responseID       string
+	model            string
+	finalPrompt      string
+	refFileTokens    int
+	toolCallsEnabled bool
+	toolNames        []string
+	toolsRaw         any
+	traceID          string
+	toolChoice       promptcompat.ToolChoicePolicy
 
 	thinkingEnabled       bool
 	searchEnabled         bool
@@ -75,6 +76,7 @@ func newResponsesStreamRuntime(
 	thinkingEnabled bool,
 	searchEnabled bool,
 	stripReferenceMarkers bool,
+	toolCallsEnabled bool,
 	toolNames []string,
 	toolsRaw any,
 	bufferToolContent bool,
@@ -91,6 +93,7 @@ func newResponsesStreamRuntime(
 		responseID:            responseID,
 		model:                 model,
 		finalPrompt:           finalPrompt,
+		toolCallsEnabled:      toolCallsEnabled,
 		thinkingEnabled:       thinkingEnabled,
 		searchEnabled:         searchEnabled,
 		stripReferenceMarkers: stripReferenceMarkers,
@@ -162,7 +165,7 @@ func (s *responsesStreamRuntime) finalize(finishReason string, deferEmptyOutput 
 	s.finalErrorMessage = ""
 	s.finalErrorCode = ""
 	if s.bufferToolContent {
-		s.processToolStreamEvents(toolstream.Flush(&s.sieve, s.toolNames), true, true)
+		s.processToolStreamEvents(toolstream.Flush(&s.sieve, s.toolNames), true, s.toolCallsEnabled)
 	}
 
 	finalThinking := s.accumulator.Thinking.String()
@@ -184,6 +187,7 @@ func (s *responsesStreamRuntime) finalize(finishReason string, deferEmptyOutput 
 		RefFileTokens:         s.refFileTokens,
 		SearchEnabled:         s.searchEnabled,
 		StripReferenceMarkers: s.stripReferenceMarkers,
+		ToolCallsEnabled:      s.toolCallsEnabled,
 		ToolNames:             s.toolNames,
 		ToolsRaw:              s.toolsRaw,
 		ToolChoice:            s.toolChoice,
@@ -192,7 +196,7 @@ func (s *responsesStreamRuntime) finalize(finishReason string, deferEmptyOutput 
 	detected := turn.ToolCalls
 	s.logToolPolicyRejections(textParsed)
 
-	if len(detected) > 0 {
+	if s.toolCallsEnabled && len(detected) > 0 {
 		s.toolCallsEmitted = true
 		if !s.toolCallsDoneEmitted {
 			s.emitFunctionCallDoneEvents(detected)
@@ -284,7 +288,7 @@ func (s *responsesStreamRuntime) onParsed(parsed sse.LineResult) streamengine.Pa
 			continue
 		}
 		batch.flush()
-		s.processToolStreamEvents(toolstream.ProcessChunk(&s.sieve, p.RawText, s.toolNames), true, true)
+		s.processToolStreamEvents(toolstream.ProcessChunk(&s.sieve, p.RawText, s.toolNames), true, s.toolCallsEnabled)
 	}
 
 	batch.flush()

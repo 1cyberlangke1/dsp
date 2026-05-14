@@ -41,7 +41,7 @@ func (h *Handler) handleStreamGenerateContent(w http.ResponseWriter, r *http.Req
 
 	rc := http.NewResponseController(w)
 	_, canFlush := w.(http.Flusher)
-	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, historySession)
+	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), len(toolNames) > 0, toolNames, toolsRaw, historySession)
 
 	initialType := "text"
 	if thinkingEnabled {
@@ -69,8 +69,9 @@ type geminiStreamRuntime struct {
 	rc       *http.ResponseController
 	canFlush bool
 
-	model       string
-	finalPrompt string
+	model            string
+	finalPrompt      string
+	toolCallsEnabled bool
 
 	thinkingEnabled       bool
 	searchEnabled         bool
@@ -106,7 +107,7 @@ func (h *Handler) handleStreamGenerateContentWithRetry(w http.ResponseWriter, r 
 
 	rc := http.NewResponseController(w)
 	_, canFlush := w.(http.Flusher)
-	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, historySession)
+	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), stdReq.ToolCallsEnabled, toolNames, toolsRaw, historySession)
 
 	completionruntime.ExecuteStreamWithRetry(r.Context(), h.DS, a, resp, payload, pow, completionruntime.StreamRetryOptions{
 		Surface:          "gemini.generate_content",
@@ -171,6 +172,7 @@ func newGeminiStreamRuntime(
 	thinkingEnabled bool,
 	searchEnabled bool,
 	stripReferenceMarkers bool,
+	toolCallsEnabled bool,
 	toolNames []string,
 	toolsRaw any,
 	history *responsehistory.Session,
@@ -181,6 +183,7 @@ func newGeminiStreamRuntime(
 		canFlush:              canFlush,
 		model:                 model,
 		finalPrompt:           finalPrompt,
+		toolCallsEnabled:      toolCallsEnabled,
 		thinkingEnabled:       thinkingEnabled,
 		searchEnabled:         searchEnabled,
 		bufferContent:         len(toolNames) > 0,
@@ -316,6 +319,7 @@ func (s *geminiStreamRuntime) finalize(deferEmptyOutput bool) bool {
 		Prompt:                s.finalPrompt,
 		SearchEnabled:         s.searchEnabled,
 		StripReferenceMarkers: s.stripReferenceMarkers,
+		ToolCallsEnabled:      s.toolCallsEnabled,
 		ToolNames:             s.toolNames,
 		ToolsRaw:              s.toolsRaw,
 	})

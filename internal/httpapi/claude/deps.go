@@ -24,6 +24,8 @@ type DeepSeekCaller interface {
 type ConfigReader interface {
 	ModelAliases() map[string]string
 	CurrentInputFileEnabledForModel(model string) bool
+	ModelFamilyPolicy() config.ModelFamilyPolicyConfig
+	ToolCallsEnabledForModel(model string) bool
 }
 
 type OpenAIChatRunner interface {

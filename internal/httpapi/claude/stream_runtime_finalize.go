@@ -72,12 +72,14 @@ func (s *claudeStreamRuntime) finalize(stopReason string, deferEmptyOutput bool)
 		for _, evt := range toolstream.Flush(&s.sieve, s.toolNames) {
 			if len(evt.ToolCalls) > 0 {
 				s.closeTextBlock()
-				s.toolCallsDetected = true
-				normalized := toolcall.NormalizeParsedToolCallsForSchemas(evt.ToolCalls, s.toolsRaw)
-				for _, tc := range normalized {
-					idx := s.nextBlockIndex
-					s.nextBlockIndex++
-					s.sendToolUseBlock(idx, tc)
+				if s.toolCallsEnabled {
+					s.toolCallsDetected = true
+					normalized := toolcall.NormalizeParsedToolCallsForSchemas(evt.ToolCalls, s.toolsRaw)
+					for _, tc := range normalized {
+						idx := s.nextBlockIndex
+						s.nextBlockIndex++
+						s.sendToolUseBlock(idx, tc)
+					}
 				}
 				continue
 			}
@@ -128,6 +130,7 @@ func (s *claudeStreamRuntime) finalize(stopReason string, deferEmptyOutput bool)
 		Prompt:                s.promptTokenText,
 		SearchEnabled:         s.searchEnabled,
 		StripReferenceMarkers: s.stripReferenceMarkers,
+		ToolCallsEnabled:      s.toolCallsEnabled,
 		ToolNames:             s.toolNames,
 		ToolsRaw:              s.toolsRaw,
 	})
@@ -154,11 +157,13 @@ func (s *claudeStreamRuntime) finalize(stopReason string, deferEmptyOutput bool)
 
 	if s.bufferToolContent && !s.toolCallsDetected {
 		if len(turn.ToolCalls) > 0 {
-			stopReason = "tool_use"
-			for _, tc := range turn.ToolCalls {
-				idx := s.nextBlockIndex
-				s.nextBlockIndex++
-				s.sendToolUseBlock(idx, tc)
+			if s.toolCallsEnabled {
+				stopReason = "tool_use"
+				for _, tc := range turn.ToolCalls {
+					idx := s.nextBlockIndex
+					s.nextBlockIndex++
+					s.sendToolUseBlock(idx, tc)
+				}
 			}
 		} else if finalText != "" && !s.textEmitted {
 			idx := s.nextBlockIndex
@@ -187,7 +192,7 @@ func (s *claudeStreamRuntime) finalize(stopReason string, deferEmptyOutput bool)
 		}
 	}
 
-	if outcome.HasToolCalls {
+	if s.toolCallsEnabled && outcome.HasToolCalls {
 		stopReason = "tool_use"
 	}
 	if s.history != nil {

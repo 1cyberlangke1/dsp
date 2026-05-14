@@ -1,5 +1,7 @@
 package gemini
 
+import "ds2api/internal/config"
+
 import (
 	"bufio"
 	"context"
@@ -23,6 +25,10 @@ type testGeminiConfig struct{}
 
 func (testGeminiConfig) ModelAliases() map[string]string             { return nil }
 func (testGeminiConfig) CurrentInputFileEnabledForModel(string) bool { return true }
+func (testGeminiConfig) ModelFamilyPolicy() config.ModelFamilyPolicyConfig {
+	return config.ModelFamilyPolicyConfig{}
+}
+func (testGeminiConfig) ToolCallsEnabledForModel(string) bool { return true }
 
 type testGeminiAuth struct {
 	a   *auth.RequestAuth

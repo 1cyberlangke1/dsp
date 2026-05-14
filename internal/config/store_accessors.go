@@ -147,6 +147,36 @@ func (s *Store) RuntimeTokenRefreshIntervalHours() int {
 	return 6
 }
 
+func NormalizeAccountScheduleMode(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "fast_round_robin":
+		return "fast_round_robin"
+	case "sticky_round_robin":
+		return "sticky_round_robin"
+	default:
+		return ""
+	}
+}
+
+func (s *Store) RuntimeAccountScheduleMode() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	mode := NormalizeAccountScheduleMode(s.cfg.Runtime.AccountScheduleMode)
+	if mode == "" {
+		return "fast_round_robin"
+	}
+	return mode
+}
+
+func (s *Store) RuntimeAccountStickyReuseCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.Runtime.AccountStickyReuseCount > 0 {
+		return s.cfg.Runtime.AccountStickyReuseCount
+	}
+	return 5
+}
+
 func (s *Store) AutoDeleteSessions() bool {
 	return s.AutoDeleteMode() != "none"
 }
@@ -203,4 +233,27 @@ func (s *Store) ThinkingInjectionPrompt() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return strings.TrimSpace(s.cfg.ThinkingInjection.Prompt)
+}
+
+func toolPolicyEnabled(ptr *bool) bool {
+	if ptr == nil {
+		return true
+	}
+	return *ptr
+}
+
+func (s *Store) ToolCallsEnabledForModel(model string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	baseModel, _ := splitNoThinkingModel(model)
+	switch baseModel {
+	case "deepseek-v4-flash", "deepseek-v4-flash-search":
+		return toolPolicyEnabled(s.cfg.ModelToolPolicy.Flash.Enabled)
+	case "deepseek-v4-pro", "deepseek-v4-pro-search":
+		return toolPolicyEnabled(s.cfg.ModelToolPolicy.Pro.Enabled)
+	case "deepseek-v4-vision":
+		return toolPolicyEnabled(s.cfg.ModelToolPolicy.Vision.Enabled)
+	default:
+		return true
+	}
 }

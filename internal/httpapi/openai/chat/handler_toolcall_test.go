@@ -201,6 +201,30 @@ func TestHandleNonStreamPromotesHiddenThinkingDSMLToolCallsWhenTextEmpty(t *test
 	}
 }
 
+func TestHandleNonStreamDropsToolCallsWhenDisabled(t *testing.T) {
+	h := &Handler{}
+	resp := makeSSEHTTPResponse(
+		`data: {"p":"response/thinking_content","v":"<tool_calls><invoke name=\"search\"><parameter name=\"q\">from-thinking</parameter></invoke></tool_calls>"}`,
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+
+	h.handleNonStream(rec, resp, "cid-thinking-tool-disabled", "deepseek-v4-pro", "prompt", 0, true, false, nil, nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 when tool calls are disabled, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	out := decodeJSONBody(t, rec.Body.String())
+	choices, _ := out["choices"].([]any)
+	choice, _ := choices[0].(map[string]any)
+	if got := asString(choice["finish_reason"]); got != "stop" {
+		t.Fatalf("expected finish_reason=stop, got %#v", choice["finish_reason"])
+	}
+	message, _ := choice["message"].(map[string]any)
+	if _, ok := message["tool_calls"]; ok {
+		t.Fatalf("expected tool_calls to be dropped, got %#v", message)
+	}
+}
+
 func TestHandleStreamToolsPlainTextStreamsBeforeFinish(t *testing.T) {
 	h := &Handler{}
 	resp := makeSSEHTTPResponse(
@@ -448,6 +472,29 @@ func TestHandleStreamPromotesHiddenThinkingDSMLToolCallsOnFinalize(t *testing.T)
 	}
 	if streamFinishReason(frames) != "tool_calls" {
 		t.Fatalf("expected finish_reason=tool_calls, body=%s", rec.Body.String())
+	}
+}
+
+func TestHandleStreamDropsToolCallsWhenDisabled(t *testing.T) {
+	h := &Handler{}
+	resp := makeSSEHTTPResponse(
+		`data: {"p":"response/thinking_content","v":"<tool_calls><invoke name=\"search\"><parameter name=\"q\">from-thinking</parameter></invoke></tool_calls>"}`,
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	h.handleStream(rec, req, resp, "cid-thinking-stream-disabled", "deepseek-v4-pro", "prompt", 0, true, false, nil, nil, nil)
+
+	frames, done := parseSSEDataFrames(t, rec.Body.String())
+	if !done {
+		t.Fatalf("expected [DONE], body=%s", rec.Body.String())
+	}
+	if streamHasToolCallsDelta(frames) {
+		t.Fatalf("expected no tool_calls delta when tool calls are disabled, body=%s", rec.Body.String())
+	}
+	if streamFinishReason(frames) != "stop" {
+		t.Fatalf("expected finish_reason=stop, body=%s", rec.Body.String())
 	}
 }
 

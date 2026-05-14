@@ -28,14 +28,22 @@ func normalizeClaudeRequest(store ConfigReader, req map[string]any) (claudeNorma
 	payload := cloneMap(req)
 	payload["messages"] = normalizedMessages
 	toolsRequested, _ := req["tools"].([]any)
-	payload["messages"] = injectClaudeToolPrompt(payload, normalizedMessages, toolsRequested)
-
 	dsPayload := convertClaudeToDeepSeek(payload, store)
 	dsModel, _ := dsPayload["model"].(string)
 	dsModel, err := config.ResolveModelOrError(store, dsModel)
 	if err != nil {
 		return claudeNormalizedRequest{}, err
 	}
+	toolCallsEnabled := true
+	if store != nil {
+		toolCallsEnabled = store.ToolCallsEnabledForModel(dsModel)
+	}
+	promptTools := toolsRequested
+	if !toolCallsEnabled {
+		promptTools = nil
+	}
+	payload["messages"] = injectClaudeToolPrompt(payload, normalizedMessages, promptTools)
+	dsPayload = convertClaudeToDeepSeek(payload, store)
 	dsPayload["model"] = dsModel
 	defaultThinkingEnabled, searchEnabled, ok := config.GetModelConfig(dsModel)
 	if !ok {
@@ -53,18 +61,19 @@ func normalizeClaudeRequest(store ConfigReader, req map[string]any) (claudeNorma
 
 	return claudeNormalizedRequest{
 		Standard: promptcompat.StandardRequest{
-			Surface:         "anthropic_messages",
-			RequestedModel:  strings.TrimSpace(model),
-			ResolvedModel:   dsModel,
-			ResponseModel:   strings.TrimSpace(model),
-			Messages:        normalizedMessages,
-			PromptTokenText: finalPrompt,
-			ToolsRaw:        toolsRequested,
-			FinalPrompt:     finalPrompt,
-			ToolNames:       toolNames,
-			Stream:          util.ToBool(req["stream"]),
-			Thinking:        thinkingEnabled,
-			Search:          searchEnabled,
+			Surface:          "anthropic_messages",
+			RequestedModel:   strings.TrimSpace(model),
+			ResolvedModel:    dsModel,
+			ResponseModel:    strings.TrimSpace(model),
+			Messages:         normalizedMessages,
+			PromptTokenText:  finalPrompt,
+			ToolsRaw:         toolsRequested,
+			ToolCallsEnabled: toolCallsEnabled,
+			FinalPrompt:      finalPrompt,
+			ToolNames:        toolNames,
+			Stream:           util.ToBool(req["stream"]),
+			Thinking:         thinkingEnabled,
+			Search:           searchEnabled,
 		},
 		NormalizedMessages: normalizedMessages,
 	}, nil

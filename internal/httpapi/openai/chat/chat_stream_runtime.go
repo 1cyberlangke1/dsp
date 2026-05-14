@@ -19,14 +19,15 @@ type chatStreamRuntime struct {
 	rc       *http.ResponseController
 	canFlush bool
 
-	completionID  string
-	created       int64
-	model         string
-	finalPrompt   string
-	refFileTokens int
-	toolNames     []string
-	toolsRaw      any
-	toolChoice    promptcompat.ToolChoicePolicy
+	completionID     string
+	created          int64
+	model            string
+	finalPrompt      string
+	refFileTokens    int
+	toolCallsEnabled bool
+	toolNames        []string
+	toolsRaw         any
+	toolChoice       promptcompat.ToolChoicePolicy
 
 	thinkingEnabled       bool
 	searchEnabled         bool
@@ -90,6 +91,7 @@ func newChatStreamRuntime(
 	thinkingEnabled bool,
 	searchEnabled bool,
 	stripReferenceMarkers bool,
+	toolCallsEnabled bool,
 	toolNames []string,
 	toolsRaw any,
 	toolChoice promptcompat.ToolChoicePolicy,
@@ -104,6 +106,7 @@ func newChatStreamRuntime(
 		created:               created,
 		model:                 model,
 		finalPrompt:           finalPrompt,
+		toolCallsEnabled:      toolCallsEnabled,
 		toolNames:             toolNames,
 		toolsRaw:              toolsRaw,
 		toolChoice:            toolChoice,
@@ -235,13 +238,14 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 		RefFileTokens:         s.refFileTokens,
 		SearchEnabled:         s.searchEnabled,
 		StripReferenceMarkers: s.stripReferenceMarkers,
+		ToolCallsEnabled:      s.toolCallsEnabled,
 		ToolNames:             s.toolNames,
 		ToolsRaw:              s.toolsRaw,
 		ToolChoice:            s.toolChoice,
 	})
 	s.finalThinking = turn.Thinking
 	s.finalText = turn.Text
-	if len(turn.ToolCalls) > 0 && !s.toolCallsDoneEmitted {
+	if s.toolCallsEnabled && len(turn.ToolCalls) > 0 && !s.toolCallsDoneEmitted {
 		s.sendDelta(map[string]any{
 			"tool_calls": formatFinalStreamToolCallsWithStableIDs(turn.ToolCalls, s.streamToolCallIDs, s.toolsRaw),
 		})
@@ -251,22 +255,24 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 		batch := chatDeltaBatch{runtime: s}
 		for _, evt := range toolstream.Flush(&s.toolSieve, s.toolNames) {
 			if len(evt.ToolCalls) > 0 {
-				batch.flush()
-				s.toolCallsEmitted = true
-				s.toolCallsDoneEmitted = true
-				s.sendDelta(map[string]any{
-					"tool_calls": formatFinalStreamToolCallsWithStableIDs(evt.ToolCalls, s.streamToolCallIDs, s.toolsRaw),
-				})
-				s.resetStreamToolCallState()
-			}
-			if evt.Content == "" {
+				if s.toolCallsEnabled {
+					batch.flush()
+					s.toolCallsEmitted = true
+					s.toolCallsDoneEmitted = true
+					s.sendDelta(map[string]any{
+						"tool_calls": formatFinalStreamToolCallsWithStableIDs(evt.ToolCalls, s.streamToolCallIDs, s.toolsRaw),
+					})
+					s.resetStreamToolCallState()
+				}
 				continue
 			}
-			cleaned := cleanVisibleOutput(evt.Content, s.stripReferenceMarkers)
-			if cleaned == "" || (s.searchEnabled && sse.IsCitation(cleaned)) {
-				continue
+			if evt.Content != "" {
+				cleaned := cleanVisibleOutput(evt.Content, s.stripReferenceMarkers)
+				if cleaned == "" || (s.searchEnabled && sse.IsCitation(cleaned)) {
+					continue
+				}
+				batch.append("content", cleaned)
 			}
-			batch.append("content", cleaned)
 		}
 		batch.flush()
 	}
@@ -338,7 +344,7 @@ func (s *chatStreamRuntime) onParsed(parsed sse.LineResult) streamengine.ParsedD
 			events := toolstream.ProcessChunk(&s.toolSieve, p.RawText, s.toolNames)
 			for _, evt := range events {
 				if len(evt.ToolCallDeltas) > 0 {
-					if !s.emitEarlyToolDeltas {
+					if !s.toolCallsEnabled || !s.emitEarlyToolDeltas {
 						continue
 					}
 					filtered := filterIncrementalToolCallDeltasByAllowed(evt.ToolCallDeltas, s.streamToolNames)
@@ -358,14 +364,16 @@ func (s *chatStreamRuntime) onParsed(parsed sse.LineResult) streamengine.ParsedD
 					continue
 				}
 				if len(evt.ToolCalls) > 0 {
-					batch.flush()
-					s.toolCallsEmitted = true
-					s.toolCallsDoneEmitted = true
-					tcDelta := map[string]any{
-						"tool_calls": formatFinalStreamToolCallsWithStableIDs(evt.ToolCalls, s.streamToolCallIDs, s.toolsRaw),
+					if s.toolCallsEnabled {
+						batch.flush()
+						s.toolCallsEmitted = true
+						s.toolCallsDoneEmitted = true
+						tcDelta := map[string]any{
+							"tool_calls": formatFinalStreamToolCallsWithStableIDs(evt.ToolCalls, s.streamToolCallIDs, s.toolsRaw),
+						}
+						s.sendDelta(tcDelta)
+						s.resetStreamToolCallState()
 					}
-					s.sendDelta(tcDelta)
-					s.resetStreamToolCallState()
 					continue
 				}
 				if evt.Content != "" {

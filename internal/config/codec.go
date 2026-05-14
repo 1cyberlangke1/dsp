@@ -32,6 +32,9 @@ func (c Config) MarshalJSON() ([]byte, error) {
 	if !isEmptyModelFamilyPolicy(c.ModelFamilyPolicy) {
 		m["model_family_policy"] = c.ModelFamilyPolicy
 	}
+	if !isEmptyModelToolPolicy(c.ModelToolPolicy) {
+		m["model_tool_policy"] = c.ModelToolPolicy
+	}
 	if strings.TrimSpace(c.Admin.PasswordHash) != "" || c.Admin.JWTExpireHours > 0 || c.Admin.JWTValidAfterUnix > 0 {
 		m["admin"] = c.Admin
 	}
@@ -87,6 +90,10 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 			}
 		case "model_family_policy":
 			if err := json.Unmarshal(v, &c.ModelFamilyPolicy); err != nil {
+				return fmt.Errorf("invalid field %q: %w", k, err)
+			}
+		case "model_tool_policy":
+			if err := json.Unmarshal(v, &c.ModelToolPolicy); err != nil {
 				return fmt.Errorf("invalid field %q: %w", k, err)
 			}
 		case "admin":
@@ -149,6 +156,11 @@ func (c Config) Clone() Config {
 			Pro:    c.ModelFamilyPolicy.Pro,
 			Vision: c.ModelFamilyPolicy.Vision,
 		},
+		ModelToolPolicy: ModelToolPolicyConfig{
+			Flash:  ModelToolPolicyRule{Enabled: cloneBoolPtr(c.ModelToolPolicy.Flash.Enabled)},
+			Pro:    ModelToolPolicyRule{Enabled: cloneBoolPtr(c.ModelToolPolicy.Pro.Enabled)},
+			Vision: ModelToolPolicyRule{Enabled: cloneBoolPtr(c.ModelToolPolicy.Vision.Enabled)},
+		},
 		Admin:      c.Admin,
 		Runtime:    c.Runtime,
 		Responses:  c.Responses,
@@ -197,6 +209,12 @@ func isEmptyModelFamilyPolicy(cfg ModelFamilyPolicyConfig) bool {
 		strings.TrimSpace(cfg.Pro.Target) == "" &&
 		strings.TrimSpace(cfg.Vision.Mode) == "" &&
 		strings.TrimSpace(cfg.Vision.Target) == ""
+}
+
+func isEmptyModelToolPolicy(cfg ModelToolPolicyConfig) bool {
+	return cfg.Flash.Enabled == nil &&
+		cfg.Pro.Enabled == nil &&
+		cfg.Vision.Enabled == nil
 }
 
 func parseConfigString(raw string) (Config, error) {

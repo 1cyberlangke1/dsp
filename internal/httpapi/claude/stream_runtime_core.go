@@ -18,11 +18,12 @@ type claudeStreamRuntime struct {
 	rc       *http.ResponseController
 	canFlush bool
 
-	model           string
-	toolNames       []string
-	messages        []any
-	toolsRaw        any
-	promptTokenText string
+	model            string
+	toolCallsEnabled bool
+	toolNames        []string
+	messages         []any
+	toolsRaw         any
+	promptTokenText  string
 
 	thinkingEnabled       bool
 	searchEnabled         bool
@@ -60,6 +61,7 @@ func newClaudeStreamRuntime(
 	thinkingEnabled bool,
 	searchEnabled bool,
 	stripReferenceMarkers bool,
+	toolCallsEnabled bool,
 	toolNames []string,
 	toolsRaw any,
 	promptTokenText string,
@@ -70,6 +72,7 @@ func newClaudeStreamRuntime(
 		rc:                    rc,
 		canFlush:              canFlush,
 		model:                 model,
+		toolCallsEnabled:      toolCallsEnabled,
 		messages:              messages,
 		thinkingEnabled:       thinkingEnabled,
 		searchEnabled:         searchEnabled,
@@ -198,12 +201,14 @@ func (s *claudeStreamRuntime) onParsed(parsed sse.LineResult) streamengine.Parse
 		for _, evt := range events {
 			if len(evt.ToolCalls) > 0 {
 				s.closeTextBlock()
-				s.toolCallsDetected = true
-				normalized := toolcall.NormalizeParsedToolCallsForSchemas(evt.ToolCalls, s.toolsRaw)
-				for _, tc := range normalized {
-					idx := s.nextBlockIndex
-					s.nextBlockIndex++
-					s.sendToolUseBlock(idx, tc)
+				if s.toolCallsEnabled {
+					s.toolCallsDetected = true
+					normalized := toolcall.NormalizeParsedToolCallsForSchemas(evt.ToolCalls, s.toolsRaw)
+					for _, tc := range normalized {
+						idx := s.nextBlockIndex
+						s.nextBlockIndex++
+						s.sendToolUseBlock(idx, tc)
+					}
 				}
 				continue
 			}

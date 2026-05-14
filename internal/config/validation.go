@@ -30,6 +30,9 @@ func ValidateConfig(c Config) error {
 	if err := ValidateModelFamilyPolicyConfig(c.ModelFamilyPolicy); err != nil {
 		return err
 	}
+	if err := ValidateModelToolPolicyConfig(c.ModelToolPolicy); err != nil {
+		return err
+	}
 	if err := ValidateAccountProxyReferences(c.Accounts, c.Proxies); err != nil {
 		return err
 	}
@@ -97,6 +100,12 @@ func ValidateRuntimeConfig(runtime RuntimeConfig) error {
 		return err
 	}
 	if err := ValidateIntRange("runtime.token_refresh_interval_hours", runtime.TokenRefreshIntervalHours, 1, 720, false); err != nil {
+		return err
+	}
+	if mode := NormalizeAccountScheduleMode(runtime.AccountScheduleMode); mode == "" && strings.TrimSpace(runtime.AccountScheduleMode) != "" {
+		return fmt.Errorf("runtime.account_schedule_mode must be one of fast_round_robin, sticky_round_robin")
+	}
+	if err := ValidateIntRange("runtime.account_sticky_reuse_count", runtime.AccountStickyReuseCount, 1, 1000000, false); err != nil {
 		return err
 	}
 	if runtime.AccountMaxInflight > 0 && runtime.GlobalMaxInflight > 0 && runtime.GlobalMaxInflight < runtime.AccountMaxInflight {
@@ -169,6 +178,10 @@ func ValidateModelFamilyPolicyConfig(policy ModelFamilyPolicyConfig) error {
 			current = next
 		}
 	}
+	return nil
+}
+
+func ValidateModelToolPolicyConfig(policy ModelToolPolicyConfig) error {
 	return nil
 }
 

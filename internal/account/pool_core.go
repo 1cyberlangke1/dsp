@@ -8,15 +8,18 @@ import (
 )
 
 type Pool struct {
-	store                  *config.Store
-	mu                     sync.Mutex
-	queue                  []string
-	inUse                  map[string]int
-	waiters                []chan struct{}
-	maxInflightPerAccount  int
-	recommendedConcurrency int
-	maxQueueSize           int
-	globalMaxInflight      int
+	store                   *config.Store
+	mu                      sync.Mutex
+	queue                   []string
+	inUse                   map[string]int
+	stickyReuse             map[string]int
+	waiters                 []chan struct{}
+	maxInflightPerAccount   int
+	recommendedConcurrency  int
+	maxQueueSize            int
+	globalMaxInflight       int
+	accountScheduleMode     string
+	accountStickyReuseCount int
 }
 
 func NewPool(store *config.Store) *Pool {
@@ -27,6 +30,7 @@ func NewPool(store *config.Store) *Pool {
 	p := &Pool{
 		store:                 store,
 		inUse:                 map[string]int{},
+		stickyReuse:           map[string]int{},
 		maxInflightPerAccount: maxPer,
 	}
 	p.Reset()
@@ -55,6 +59,12 @@ func (p *Pool) Reset() {
 	} else {
 		p.maxInflightPerAccount = maxInflightFromEnv()
 	}
+	scheduleMode := "fast_round_robin"
+	stickyReuseCount := 5
+	if p.store != nil {
+		scheduleMode = p.store.RuntimeAccountScheduleMode()
+		stickyReuseCount = p.store.RuntimeAccountStickyReuseCount()
+	}
 	recommended := defaultRecommendedConcurrency(len(ids), p.maxInflightPerAccount)
 	queueLimit := maxQueueFromEnv(recommended)
 	globalLimit := recommended
@@ -67,9 +77,12 @@ func (p *Pool) Reset() {
 	p.drainWaitersLocked()
 	p.queue = ids
 	p.inUse = map[string]int{}
+	p.stickyReuse = map[string]int{}
 	p.recommendedConcurrency = recommended
 	p.maxQueueSize = queueLimit
 	p.globalMaxInflight = globalLimit
+	p.accountScheduleMode = scheduleMode
+	p.accountStickyReuseCount = stickyReuseCount
 	config.Logger.Info(
 		"[init_account_queue] initialized",
 		"total", len(ids),
@@ -77,6 +90,8 @@ func (p *Pool) Reset() {
 		"global_max_inflight", p.globalMaxInflight,
 		"recommended_concurrency", p.recommendedConcurrency,
 		"max_queue_size", p.maxQueueSize,
+		"account_schedule_mode", p.accountScheduleMode,
+		"account_sticky_reuse_count", p.accountStickyReuseCount,
 	)
 }
 
@@ -118,15 +133,17 @@ func (p *Pool) Status() map[string]any {
 	}
 	sort.Strings(inUseAccounts)
 	return map[string]any{
-		"available":                len(available),
-		"in_use":                   inUseSlots,
-		"total":                    len(p.store.Accounts()),
-		"available_accounts":       available,
-		"in_use_accounts":          inUseAccounts,
-		"max_inflight_per_account": p.maxInflightPerAccount,
-		"global_max_inflight":      p.globalMaxInflight,
-		"recommended_concurrency":  p.recommendedConcurrency,
-		"waiting":                  len(p.waiters),
-		"max_queue_size":           p.maxQueueSize,
+		"available":                  len(available),
+		"in_use":                     inUseSlots,
+		"total":                      len(p.store.Accounts()),
+		"available_accounts":         available,
+		"in_use_accounts":            inUseAccounts,
+		"max_inflight_per_account":   p.maxInflightPerAccount,
+		"global_max_inflight":        p.globalMaxInflight,
+		"recommended_concurrency":    p.recommendedConcurrency,
+		"waiting":                    len(p.waiters),
+		"max_queue_size":             p.maxQueueSize,
+		"account_schedule_mode":      p.accountScheduleMode,
+		"account_sticky_reuse_count": p.accountStickyReuseCount,
 	}
 }
