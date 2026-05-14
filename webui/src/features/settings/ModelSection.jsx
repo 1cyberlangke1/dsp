@@ -1,3 +1,5 @@
+import { buildRouteTargetOptions, resolveRouteTarget } from './modelPolicy'
+
 export default function ModelSection({ t, form, setForm }) {
     const families = ['flash', 'pro', 'vision']
     const updateFamilyRule = (family, patch) => setForm((prev) => ({
@@ -20,13 +22,6 @@ export default function ModelSection({ t, form, setForm }) {
             },
         },
     }))
-    const routeTargets = [
-        { value: '', label: t('settings.modelPolicyTargetUnset') },
-        { value: 'flash', label: t('settings.currentInputFileFlash') },
-        { value: 'pro', label: t('settings.currentInputFilePro') },
-        { value: 'vision', label: t('settings.currentInputFileVision') },
-    ]
-
     return (
         <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <h3 className="font-semibold">{t('settings.modelTitle')}</h3>
@@ -35,6 +30,10 @@ export default function ModelSection({ t, form, setForm }) {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     {families.map((family) => {
                         const rule = form.model_family_policy?.[family] || { mode: 'allow', target: '' }
+                        const routeTargets = buildRouteTargetOptions(t, family)
+                        const targetValue = rule.mode === 'route'
+                            ? resolveRouteTarget(rule.target, family)
+                            : ''
                         return (
                             <div key={family} className="rounded-lg border border-border bg-background/60 p-4 space-y-3">
                                 <div className="text-sm font-medium">{t(`settings.modelPolicy.${family}`)}</div>
@@ -45,7 +44,7 @@ export default function ModelSection({ t, form, setForm }) {
                                         onChange={(e) => updateFamilyRule(family, {
                                             mode: e.target.value,
                                             target: e.target.value === 'route'
-                                                ? (form.model_family_policy?.[family]?.target || 'flash')
+                                                ? resolveRouteTarget(form.model_family_policy?.[family]?.target, family)
                                                 : '',
                                         })}
                                         className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
@@ -58,13 +57,16 @@ export default function ModelSection({ t, form, setForm }) {
                                 <label className="text-xs space-y-1 block">
                                     <span className="text-muted-foreground">{t('settings.modelPolicyTarget')}</span>
                                     <select
-                                        value={rule.target}
+                                        value={targetValue}
                                         disabled={rule.mode !== 'route'}
                                         onChange={(e) => updateFamilyRule(family, { target: e.target.value })}
                                         className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm disabled:opacity-50"
                                     >
+                                        {rule.mode !== 'route' && (
+                                            <option value="">{t('settings.modelPolicyTargetUnset')}</option>
+                                        )}
                                         {routeTargets.map((target) => (
-                                            <option key={target.value || 'unset'} value={target.value}>{target.label}</option>
+                                            <option key={target.value} value={target.value}>{target.label}</option>
                                         ))}
                                     </select>
                                 </label>

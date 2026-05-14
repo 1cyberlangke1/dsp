@@ -14,7 +14,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if ! node --test --test-concurrency=1 tests/node/chat-history-utils.test.js "$@" 2>&1 | tee "$NODE_TEST_LOG"; then
+if ! node --test --test-concurrency=1 tests/node/*.test.js "$@" 2>&1 | tee "$NODE_TEST_LOG"; then
   echo
   echo "[run-unit-node] Node tests failed. 失败摘要如下："
   if command -v rg >/dev/null 2>&1; then

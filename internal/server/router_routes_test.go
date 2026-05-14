@@ -96,10 +96,13 @@ func TestAPIRoutesRemainRegistered(t *testing.T) {
 		"DELETE /admin/chat-history",
 		"DELETE /admin/chat-history/{id}",
 		"PUT /admin/chat-history/settings",
-		"GET /admin/version",
 	} {
 		if !got[want] {
 			t.Fatalf("expected route %s to be registered", want)
 		}
+	}
+
+	if got["GET /admin/version"] {
+		t.Fatal("expected /admin/version route to be removed")
 	}
 }

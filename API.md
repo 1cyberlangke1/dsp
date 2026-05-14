@@ -164,7 +164,6 @@ Gemini 兼容客户端还可以使用 `x-goog-api-key`、`?key=` 或 `?api_key=`
 | GET | `/admin/chat-history/{id}` | Admin | 查看单条服务器端对话记录 |
 | DELETE | `/admin/chat-history/{id}` | Admin | 删除单条服务器端对话记录 |
 | PUT | `/admin/chat-history/settings` | Admin | 更新对话记录保留条数 |
-| GET | `/admin/version` | Admin | 查询当前版本与最新 Release |
 
 OpenAI `/v1/*` 仍是规范路径。对于只配置 DS2API 根地址的客户端，同一套 OpenAI handler 也通过根路径快捷路由暴露：`/models`、`/models/{id}`、`/chat/completions`、`/responses`、`/responses/{response_id}`、`/embeddings`、`/files`、`/files/{file_id}`。
 
@@ -1172,27 +1171,6 @@ data: {"type":"message_stop"}
 ```
 
 该接口与 `GET /admin/config/export` 返回相同内容，只是路径更短。
-
-### `GET /admin/version`
-
-查询当前构建版本与 GitHub 最新 Release：
-
-```json
-{
-  "success": true,
-  "current_version": "3.0.0",
-  "current_tag": "v3.0.0",
-  "source": "file:VERSION",
-  "checked_at": "2026-03-29T00:00:00Z",
-  "latest_tag": "v3.0.0",
-  "latest_version": "3.0.0",
-  "release_url": "https://github.com/CJackHwang/ds2api/releases/tag/v3.0.0",
-  "published_at": "2026-03-28T12:00:00Z",
-  "has_update": false
-}
-```
-
-如果 GitHub API 不可用，响应里会额外包含 `check_error`，但 HTTP 状态仍为 200。
 
 ### `GET /admin/dev/captures`
 

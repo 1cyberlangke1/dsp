@@ -164,7 +164,6 @@ Gemini-compatible clients can also send `x-goog-api-key`, `?key=`, or `?api_key=
 | GET | `/admin/chat-history/{id}` | Admin | Read one server-side conversation entry |
 | DELETE | `/admin/chat-history/{id}` | Admin | Delete one server-side conversation entry |
 | PUT | `/admin/chat-history/settings` | Admin | Update conversation history retention limit |
-| GET | `/admin/version` | Admin | Check current version and latest Release |
 
 OpenAI `/v1/*` paths are canonical. For clients configured with the bare DS2API service URL, the same OpenAI handlers are also exposed through root shortcuts: `/models`, `/models/{id}`, `/chat/completions`, `/responses`, `/responses/{response_id}`, `/embeddings`, `/files`, and `/files/{file_id}`.
 
@@ -1165,27 +1164,6 @@ Or manual deploy required:
 ```
 
 This is the same payload as `GET /admin/config/export`, just with a shorter path.
-
-### `GET /admin/version`
-
-Checks the current build version and the latest GitHub Release:
-
-```json
-{
-  "success": true,
-  "current_version": "3.0.0",
-  "current_tag": "v3.0.0",
-  "source": "file:VERSION",
-  "checked_at": "2026-03-29T00:00:00Z",
-  "latest_tag": "v3.0.0",
-  "latest_version": "3.0.0",
-  "release_url": "https://github.com/CJackHwang/ds2api/releases/tag/v3.0.0",
-  "published_at": "2026-03-28T12:00:00Z",
-  "has_update": false
-}
-```
-
-If GitHub API access fails, the response includes `check_error` while still returning HTTP 200.
 
 ### `GET /admin/dev/captures`
 
