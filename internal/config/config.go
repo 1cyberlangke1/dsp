@@ -21,6 +21,7 @@ type Config struct {
 	Embeddings        EmbeddingsConfig        `json:"embeddings,omitempty"`
 	AutoDelete        AutoDeleteConfig        `json:"auto_delete"`
 	CurrentInputFile  CurrentInputFileConfig  `json:"current_input_file,omitempty"`
+	Prompts           PromptsConfig           `json:"prompts,omitempty"`
 	AdditionalFields  map[string]any          `json:"-"`
 }
 
@@ -171,6 +172,14 @@ type CurrentInputFileConfig struct {
 	Flash  *bool `json:"flash,omitempty"`
 	Pro    *bool `json:"pro,omitempty"`
 	Vision *bool `json:"vision,omitempty"`
+}
+
+type PromptsConfig struct {
+	OutputIntegrityGuard   *string `json:"output_integrity_guard,omitempty"`
+	ToolCallInstructions   *string `json:"tool_call_instructions,omitempty"`
+	ToolDescriptionsPrefix *string `json:"tool_descriptions_prefix,omitempty"`
+	ReadToolCacheGuard     *string `json:"read_tool_cache_guard,omitempty"`
+	ToolCallExamples       *string `json:"tool_call_examples,omitempty"`
 }
 
 type ModelFamilyPolicyRule struct {

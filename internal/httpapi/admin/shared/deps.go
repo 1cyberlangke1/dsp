@@ -40,6 +40,7 @@ type ConfigStore interface {
 	ModelFamilyPolicy() config.ModelFamilyPolicyConfig
 	ToolCallsEnabledForModel(model string) bool
 	AutoDeleteSessions() bool
+	Prompts() config.PromptsConfig
 }
 
 type PoolController interface {

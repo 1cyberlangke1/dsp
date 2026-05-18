@@ -48,5 +48,6 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 		},
 		"model_aliases": snap.ModelAliases,
 		"env_backed":    h.Store.IsEnvBacked(),
+		"prompts":       snap.Prompts,
 	})
 }

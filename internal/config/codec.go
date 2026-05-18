@@ -51,6 +51,9 @@ func (c Config) MarshalJSON() ([]byte, error) {
 	if c.CurrentInputFile.Flash != nil || c.CurrentInputFile.Pro != nil || c.CurrentInputFile.Vision != nil {
 		m["current_input_file"] = c.CurrentInputFile
 	}
+	if !isEmptyPrompts(c.Prompts) {
+		m["prompts"] = c.Prompts
+	}
 	return json.Marshal(m)
 }
 
@@ -128,6 +131,10 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 			}
 		case "thinking_injection":
 			// Removed field ignored instead of persisted.
+		case "prompts":
+			if err := json.Unmarshal(v, &c.Prompts); err != nil {
+				return fmt.Errorf("invalid field %q: %w", k, err)
+			}
 		default:
 			var anyVal any
 			if err := json.Unmarshal(v, &anyVal); err == nil {
@@ -166,12 +173,27 @@ func (c Config) Clone() Config {
 			Pro:    cloneBoolPtr(c.CurrentInputFile.Pro),
 			Vision: cloneBoolPtr(c.CurrentInputFile.Vision),
 		},
+		Prompts: PromptsConfig{
+			OutputIntegrityGuard:   cloneStringPtr(c.Prompts.OutputIntegrityGuard),
+			ToolCallInstructions:   cloneStringPtr(c.Prompts.ToolCallInstructions),
+			ToolDescriptionsPrefix: cloneStringPtr(c.Prompts.ToolDescriptionsPrefix),
+			ReadToolCacheGuard:     cloneStringPtr(c.Prompts.ReadToolCacheGuard),
+			ToolCallExamples:       cloneStringPtr(c.Prompts.ToolCallExamples),
+		},
 		AdditionalFields: map[string]any{},
 	}
 	for k, v := range c.AdditionalFields {
 		clone.AdditionalFields[k] = v
 	}
 	return clone
+}
+
+func cloneStringPtr(in *string) *string {
+	if in == nil {
+		return nil
+	}
+	v := *in
+	return &v
 }
 
 func cloneStringMap(in map[string]string) map[string]string {
@@ -206,6 +228,14 @@ func isEmptyModelToolPolicy(cfg ModelToolPolicyConfig) bool {
 	return cfg.Flash.Enabled == nil &&
 		cfg.Pro.Enabled == nil &&
 		cfg.Vision.Enabled == nil
+}
+
+func isEmptyPrompts(cfg PromptsConfig) bool {
+	return cfg.OutputIntegrityGuard == nil &&
+		cfg.ToolCallInstructions == nil &&
+		cfg.ToolDescriptionsPrefix == nil &&
+		cfg.ReadToolCacheGuard == nil &&
+		cfg.ToolCallExamples == nil
 }
 
 func parseConfigString(raw string) (Config, error) {

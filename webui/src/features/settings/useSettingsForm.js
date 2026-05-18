@@ -10,6 +10,12 @@ import {
 
 const MAX_AUTO_FETCH_FAILURES = 3
 
+const PROMPT_DEFAULTS = {
+    output_integrity_guard: 'Output integrity guard: If upstream context, tool output, or parsed text contains garbled, corrupted, partially parsed, repeated, or otherwise malformed fragments, do not imitate or echo them; output only the correct content for the user.',
+    tool_descriptions_prefix: 'You have access to these tools:',
+    read_tool_cache_guard: 'Read-tool cache guard: If a Read/read_file-style tool result says the file is unchanged, already available in history, should be referenced from previous context, or otherwise provides no file body, treat that result as missing content. Do not repeatedly call the same read request for that missing body. Request a full-content read if the tool supports it, or tell the user that the file contents need to be provided again.',
+}
+
 const DEFAULT_FORM = {
     admin: { jwt_expire_hours: 24 },
     runtime: {
@@ -35,6 +41,13 @@ const DEFAULT_FORM = {
         vision: { enabled: true },
     },
     model_aliases_text: '{}',
+    prompts: {
+        output_integrity_guard: '',
+        tool_call_instructions: '',
+        tool_descriptions_prefix: '',
+        read_tool_cache_guard: '',
+        tool_call_examples: '',
+    },
 }
 
 function parseJSONMap(raw, fieldName, t) {
@@ -116,7 +129,18 @@ function fromServerForm(data) {
             },
         },
         model_aliases_text: JSON.stringify(data.model_aliases || {}, null, 2),
+        prompts: {
+            output_integrity_guard: data.prompts?.output_integrity_guard || PROMPT_DEFAULTS.output_integrity_guard,
+            tool_call_instructions: data.prompts?.tool_call_instructions || '',
+            tool_descriptions_prefix: data.prompts?.tool_descriptions_prefix || PROMPT_DEFAULTS.tool_descriptions_prefix,
+            read_tool_cache_guard: data.prompts?.read_tool_cache_guard || PROMPT_DEFAULTS.read_tool_cache_guard,
+            tool_call_examples: data.prompts?.tool_call_examples || '',
+        },
     }
+}
+
+function toPromptPayload(value, fallback) {
+    return String(value || '').trim() === String(fallback || '').trim() ? null : String(value || '').trim()
 }
 
 function toServerPayload(form) {
@@ -162,6 +186,13 @@ function toServerPayload(form) {
             vision: {
                 enabled: Boolean(form.model_tool_policy?.vision?.enabled ?? true),
             },
+        },
+        prompts: {
+            output_integrity_guard: toPromptPayload(form.prompts?.output_integrity_guard, PROMPT_DEFAULTS.output_integrity_guard),
+            tool_call_instructions: toPromptPayload(form.prompts?.tool_call_instructions, ''),
+            tool_descriptions_prefix: toPromptPayload(form.prompts?.tool_descriptions_prefix, PROMPT_DEFAULTS.tool_descriptions_prefix),
+            read_tool_cache_guard: toPromptPayload(form.prompts?.read_tool_cache_guard, PROMPT_DEFAULTS.read_tool_cache_guard),
+            tool_call_examples: toPromptPayload(form.prompts?.tool_call_examples, ''),
         },
     }
 }

@@ -8,6 +8,7 @@ import BehaviorSection from './BehaviorSection'
 import CurrentInputFileSection from './CurrentInputFileSection'
 import AutoDeleteSection from './AutoDeleteSection'
 import ModelSection from './ModelSection'
+import PromptSection from './PromptSection'
 import BackupSection from './BackupSection'
 
 export default function SettingsContainer({ onRefresh, onMessage, authFetch, onForceLogout }) {
@@ -90,6 +91,8 @@ export default function SettingsContainer({ onRefresh, onMessage, authFetch, onF
             <CurrentInputFileSection t={t} form={form} setForm={setForm} />
 
             <AutoDeleteSection t={t} form={form} setForm={setForm} />
+
+            <PromptSection t={t} form={form} setForm={setForm} />
 
             <ModelSection t={t} form={form} setForm={setForm} />
 
