@@ -442,7 +442,20 @@
         "invalidJsonField": "{field} 不是有效 JSON 对象",
         "defaultPasswordWarning": "当前使用默认密码 admin，请尽快在此修改。",
         "autoFetchPaused": "自动加载已暂停：连续失败 {count} 次（{error}）",
-        "retryLoad": "立即重试"
+        "retryLoad": "立即重试",
+        "promptSectionTitle": "自定义提示词",
+        "promptSectionDesc": "自定义模型对话中注入的系统提示词。留空则使用默认值。修改需保存后新对话生效。",
+        "outputIntegrityGuard": "输出完整性守卫",
+        "outputIntegrityGuardDesc": "每次对话前注入 System 角色。防止模型模仿或回显上游上下文中出现的乱码、截断或错误片段。",
+        "toolCallInstructions": "工具调用指令",
+        "toolCallInstructionsDesc": "启用工具调用时注入，定义工具调用的 XML 格式、规则与参数类型。留空使用内置默认指令。",
+        "toolDescriptionsPrefix": "工具描述前缀",
+        "toolDescriptionsPrefixDesc": "在工具描述列表前显示，告诉模型当前可用的工具列表。",
+        "readToolCacheGuard": "读取工具缓存守卫",
+        "readToolCacheGuardDesc": "当有 Read/read_file 类工具时追加到指令末尾。防止模型重复读取相同的文件或返回空结果。",
+        "toolCallExamples": "工具调用示例",
+        "toolCallExamplesDesc": "在工具调用指令后附加示例，展示正确的调用格式和参数用法。留空使用内置示例（根据实际工具名生成）。",
+        "promptDynamicPlaceholder": "由服务端根据工具名动态生成，留空使用内置默认值"
     },
     "login": {
         "welcome": "欢迎回来",

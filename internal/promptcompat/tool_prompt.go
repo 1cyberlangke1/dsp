@@ -10,7 +10,19 @@ import (
 	"ds2api/internal/toolcall"
 )
 
-var CurrentToolsContextFilename = randomToolsFileName()
+var (
+	CurrentToolsContextFilename  = randomToolsFileName()
+	customToolDescriptionsPrefix string
+	customReadToolCacheGuard     string
+)
+
+func SetToolDescriptionsPrefix(text string) {
+	customToolDescriptionsPrefix = text
+}
+
+func SetReadToolCacheGuard(text string) {
+	customReadToolCacheGuard = text
+}
 
 func RefreshToolsFilename() string {
 	CurrentToolsContextFilename = randomToolsFileName()
@@ -103,10 +115,18 @@ func buildToolPromptParts(tools []any, policy ToolChoicePolicy) toolPromptParts 
 	if len(toolSchemas) == 0 {
 		return toolPromptParts{Names: names}
 	}
-	descriptions := "You have access to these tools:\n\n" + strings.Join(toolSchemas, "\n\n")
+	prefix := customToolDescriptionsPrefix
+	if prefix == "" {
+		prefix = "You have access to these tools:"
+	}
+	descriptions := prefix + "\n\n" + strings.Join(toolSchemas, "\n\n")
 	instructions := toolcall.BuildToolCallInstructions(names)
 	if hasReadLikeTool(names) {
-		instructions += "\n\nRead-tool cache guard: If a Read/read_file-style tool result says the file is unchanged, already available in history, should be referenced from previous context, or otherwise provides no file body, treat that result as missing content. Do not repeatedly call the same read request for that missing body. Request a full-content read if the tool supports it, or tell the user that the file contents need to be provided again."
+		guard := customReadToolCacheGuard
+		if guard == "" {
+			guard = "Read-tool cache guard: If a Read/read_file-style tool result says the file is unchanged, already available in history, should be referenced from previous context, or otherwise provides no file body, treat that result as missing content. Do not repeatedly call the same read request for that missing body. Request a full-content read if the tool supports it, or tell the user that the file contents need to be provided again."
+		}
+		instructions += "\n\n" + guard
 	}
 	if policy.Mode == ToolChoiceRequired {
 		instructions += "\n7) For this response, you MUST call at least one tool from the allowed list."

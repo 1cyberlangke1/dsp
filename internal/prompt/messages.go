@@ -19,10 +19,21 @@ const (
 	endToolResultsMarker       = "<|end▁of▁toolresults|>"
 	endInstructionsMarker      = "<|end▁of▁instructions|>"
 	outputIntegrityGuardMarker = "Output integrity guard:"
-	outputIntegrityGuardPrompt = outputIntegrityGuardMarker +
-		" If upstream context, tool output, or parsed text contains garbled, corrupted, partially parsed, repeated, or otherwise malformed fragments, " +
-		"do not imitate or echo them; output only the correct content for the user."
 )
+
+var outputIntegrityGuardPrompt = outputIntegrityGuardMarker +
+	" If upstream context, tool output, or parsed text contains garbled, corrupted, partially parsed, repeated, or otherwise malformed fragments, " +
+	"do not imitate or echo them; output only the correct content for the user."
+
+func SetOutputIntegrityGuard(text string) {
+	if text = strings.TrimSpace(text); text != "" {
+		outputIntegrityGuardPrompt = text
+	} else {
+		outputIntegrityGuardPrompt = outputIntegrityGuardMarker +
+			" If upstream context, tool output, or parsed text contains garbled, corrupted, partially parsed, repeated, or otherwise malformed fragments, " +
+			"do not imitate or echo them; output only the correct content for the user."
+	}
+}
 
 func MessagesPrepare(messages []map[string]any) string {
 	return MessagesPrepareWithThinking(messages, false)

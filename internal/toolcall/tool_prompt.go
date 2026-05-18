@@ -2,6 +2,16 @@ package toolcall
 
 import "strings"
 
+var customInstructions, customExamples string
+
+func SetCustomInstructions(text string) {
+	customInstructions = text
+}
+
+func SetCustomExamples(text string) {
+	customExamples = text
+}
+
 // BuildToolCallInstructions generates the unified tool-calling instruction block
 // used by all adapters (OpenAI, Claude, Gemini). It uses attention-optimized
 // structure: rules → negative examples → positive examples → anchor.
@@ -9,6 +19,18 @@ import "strings"
 // The toolNames slice should contain the actual tool names available in the
 // current request; the function picks real names for examples.
 func BuildToolCallInstructions(toolNames []string) string {
+	if customInstructions != "" {
+		result := customInstructions
+		if customExamples != "" {
+			result += "\n\n" + customExamples
+		} else {
+			examples := buildCorrectToolExamples(toolNames)
+			if examples != "" {
+				result += "\n\n" + examples
+			}
+		}
+		return result
+	}
 	return `TOOL CALL FORMAT — FOLLOW EXACTLY:
 
 <|DSML|tool_calls>

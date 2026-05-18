@@ -17,7 +17,7 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	adminCfg, runtimeCfg, responsesCfg, embeddingsCfg, autoDeleteCfg, currentInputCfg, modelFamilyCfg, modelToolCfg, aliasMap, err := parseSettingsUpdateRequest(req)
+	adminCfg, runtimeCfg, responsesCfg, embeddingsCfg, autoDeleteCfg, currentInputCfg, modelFamilyCfg, modelToolCfg, aliasMap, promptsCfg, err := parseSettingsUpdateRequest(req)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
@@ -110,6 +110,23 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 		if aliasMap != nil {
 			c.ModelAliases = aliasMap
 		}
+		if promptsCfg != nil {
+			if promptsCfg.OutputIntegrityGuard != nil {
+				c.Prompts.OutputIntegrityGuard = promptsCfg.OutputIntegrityGuard
+			}
+			if promptsCfg.ToolCallInstructions != nil {
+				c.Prompts.ToolCallInstructions = promptsCfg.ToolCallInstructions
+			}
+			if promptsCfg.ToolDescriptionsPrefix != nil {
+				c.Prompts.ToolDescriptionsPrefix = promptsCfg.ToolDescriptionsPrefix
+			}
+			if promptsCfg.ReadToolCacheGuard != nil {
+				c.Prompts.ReadToolCacheGuard = promptsCfg.ReadToolCacheGuard
+			}
+			if promptsCfg.ToolCallExamples != nil {
+				c.Prompts.ToolCallExamples = promptsCfg.ToolCallExamples
+			}
+		}
 		return nil
 	}); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"detail": err.Error()})
@@ -117,6 +134,7 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.applyRuntimeSettings()
+	h.ApplyPromptsSettings()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"success":    true,
 		"message":    "settings updated and hot reloaded",
